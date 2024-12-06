@@ -13,12 +13,20 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
+            $table->string('first_name');
+            $table->foreignId('factory_id')->nullable()->constrained('factories')->onDelete('set null'); // Ensure 'factories' table exists
+            $table->string('last_name');
+            $table->string('emp_id')->default(0);
+            $table->foreignId('department_id')->nullable()->constrained('departments')->onDelete('cascade'); // Fixed foreignId
+
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->rememberToken();
             $table->timestamps();
+            $table->softDeletes();
+
+           
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
@@ -29,7 +37,7 @@ return new class extends Migration
 
         Schema::create('sessions', function (Blueprint $table) {
             $table->string('id')->primary();
-            $table->foreignId('user_id')->nullable()->index();
+            $table->foreignId('user_id')->nullable()->constrained('users')->onDelete('cascade')->index(); // Ensure 'users' table exists
             $table->string('ip_address', 45)->nullable();
             $table->text('user_agent')->nullable();
             $table->longText('payload');

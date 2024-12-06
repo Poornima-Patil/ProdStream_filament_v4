@@ -1,0 +1,21 @@
+<?php
+
+namespace App\Filament\Admin\Resources\PurchaseorderResource\Pages;
+
+use App\Filament\Admin\Resources\PurchaseorderResource;
+use Filament\Actions;
+use Filament\Resources\Pages\EditRecord;
+
+class EditPurchaseorder extends EditRecord
+{
+    protected static string $resource = PurchaseorderResource::class;
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Actions\DeleteAction::make(),
+            Actions\ForceDeleteAction::make(),
+            Actions\RestoreAction::make(),
+        ];
+    }
+}

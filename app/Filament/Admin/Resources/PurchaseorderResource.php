@@ -1,0 +1,112 @@
+<?php
+
+namespace App\Filament\Admin\Resources;
+
+use App\Filament\Admin\Resources\PurchaseorderResource\Pages;
+use App\Filament\Admin\Resources\PurchaseorderResource\RelationManagers;
+use App\Models\Purchaseorder;
+use Filament\Forms;
+use Filament\Forms\Form;
+use Filament\Resources\Resource;
+use Filament\Tables;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Auth;
+
+class PurchaseorderResource extends Resource
+{
+    protected static ?string $model = Purchaseorder::class;
+
+    protected static ?string $navigationIcon = 'heroicon-o-shopping-bag';
+    protected static ?string $navigationGroup = 'Process Operations';
+    protected static ?string $tenantOwnershipRelationshipName = 'factory';
+
+
+    public static function form(Form $form): Form
+    {
+        return $form
+        ->schema([
+            Forms\Components\Select::make('part_number_id')
+                ->label('Partnumber')
+                ->relationship('partNumber', 'partnumber', function ($query) {
+                    $factoryId = Auth::user()->factory_id; 
+                    $query->where('factory_id', $factoryId)
+                    ->select(['id', 'partnumber', 'revision']);
+                })
+                ->getOptionLabelFromRecordUsing(function ($record) {
+                    return $record->partnumber . ' - ' . $record->revision;
+                })
+                ->required()
+                ->searchable(),
+            Forms\Components\TextInput::make('supplierInfo'),
+            Forms\Components\TextInput::make('description')
+                ->required(),
+            Forms\Components\TextInput::make('QTY')
+                ->required(),
+            Forms\Components\Select::make('Unit Of Measurement')
+                ->options([
+                    'Kgs' => 'Kgs',
+                    'Numbers' => 'Numbers',
+                ])
+                ->required(),
+            Forms\Components\TextInput::make('price')
+                ->required(),
+        ]);
+    }
+
+    public static function table(Table $table): Table
+    {
+        return $table
+            ->columns([
+                Tables\Columns\TextColumn::make('partnumber.partnumber'),
+                Tables\Columns\TextColumn::make('partnumber.revision')->label('Revision'),
+                 Tables\Columns\TextColumn::make('description'),
+                 Tables\Columns\TextColumn::make('QTY'),
+                 Tables\Columns\TextColumn::make('Unit Of Measurement')
+                 ->label('UM'),
+                 Tables\Columns\TextColumn::make('supplierInfo'),
+                 Tables\Columns\TextColumn::make('price'),
+
+            ])
+            ->filters([
+                //
+            ])
+            ->actions([
+                Tables\Actions\EditAction::make()
+                ->label('Edit PO'),
+                Tables\Actions\ViewAction::make()
+                ->hiddenLabel()
+            ])
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make(),
+                ]),
+            ]);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            //
+        ];
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ListPurchaseorders::route('/'),
+            'create' => Pages\CreatePurchaseorder::route('/create'),
+            'edit' => Pages\EditPurchaseorder::route('/{record}/edit'),
+            'view' => Pages\ViewPurchaseorder::route('/{record}/'),
+
+        ];
+    }
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->withoutGlobalScopes([
+                SoftDeletingScope::class,
+            ]);
+    }
+}
