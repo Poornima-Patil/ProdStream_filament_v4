@@ -23,6 +23,10 @@ class PurchaseorderResource extends Resource
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
 
+    public static function getLabel(): string
+    {
+        return 'Customer Order Lines'; // This will be displayed in the left panel
+    }
     public static function form(Form $form): Form
     {
         return $form
