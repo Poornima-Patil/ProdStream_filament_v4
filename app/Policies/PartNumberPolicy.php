@@ -37,7 +37,7 @@ class PartNumberPolicy
      */
     public function update(User $user, PartNumber $partNumber): bool
     {
-        return $user->hasPermissionTo(permission: 'Edit PartNumber');
+    return $user->hasPermissionTo(permission: 'Edit PartNumber');
     }
 
     /**

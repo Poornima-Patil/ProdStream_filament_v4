@@ -12,6 +12,8 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Validation\Rule;
+
 
 class PartnumberResource extends Resource
 {
@@ -23,18 +25,35 @@ class PartnumberResource extends Resource
 
     public static function form(Form $form): Form
     {
-        return $form
-        ->schema([
+        return $form->schema([
             Forms\Components\TextInput::make('partnumber')
                 ->required()
-                ->label('Part Number'),
+                ->label('Part Number')
+                ->rules([
+                    'required',
+                    Rule::unique('part_numbers', 'partnumber')
+                        ->where(function ($query) {
+                            $query->where('revision', request()->input('revision'));
+                        })
+                        ->ignore(request()->route('record')), // Exclude current record during editing
+                ])->reactive(),
+    
             Forms\Components\TextInput::make('revision')
                 ->default(0)
                 ->required()
-                ->label('Revision'),
+                ->label('Revision')
+                ->rules([
+                    'required',
+                    Rule::unique('part_numbers', 'revision')
+                        ->where(function ($query) {
+                            $query->where('partnumber', request()->input('partnumber'));
+                        })
+                        ->ignore(request()->route('record')), // Exclude current record during editing
+                ])->reactive(),
+    
             Forms\Components\TextInput::make('description')
                 ->required()
-                ->label('Description'),
+                ->label('Description'), // This will now update correctly without unnecessary checks
         ]);
     }
 
@@ -81,7 +100,7 @@ class PartnumberResource extends Resource
         ];
     }
 
-    private function validateUniqueCombination($partnumber, $revision, callable $get)
+   /* private function validateUniqueCombination($partnumber, $revision, callable $get)
     {
         if (PartNumber::where('partnumber', $partnumber)->where('revision', $revision)->exists()) {
             dd($partnumber);
@@ -90,7 +109,7 @@ class PartnumberResource extends Resource
             dd($partnumber);
             $get('unique_error', null);
         }
-    }
+    }*/
 
     public static function getEloquentQuery(): Builder
     {

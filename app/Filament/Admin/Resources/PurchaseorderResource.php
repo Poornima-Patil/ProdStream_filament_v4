@@ -28,20 +28,34 @@ class PurchaseorderResource extends Resource
         return $form
         ->schema([
             Forms\Components\Select::make('part_number_id')
-                ->label('Partnumber')
-                ->relationship('partNumber', 'partnumber', function ($query) {
-                    $factoryId = Auth::user()->factory_id; 
-                    $query->where('factory_id', $factoryId)
-                    ->select(['id', 'partnumber', 'revision']);
-                })
-                ->getOptionLabelFromRecordUsing(function ($record) {
-                    return $record->partnumber . ' - ' . $record->revision;
-                })
-                ->required()
-                ->searchable(),
+            ->label('Partnumber')
+            ->options(function () {
+                $factoryId = Auth::user()->factory_id; // Get the factory ID of the logged-in user
+                // Query the PartNumber model and include the partnumber and revision
+                return \App\Models\PartNumber::where('factory_id', $factoryId)
+                    ->get()
+                    ->mapWithKeys(function ($partNumber) {
+                        return [
+                            $partNumber->id => $partNumber->partnumber . ' - ' . $partNumber->revision
+                        ];
+                    });
+            })
+            ->required()
+            ->searchable()
+            ->reactive(),
+
             Forms\Components\TextInput::make('supplierInfo'),
-            Forms\Components\TextInput::make('description')
-                ->required(),
+           /* Forms\Components\TextInput::make('description')
+            ->disabled()
+          
+            ->afterStateHydrated(function ($state, callable $set,$get ) {
+                $partNumber = $get('part_number_id');
+                if($partNumber)
+                  $set('description', $partNumber->description);
+                else 
+                    $set('description', 'No description available');
+                })->reactive(),
+           */
             Forms\Components\TextInput::make('QTY')
                 ->required(),
             Forms\Components\Select::make('Unit Of Measurement')
@@ -61,7 +75,6 @@ class PurchaseorderResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('partnumber.partnumber'),
                 Tables\Columns\TextColumn::make('partnumber.revision')->label('Revision'),
-                 Tables\Columns\TextColumn::make('description'),
                  Tables\Columns\TextColumn::make('QTY'),
                  Tables\Columns\TextColumn::make('Unit Of Measurement')
                  ->label('UM'),

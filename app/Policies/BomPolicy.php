@@ -13,6 +13,7 @@ class BomPolicy
      */
     public function viewAny(User $user): bool
     {
+       
         return $user->hasPermissionTo(permission: 'View Bom');
     }
 

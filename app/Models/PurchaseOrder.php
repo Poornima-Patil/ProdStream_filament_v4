@@ -14,7 +14,6 @@ class PurchaseOrder extends Model
 
     protected $fillable = [
         'part_number_id',
-        'description',
         'QTY',
         'Unit Of Measurement',
         'supplierInfo',

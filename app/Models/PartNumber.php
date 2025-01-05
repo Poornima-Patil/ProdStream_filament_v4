@@ -23,33 +23,6 @@ class PartNumber extends Model
         return $this->hasMany(PurchaseOrder::class);
     }
 
-
-    protected static function boot()
-    {
-        parent::boot();
-
-        static::creating(function ($model) {
-            $model->validateUniquePartNumber();
-        });
-
-        static::updating(function ($model) {
-            $model->validateUniquePartNumber();
-        });
-    }
-
-    public function validateUniquePartNumber()
-    {
-        $exists = self::where('partnumber', $this->partnumber)
-            ->where('revision', $this->revision)
-            ->exists();
-
-        if ($exists) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'partnumber' => 'The combination of Part Number and Revision must be unique.',
-            ]);
-        }
-    }
-
     public function factory(): BelongsTo
     {
         return $this->belongsTo(Factory::class);

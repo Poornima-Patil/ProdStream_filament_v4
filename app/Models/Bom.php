@@ -14,7 +14,6 @@ class Bom extends Model
 
     protected $fillable = [
         'purchase_order_id',
-        'description',
         'requirement_pkg',
         'process_flowchart',
         'machine_id',

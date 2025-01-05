@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('boms', function (Blueprint $table) {
             $table->id();
-            $table->string('description');
+          
             $table->foreignId('purchase_order_id')->constrained();
             $table-> binary('requirement_pkg')
             ->disk('public') // Specify the disk where files should be stored

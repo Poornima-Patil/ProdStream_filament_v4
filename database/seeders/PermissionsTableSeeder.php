@@ -6,7 +6,7 @@ use App\Models\Permission;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
-
+use App\Models\User;
 class PermissionsTableSeeder extends Seeder
 {
     /**
@@ -95,17 +95,20 @@ class PermissionsTableSeeder extends Seeder
 
             // Create permission with the group name
             $perm = Permission::firstOrCreate([
-                'name' => 'factory2'. ' ' . $permission,
+                'name' => $permission,
                 'group' => $groupName,  // Add the group attribute
                 'guard_name' => 'web',
-                'factory_id' => 2,
+                'factory_id' => 1,
             ]);
 
             $role1 = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web', 'factory_id'=> 1]);
 
             // Assign role
             $perm->assignRole('Super Admin');
-        }
 
+        }
+        $user= User::find(1);
+        $user->assignRole('Super Admin');
     }
+
 }

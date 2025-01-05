@@ -36,14 +36,42 @@ class WorkOrderResource extends Resource
         $isAdminOrManager = $user && $user->can(abilities: 'Edit Bom');        //dd($isAdminOrManager);
         return $form
             ->schema([
+                Forms\Components\Select::make('part_number_id')
+                ->label('Partnumber')
+                ->options(function () {
+                    $factoryId = Auth::user()->factory_id; // Get the factory ID of the logged-in user
+                    // Query the PartNumber model and include the partnumber and revision
+                    return \App\Models\PartNumber::where('factory_id', $factoryId)
+                        ->get()
+                        ->mapWithKeys(function ($partNumber) {
+                            return [
+                                $partNumber->id => $partNumber->partnumber . ' - ' . $partNumber->revision
+                            ];
+                        });
+                })
+                ->required()
+                ->searchable()
+                ->reactive(),
                 Forms\Components\Select::make('bom_id')
-                    ->label('BOM')
-                    ->options(function () {
-                        $factoryId = Auth::user()->factory_id; // Adjust based on how you get factory_id
-                        return \App\Models\BOM::where('factory_id', $factoryId)
-                            ->pluck('description', 'id');
-                    })
-                    ->required()
+                ->label('BOM')
+                ->options(function (callable $get) {
+                    $partNumberId = $get('part_number_id'); // Get the selected Part Number ID
+                    if (!$partNumberId) {
+                        return []; // No Part Number selected, return empty options
+                    }
+                    // Query BOMs through the Purchase Order link and include Part Number description
+                    return \App\Models\Bom::whereHas('purchaseOrder', function ($query) use ($partNumberId) {
+                        $query->where('part_number_id', $partNumberId);
+                    })->get()->mapWithKeys(function ($bom) {
+                        $partNumberDescription = $bom->purchaseOrder->partNumber->description ?? ''; // Assuming PartNumber has a 'description' field
+                        return [
+                            $bom->id => "BOM ID: {$bom->id} - Part Description: {$partNumberDescription}"
+                        ];
+                    });
+                })
+                ->required()
+                ->reactive()
+                ->searchable()
                     ->disabled(!$isAdminOrManager),
                 Forms\Components\TextInput::make('qty')
                     ->label('Quantity')
@@ -57,24 +85,32 @@ class WorkOrderResource extends Resource
                     })
                     ->required()
                     ->disabled(!$isAdminOrManager),
-                   
-                  
-                Forms\Components\Select::make('operator_id')
-                    ->label('Operator')
-                    ->disabled(!$isAdminOrManager)
-                    ->options(function () {
-                        $factoryId = Auth::user()->factory_id; // Adjust based on how you get factory_id
-                        
-                        // Filter operators based on factory_id and map them
-                        return Operator::where('factory_id', $factoryId)
-                            ->with('user')
-                            ->get()
-                            ->mapWithKeys(function ($operator) {
-                                return [$operator->id => $operator->user->first_name];
-                            });
-                    })
-                    ->searchable()
-                    ->required(),
+                    Forms\Components\Select::make('operator_id')
+    ->label('Operator')
+    ->disabled(!$isAdminOrManager)
+    ->options(function (callable $get) {
+        $bomId = $get('bom_id'); // Get selected BOM ID
+        
+        if (!$bomId) {
+            return []; // No BOM selected, return empty options
+        }
+
+        // Get the operator proficiency ID from the BOM's linked Purchase Order
+        $operatorProficiencyId = \App\Models\Bom::find($bomId)->operator_proficiency_id;
+
+        // Get operators based on the proficiency ID
+        $factoryId = Auth::user()->factory_id; // Get the logged-in user's factory_id
+        return Operator::where('factory_id', $factoryId)
+            ->where('operator_proficiency_id', $operatorProficiencyId) // Filter by proficiency
+            ->with('user') // Get the associated user (operator)
+            ->get()
+            ->mapWithKeys(function ($operator) {
+                return [$operator->id => $operator->user->first_name];
+            });
+    })
+    ->searchable()
+    ->required(),
+             
                 Forms\Components\DateTimePicker::make('start_time')
                     ->label('Start Time'),
                 Forms\Components\DateTimePicker::make('end_time')
@@ -86,21 +122,26 @@ class WorkOrderResource extends Resource
                         'Start' => 'Start',
                         'Hold' => 'Hold',
                         'Completed' => 'Completed'
-                    ]),
-                Forms\Components\TextInput::make('ok_qtys')
+                    ])
+                    ->reactive(),
+                    Forms\Components\TextInput::make('ok_qtys')
                     ->label('Ok Qtys')
-                    ->default(0),
+                    ->default(0)
+                    ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
+                
                 Forms\Components\TextInput::make('scrapped_qtys')
                     ->label('Scrapped Qtys')
-                    ->default(0),
+                    ->default(0)
+                    ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
+                
                 Forms\Components\Select::make('scrapped_reason_id')
                     ->label('Why Scrapped')
                     ->relationship('scrappedReason', 'description', function ($query) {
-                        // Apply factory_id filter if needed
-                        $factoryId = Auth::user()->factory_id; // Adjust based on how you get factory_id
+                        $factoryId = Auth::user()->factory_id; // Apply factory_id filter
                         $query->where('factory_id', $factoryId);
                     })
-                    ->required(),
+                    ->required()
+                    ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
 
             ]);
     }
@@ -111,7 +152,7 @@ class WorkOrderResource extends Resource
         $isAdminOrManager = $user && $user->can(abilities: 'Edit Bom');       
         return $table
             ->Columns ([
-                 Tables\Columns\TextColumn::make('bom.description')->label('BOM')
+                 Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.description')->label('BOM')
                 ->hidden(!$isAdminOrManager),
                 Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.partnumber')->label('Part Number'),
                 Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.revision')->label('Revision'),

@@ -33,16 +33,43 @@ class BomResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('description')
-                ->required(),
+               
+                Forms\Components\Select::make('part_number_id')
+                ->label('Partnumber')
+                ->options(function () {
+                    $factoryId = Auth::user()->factory_id; // Get the factory ID of the logged-in user
+                    return \App\Models\PartNumber::where('factory_id', $factoryId)
+                    ->get()
+                    ->mapWithKeys(function ($partNumber) {
+                        return [$partNumber->id => $partNumber->partnumber . ' - ' . $partNumber->revision];
+                    });
+                })
+                ->required()
+                ->searchable()
+                ->reactive()
+                ->preload(),
+               
                 Forms\Components\Select::make('purchase_order_id')
                 ->label('Purchase Order')
-                ->options(function () {
-                    $factoryId = Auth::user()->factory_id; // Adjust this as needed
-                    return \App\Models\PurchaseOrder::where('factory_id', $factoryId)
-                        ->pluck('description', 'id');
+                ->options(function (callable $get) {
+                    $factoryId = Auth::user()->factory_id; // Get the factory ID of the logged-in user
+                    $partNumberId = $get('part_number_id'); // Get the selected PartNumber ID
+            
+                    if (!$partNumberId) {
+                        return [];
+                    }
+            
+                    // Query Purchase Orders based on the selected PartNumber and Factory
+                    return \App\Models\PurchaseOrder::where('part_number_id', $partNumberId)
+                        ->where('factory_id', $factoryId)
+                        ->get()
+                        ->mapWithKeys(function ($purchaseOrder) {
+                            $description = $purchaseOrder->partNumber->description ?? 'No description available';
+                            return [$purchaseOrder->id => "Purchase Order ID: {$purchaseOrder->id} - {$description}"];
+                        });
                 })
-                ->required(),
+                ->required()
+                ->reactive(),
                 Forms\Components\FileUpload::make('requirement_pkg')
                 ->label(label: 'Requirement Package')
                 ->directory(function() {
@@ -79,7 +106,7 @@ class BomResource extends Resource
                 }),
                 
                 Forms\Components\DatePicker::make('lead_time')
-                ->label('Lead Time'),
+                ->label('Cycle Time'),
                 Forms\Components\Select::make('status')->options([
                     '1' => 'Active',
                     '0' => 'InActive',
@@ -91,7 +118,7 @@ class BomResource extends Resource
     {
         return $table
             ->columns([
-               Tables\Columns\TextColumn::make('purchaseorder.description')->label('Purchase Order'),
+               Tables\Columns\TextColumn::make('purchaseorder.partnumber.description')->label('Purchase Order'),
                Tables\Columns\TextColumn::make('purchaseorder.partnumber.partnumber')->label('PartNumber'),
                Tables\Columns\TextColumn::make('purchaseorder.partnumber.revision')->label('Revision'),
             Tables\Columns\TextColumn::make('requirement_pkg')
@@ -101,7 +128,7 @@ class BomResource extends Resource
 
                 Tables\Columns\TextColumn::make('machine.name'),
                 Tables\Columns\TextColumn::make('operatorproficiency.proficiency'),
-                Tables\Columns\TextColumn::make('lead_time'),
+                Tables\Columns\TextColumn::make('lead_time')->label('Cycle Time'),
                 Tables\Columns\IconColumn::make('status')
                 ->boolean(),
                 

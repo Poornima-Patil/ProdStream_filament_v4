@@ -3,7 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Filament\Models\Contracts\FilamentUser;
+
 use Filament\Models\Contracts\HasTenants;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +17,7 @@ use App\Models\Factory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Permission\Traits\HasRoles;
 use Filament\Models\Contracts\HasName;
+use Filament\Models\Contracts\FilamentUser;
 
 
 class User extends Authenticatable implements FilamentUser,HasTenants,HasName

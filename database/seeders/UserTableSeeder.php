@@ -14,7 +14,7 @@ class UserTableSeeder extends Seeder
      */
     public function run(): void
     {
-        DB::table('users')->insert([
+        $user = DB::table('users')->insert([
             [
                 'first_name' => 'Super',
                 'last_name' => 'Admin',
@@ -28,4 +28,6 @@ class UserTableSeeder extends Seeder
             ],
         ]);
     }
+
+    
 }
