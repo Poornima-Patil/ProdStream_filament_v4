@@ -19,6 +19,11 @@ use Illuminate\Support\Facades\Auth;
 use Filament\Infolists\Infolist;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Support\Colors\Color;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+
+use function Psy\debug;
 
 class WorkOrderResource extends Resource
 {
@@ -51,7 +56,15 @@ class WorkOrderResource extends Resource
                 })
                 ->required()
                 ->searchable()
-                ->reactive(),
+                ->reactive()
+                ->preload()
+                ->disabled(!$isAdminOrManager)
+                ->formatStateUsing(function ($record) {
+                    if ($record && $record->bom) {
+                        return $record->bom->purchaseOrder->partNumber->id ?? null;
+                    }
+                    return null; // Return null if the part number doesn't exist
+                }),
                 Forms\Components\Select::make('bom_id')
                 ->label('BOM')
                 ->options(function (callable $get) {
@@ -254,6 +267,29 @@ public static function infoList(InfoList $infoList): InfoList
                     TextEntry::make('scrapped_qtys')->label('Scrapped Quantities'),
                     TextEntry::make('scrappedReason.description')->label('Scrapped Reason'),
                 ])->columns(),
+
+                Section::make('Documents')
+                ->collapsible()
+                ->schema([
+                   TextEntry::make('requirement_pkg')
+                   ->state(state: fn($record) => $record->bom ? $record->bom->requirement_pkg : null)
+                   ->formatStateUsing(fn() => "Download Requirement Pkg")
+                   // URL to be used for the download (link), and the second parameter is for the new tab
+                   ->url(fn($record) => Storage::url($record->bom->requirement_pkg), true)
+                   // This will make the link look like a "badge" (blue)
+                   ->badge()
+                   ->color(Color::Blue),
+ 		    TextEntry::make('process_flowchart')
+             ->state(state: fn($record) => $record->bom ? $record->bom->process_flowchart : null)
+				->formatStateUsing(fn() => "Download Process Flowchart")
+                                // URL to be used for the download (link), and the second parameter is for the new tab
+                                ->url(fn($record) => Storage::url($record->bom->process_flowchart), true)
+                                // This will make the link look like a "badge" (blue)
+                                ->badge()
+                                ->color(Color::Blue),
+                ])->columns(),
+
+
         ]);
 }
 

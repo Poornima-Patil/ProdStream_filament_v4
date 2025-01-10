@@ -26,7 +26,8 @@ class MachineResource extends Resource
         return $form
             ->schema([
                 Forms\Components\TextInput::make('assetId')->required(),
-                Forms\Components\TextInput::make('name')->required(),
+                Forms\Components\TextInput::make('name')
+                ->unique()->required(),
                 Forms\Components\Select::make('status')->options([
                     1 => 'Active',
                     0 => 'Inactive',
