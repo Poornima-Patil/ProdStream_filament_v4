@@ -4,7 +4,7 @@ namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\PurchaseorderResource\Pages;
 use App\Filament\Admin\Resources\PurchaseorderResource\RelationManagers;
-use App\Models\Purchaseorder;
+use App\Models\PurchaseOrder;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Auth;
 
 class PurchaseorderResource extends Resource
 {
-    protected static ?string $model = Purchaseorder::class;
+    protected static ?string $model = PurchaseOrder::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-shopping-bag';
     protected static ?string $navigationGroup = 'Process Operations';

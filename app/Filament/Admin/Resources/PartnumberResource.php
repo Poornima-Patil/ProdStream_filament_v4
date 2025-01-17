@@ -4,7 +4,7 @@ namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\PartnumberResource\Pages;
 use App\Filament\Admin\Resources\PartnumberResource\RelationManagers;
-use App\Models\Partnumber;
+use App\Models\PartNumber;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -17,7 +17,7 @@ use Illuminate\Validation\Rule;
 
 class PartnumberResource extends Resource
 {
-    protected static ?string $model = Partnumber::class;
+    protected static ?string $model = PartNumber::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-tag';
     protected static ?string $navigationGroup = 'Admin Operations';
