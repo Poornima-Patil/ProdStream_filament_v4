@@ -128,14 +128,27 @@ class WorkOrderResource extends Resource
                     ->label('Start Time'),
                 Forms\Components\DateTimePicker::make('end_time')
                     ->label('End Time'),
-                Forms\Components\Select::make('status')
+                    Forms\Components\Select::make('status')
                     ->label('Status')
-                    ->options([
-                        'Assigned' => 'Assigned',
-                        'Start' => 'Start',
-                        'Hold' => 'Hold',
-                        'Completed' => 'Completed'
-                    ])
+                    ->options(function () {
+                        // Check if the logged-in user's role is 'Operator'
+                        $user = Auth::user(); // Adjust based on how roles are stored in your app
+                        
+                        // Define default status options
+                        $options = [
+                            'Assigned' => 'Assigned',
+                            'Start' => 'Start',
+                            'Hold' => 'Hold',
+                            'Completed' => 'Completed',
+                        ];
+                
+                        // If the user is an Operator, exclude 'Assigned' from the options
+                        if ($user->hasRole('Operator')) {
+                            unset($options['Assigned']);
+                        }
+                
+                        return $options;
+                    })
                     ->reactive(),
                     Forms\Components\TextInput::make('ok_qtys')
                     ->label('Ok Qtys')
