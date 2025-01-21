@@ -165,6 +165,7 @@ class WorkOrderResource extends Resource
         $isAdminOrManager = $user && $user->can(abilities: 'Edit Bom');       
         return $table
             ->Columns ([
+                Tables\Columns\TextColumn::make('unique_id')->label('Unique ID'),
                  Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.description')->label('BOM')
                 ->hidden(!$isAdminOrManager),
                 Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.partnumber')->label('Part Number'),
@@ -258,6 +259,7 @@ public static function infoList(InfoList $infoList): InfoList
             Section::make('Details')
                 ->collapsible()
                 ->schema([
+                    TextEntry::make('unique_id')->label('Unique ID'),
                     TextEntry::make('bom.purchaseorder.partnumber.partnumber')->label('Part Number'),
                     TextEntry::make('bom.purchaseorder.partnumber.revision')->label('Revision'),
                     TextEntry::make('status')->label('Status'),

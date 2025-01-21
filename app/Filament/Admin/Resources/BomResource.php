@@ -118,6 +118,7 @@ class BomResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('unique_id')->label('Unique ID'),
                Tables\Columns\TextColumn::make('purchaseorder.partnumber.description')->label('Description'),
                Tables\Columns\TextColumn::make('purchaseorder.partnumber.partnumber')->label('PartNumber'),
                Tables\Columns\TextColumn::make('purchaseorder.partnumber.revision')->label('Revision'),
@@ -174,6 +175,8 @@ class BomResource extends Resource
             Section::make('Purchase Order Infomation')
                 ->collapsible()
                 ->schema([
+                    TextEntry::make('unique_id')
+                        ->label('Unique ID'),
                     TextEntry::make('purchaseorder.description')
                         ->label('Purchase Order'),
                     TextEntry::make('purchaseorder.partnumber.partnumber')->label('Part Number'),

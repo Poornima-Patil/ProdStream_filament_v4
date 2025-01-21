@@ -23,7 +23,7 @@ class WorkOrder extends Model
         'ok_qtys',
         'scrapped_qtys',
         'scrapped_reason_id',
-        
+        'unique_id',
         'factory_id'
     ];
     public function scrappedReason()

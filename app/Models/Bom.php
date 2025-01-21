@@ -20,7 +20,8 @@ class Bom extends Model
         'operator_proficiency_id',
         'lead_time',
         'status',
-        'factory_id'
+        'factory_id',
+        'unique_id'
     ];
 
 public function purchaseOrder()

@@ -18,7 +18,8 @@ class PurchaseOrder extends Model
         'Unit Of Measurement',
         'supplierInfo',
         'price',
-        'factory_id'
+        'factory_id',
+        'cust_id'
     ];
     public function partNumber()
     {

@@ -60,6 +60,8 @@ class PurchaseorderResource extends Resource
                     $set('description', 'No description available');
                 })->reactive(),
            */
+          Forms\Components\TextInput::make('cust_id')
+          ->required(),
             Forms\Components\TextInput::make('QTY')
                 ->required(),
             Forms\Components\Select::make('Unit Of Measurement')
@@ -76,6 +78,7 @@ class PurchaseorderResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('cust_id'),
                 Tables\Columns\TextColumn::make('partnumber.partnumber'),
                 Tables\Columns\TextColumn::make('partnumber.revision')->label('Revision'),
                  Tables\Columns\TextColumn::make('QTY'),
