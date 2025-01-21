@@ -13,7 +13,9 @@ class Shift extends Model
     use HasFactory,SoftDeletes;
     protected $fillable = [
         'name',
-        'factory_id'
+        'factory_id',
+        'start_time',
+        'end_time',
     ];
 
     public function operators()

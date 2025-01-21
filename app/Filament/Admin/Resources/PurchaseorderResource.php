@@ -68,8 +68,7 @@ class PurchaseorderResource extends Resource
                     'Numbers' => 'Numbers',
                 ])
                 ->required(),
-            Forms\Components\TextInput::make('price')
-                ->required(),
+            Forms\Components\TextInput::make('price'),
         ]);
     }
 

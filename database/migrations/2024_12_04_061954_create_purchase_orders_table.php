@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('Unit Of Measurement');
             $table->foreignId('factory_id')->constrained();
             $table->string('supplierInfo')->nullable();
-            $table->decimal('price');
+            $table->decimal('price')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

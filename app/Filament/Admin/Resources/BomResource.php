@@ -50,7 +50,7 @@ class BomResource extends Resource
                 ->preload(),
                
                 Forms\Components\Select::make('purchase_order_id')
-                ->label('Purchase Order')
+                ->label('Customer Information')
                 ->options(function (callable $get) {
                     $factoryId = Auth::user()->factory_id; // Get the factory ID of the logged-in user
                     $partNumberId = $get('part_number_id'); // Get the selected PartNumber ID
@@ -118,7 +118,7 @@ class BomResource extends Resource
     {
         return $table
             ->columns([
-               Tables\Columns\TextColumn::make('purchaseorder.partnumber.description')->label('Purchase Order'),
+               Tables\Columns\TextColumn::make('purchaseorder.partnumber.description')->label('Description'),
                Tables\Columns\TextColumn::make('purchaseorder.partnumber.partnumber')->label('PartNumber'),
                Tables\Columns\TextColumn::make('purchaseorder.partnumber.revision')->label('Revision'),
             Tables\Columns\TextColumn::make('requirement_pkg')

@@ -26,6 +26,15 @@ class ShiftResource extends Resource
         return $form
             ->schema([
                 Forms\Components\TextInput::make('name'),
+                Forms\Components\TimePicker::make('start_time')
+                ->required()
+                ->withoutSeconds()
+                ->label('Start Time'),
+
+            Forms\Components\TimePicker::make('end_time')
+                ->required()
+                ->withoutSeconds()
+                ->label('End Time'),
             ]);
     }
 
@@ -34,6 +43,13 @@ class ShiftResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name'),
+                Tables\Columns\TextColumn::make('start_time')
+                ->label('Start Time')
+                ->dateTime('H:i'), // Format to display in 24-hour format,
+
+            Tables\Columns\TextColumn::make('end_time')
+                ->label('End Time')
+                ->dateTime('H:i'), // Format to display in 24-hour format
             ])
             ->filters([
                 //
