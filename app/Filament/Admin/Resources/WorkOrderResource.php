@@ -294,11 +294,24 @@ public static function infoList(InfoList $infoList): InfoList
 }
 
   
-    public static function getEloquentQuery(): Builder
-    {
-        return parent::getEloquentQuery()
-            ->withoutGlobalScopes([
-                SoftDeletingScope::class,
-            ]);
+public static function getEloquentQuery(): Builder
+{
+    $query = parent::getEloquentQuery()
+        ->withoutGlobalScopes([
+            SoftDeletingScope::class,
+        ]);
+
+        $user= Auth::user();
+        
+    if (Auth::check() && $user->hasRole('Operator')) {
+        $userId = Auth::id(); // Get the logged-in user's ID
+        $query->whereHas('operator', function ($operatorQuery) use ($userId) {
+            $operatorQuery->where('user_id', $userId);
+            
+        });
     }
+    
+    return $query;
+}
+
 }
