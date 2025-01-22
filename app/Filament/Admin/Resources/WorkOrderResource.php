@@ -22,6 +22,9 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Support\Colors\Color;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Filament\Infolists\Components\RepeatableEntry;
+
+use Filament\Forms\Components\Repeater;
 
 use function Psy\debug;
 
@@ -155,21 +158,43 @@ class WorkOrderResource extends Resource
                     ->default(0)
                     ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
                 
-                Forms\Components\TextInput::make('scrapped_qtys')
+                   
+                
+                Forms\Components\Repeater::make('scrapped_quantities')
+                    ->label('Scrapped Quantities')
+                    ->relationship('scrappedQuantities') // Assumes the WorkOrder model has a `scrappedQuantities` relationship
+                    ->schema([
+                        Forms\Components\TextInput::make('quantity')
+                            ->label('Quantity')
+                            ->numeric()
+                            ->required()
+                            ->minValue(1)
+                            ->reactive() // Trigger updates when the quantity is changed
+                            ->afterStateUpdated(function ($livewire, $record, callable $get, callable $set) {
+                                $formState = $livewire->data;
+                                $scrappedQuantities = $formState['scrapped_quantities'] ?? [];
+                                $total = collect($scrappedQuantities)->sum('quantity');
+                                $livewire->data['scrapped_qtys'] = $total;
+                                $set('scrapped_qtys', $total);
+                            }),
+                
+                        Forms\Components\Select::make('reason_id')
+                            ->label('Scrapped Reason')
+                            ->relationship('reason', 'description') // Assumes a relationship with the ScrappedReason model
+                            ->required(),
+                    ])
+                    ->defaultItems(0) // Optional: Number of default entries to show
+                    ->minItems(0) // Optional: Minimum number of entries
+                    ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed']))
+                    ->columnSpan('full'),
+
+                    Forms\Components\TextInput::make('scrapped_qtys')
                     ->label('Scrapped Qtys')
                     ->default(0)
+                    ->readonly() // Make it non-editable
                     ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
-                
-                Forms\Components\Select::make('scrapped_reason_id')
-                    ->label('Why Scrapped')
-                    ->relationship('scrappedReason', 'description', function ($query) {
-                        $factoryId = Auth::user()->factory_id; // Apply factory_id filter
-                        $query->where('factory_id', $factoryId);
-                    })
-                    ->required()
-                    ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
-
-            ]);
+                   
+                        ]);
     }
 
     public static function table(Table $table): Table
@@ -247,66 +272,92 @@ class WorkOrderResource extends Resource
         ];
     }   
 
-public static function infoList(InfoList $infoList): InfoList
-{
-    $user = Auth::user();
-    $isAdminOrManager = $user && in_array($user->role, ['manager', 'admin']);
+    public static function infoList(InfoList $infoList): InfoList
+    {
+        $user = Auth::user();
+        $isAdminOrManager = $user && in_array($user->role, ['manager', 'admin']);
+        
+        return $infoList
+            ->schema([
+                // Section 1: BOM, Quantity, Machines, Operator
+                Section::make('General Information')
+                    ->collapsible()
+                    ->schema([
+                        TextEntry::make('bom.description')
+                            ->label('BOM')
+                            ->hidden(!$isAdminOrManager),
+                        TextEntry::make('qty')->label('Quantity'),
+                        TextEntry::make('machine.name')->label('Machine'),
+                        TextEntry::make('operator.user.first_name')
+                            ->label('Operator')
+                            ->hidden(!$isAdminOrManager),
+                    ])->columns(2),
+                
+                // Section 2: Remaining fields
+                Section::make('Details')
+                    ->collapsible()
+                    ->schema([
+                        TextEntry::make('unique_id')->label('Unique ID'),
+                        TextEntry::make('bom.purchaseorder.partnumber.partnumber')->label('Part Number'),
+                        TextEntry::make('bom.purchaseorder.partnumber.revision')->label('Revision'),
+                        TextEntry::make('status')->label('Status'),
+                        TextEntry::make('start_time')->label('Start Time'),
+                        TextEntry::make('end_time')->label('End Time'),
+                        TextEntry::make('ok_qtys')->label('OK Quantities'),
+                        TextEntry::make('scrapped_qtys')->label('Scrapped Quantities'),
+                        TextEntry::make('scrappedReason.description')->label('Scrapped Reason'),
+                    ])->columns(2),
+                    Section::make('Scrapped Quantities Details')
+                    ->collapsible()
+                    ->schema([
+                        TextEntry::make('scrapped_quantities_table')
+                            ->label('Scrapped Quantities')
+                            ->state(function ($record) {
+                                $record->load('scrappedQuantities.reason');
+                
+                                $data = $record->scrappedQuantities->map(function ($item) {
+                                    return [
+                                        'quantity' => $item->quantity,
+                                        'reason_description' => $item->reason->description ?? '',
+                                    ];
+                                });
+                
+                                // Render the data as an HTML table
+                                $html = '<table class="table-auto w-full text-left border border-gray-300">';
+                                $html .= '<thead><tr><th class="border px-2 py-1">Quantity</th><th class="border px-2 py-1">Reason Description</th></tr></thead>';
+                                $html .= '<tbody>';
+                                foreach ($data as $row) {
+                                    $html .= '<tr>';
+                                    $html .= '<td class="border px-2 py-1">' . e($row['quantity']) . '</td>';
+                                    $html .= '<td class="border px-2 py-1">' . e($row['reason_description']) . '</td>';
+                                    $html .= '</tr>';
+                                }
+                                $html .= '</tbody></table>';
+                
+                                return $html;
+                            })
+                            ->html() // Render raw HTML
+                    ])
+                    ->columns(1),
     
-    return $infoList
-        ->schema([
-            // Section 1: BOM, Quantity, Machines, Operator
-            Section::make('General Information')
-                ->collapsible()
-                ->schema([
-                    TextEntry::make('bom.description')
-                        ->label('BOM')
-                        ->hidden(!$isAdminOrManager),
-                    TextEntry::make('qty')->label('Quantity'),
-                    TextEntry::make('machine.name')->label('Machine'),
-                    TextEntry::make('operator.user.first_name')
-                        ->label('Operator')
-                        ->hidden(!$isAdminOrManager),
-                ])->columns(),
-            
-            // Section 2: Remaining fields
-            Section::make('Details')
-                ->collapsible()
-                ->schema([
-                    TextEntry::make('unique_id')->label('Unique ID'),
-                    TextEntry::make('bom.purchaseorder.partnumber.partnumber')->label('Part Number'),
-                    TextEntry::make('bom.purchaseorder.partnumber.revision')->label('Revision'),
-                    TextEntry::make('status')->label('Status'),
-                    TextEntry::make('start_time')->label('Start Time'),
-                    TextEntry::make('end_time')->label('End Time'),
-                    TextEntry::make('ok_qtys')->label('OK Quantities'),
-                    TextEntry::make('scrapped_qtys')->label('Scrapped Quantities'),
-                    TextEntry::make('scrappedReason.description')->label('Scrapped Reason'),
-                ])->columns(),
-
                 Section::make('Documents')
-                ->collapsible()
-                ->schema([
-                   TextEntry::make('requirement_pkg')
-                   ->state(state: fn($record) => $record->bom ? $record->bom->requirement_pkg : null)
-                   ->formatStateUsing(fn() => "Download Requirement Pkg")
-                   // URL to be used for the download (link), and the second parameter is for the new tab
-                   ->url(fn($record) => Storage::url($record->bom->requirement_pkg), true)
-                   // This will make the link look like a "badge" (blue)
-                   ->badge()
-                   ->color(Color::Blue),
- 		    TextEntry::make('process_flowchart')
-             ->state(state: fn($record) => $record->bom ? $record->bom->process_flowchart : null)
-				->formatStateUsing(fn() => "Download Process Flowchart")
-                                // URL to be used for the download (link), and the second parameter is for the new tab
-                                ->url(fn($record) => Storage::url($record->bom->process_flowchart), true)
-                                // This will make the link look like a "badge" (blue)
-                                ->badge()
-                                ->color(Color::Blue),
-                ])->columns(),
-
-
-        ]);
-}
+                    ->collapsible()
+                    ->schema([
+                        TextEntry::make('requirement_pkg')
+                            ->state(fn($record) => $record->bom ? $record->bom->requirement_pkg : null)
+                            ->formatStateUsing(fn() => "Download Requirement Pkg")
+                            ->url(fn($record) => Storage::url($record->bom->requirement_pkg), true)
+                            ->badge()
+                            ->color('blue'),
+                        TextEntry::make('process_flowchart')
+                            ->state(fn($record) => $record->bom ? $record->bom->process_flowchart : null)
+                            ->formatStateUsing(fn() => "Download Process Flowchart")
+                            ->url(fn($record) => Storage::url($record->bom->process_flowchart), true)
+                            ->badge()
+                            ->color('blue'),
+                    ])->columns(1),
+            ]);
+    }
 
   
 public static function getEloquentQuery(): Builder

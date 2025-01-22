@@ -22,7 +22,6 @@ return new class extends Migration
             $table->string('status')->nullable();
             $table->integer('ok_qtys')->default(0);
             $table->integer('scrapped_qtys')->default(0);
-            $table->foreignId('scrapped_reason_id')->nullable();
             $table->timestamps();
             $table->foreignId('factory_id')->constrained();
             $table->softDeletes();

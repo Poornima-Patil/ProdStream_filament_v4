@@ -22,14 +22,10 @@ class WorkOrder extends Model
         'status',
         'ok_qtys',
         'scrapped_qtys',
-        'scrapped_reason_id',
-        'unique_id',
+         'unique_id',
         'factory_id'
     ];
-    public function scrappedReason()
-    {
-        return $this->belongsTo(ScrappedReason::class,'scrapped_reason_id');
-    }
+   
 
     public function bom()
     {
@@ -49,5 +45,10 @@ class WorkOrder extends Model
     public function factory(): BelongsTo
     {
         return $this->belongsTo(Factory::class);
+    }
+
+    public function scrappedQuantities()
+    {
+        return $this->hasMany(ScrappedQuantity::class);
     }
 }
