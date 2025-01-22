@@ -217,7 +217,7 @@ class WorkOrderResource extends Resource
                 Tables\Columns\TextColumn::make('end_time'),
                 Tables\Columns\TextColumn::make('ok_qtys'),
                 Tables\Columns\TextColumn::make('scrapped_qtys'),
-                Tables\Columns\TextColumn::make('scrappedReason.description')->label('Scrapped Reason'),
+                
                 
                 ]
                 )
