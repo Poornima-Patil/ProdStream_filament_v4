@@ -31,7 +31,7 @@ return new class extends Migration
             $table->string('guard_name'); // For MyISAM use string('guard_name', 25);
             $table->timestamps();
             $table->foreignId(column: 'factory_id')->constrained();
-            $table->unique(['name', 'guard_name']);
+            $table->unique(['name', 'guard_name','factory_id']);
             $table->string('group')->nullable();
 
             $table->softDeletes();
@@ -51,7 +51,7 @@ return new class extends Migration
             if ($teams || config('permission.testing')) {
                 $table->unique([$columnNames['team_foreign_key'], 'name', 'guard_name']);
             } else {
-                $table->unique(['name', 'guard_name']);
+                $table->unique(['name', 'guard_name', 'factory_id']);
             }
             $table->softDeletes();
             $table->foreignId(column: 'factory_id')->constrained();

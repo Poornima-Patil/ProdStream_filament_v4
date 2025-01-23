@@ -34,4 +34,8 @@ class PurchaseOrder extends Model
     {
         return $this->belongsTo(Factory::class);
     }
+    public function customer()
+{
+    return $this->belongsTo(CustomerInformation::class, 'cust_id', 'id');
+}
 }

@@ -64,7 +64,7 @@ class WorkOrderResource extends Resource
                 ->disabled(!$isAdminOrManager)
                 ->formatStateUsing(function ($record) {
                     if ($record && $record->bom) {
-                        return $record->bom->purchaseOrder->partNumber->id ?? null;
+                        return $record->bom->purchaseOrder->partnumber->id ?? null;
                     }
                     return null; // Return null if the part number doesn't exist
                 }),
@@ -81,7 +81,7 @@ class WorkOrderResource extends Resource
                     })->get()->mapWithKeys(function ($bom) {
                         $partNumberDescription = $bom->purchaseOrder->partNumber->description ?? ''; // Assuming PartNumber has a 'description' field
                         return [
-                            $bom->id => "BOM ID: {$bom->id} - Part Description: {$partNumberDescription}"
+                            $bom->id => "BOM ID: {$bom->unique_id} - Part Description: {$partNumberDescription}"
                         ];
                     });
                 })

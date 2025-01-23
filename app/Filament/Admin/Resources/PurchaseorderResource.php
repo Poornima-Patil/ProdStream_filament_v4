@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 
+use App\Models\CustomerInformation;
 class PurchaseorderResource extends Resource
 {
     protected static ?string $model = PurchaseOrder::class;
@@ -45,23 +46,13 @@ class PurchaseorderResource extends Resource
                     });
             })
             ->required()
+            ->preload()
             ->searchable()
             ->reactive(),
-
-            Forms\Components\TextInput::make('supplierInfo'),
-           /* Forms\Components\TextInput::make('description')
-            ->disabled()
-          
-            ->afterStateHydrated(function ($state, callable $set,$get ) {
-                $partNumber = $get('part_number_id');
-                if($partNumber)
-                  $set('description', $partNumber->description);
-                else 
-                    $set('description', 'No description available');
-                })->reactive(),
-           */
-          Forms\Components\TextInput::make('cust_id')
-          ->required(),
+            Forms\Components\Select::make('cust_id')
+            ->label('Customer')
+            ->options(CustomerInformation::pluck('name', 'id')->toArray()) // Get name and id of customers
+            ->required(),
             Forms\Components\TextInput::make('QTY')
                 ->required(),
             Forms\Components\Select::make('Unit Of Measurement')
@@ -78,13 +69,13 @@ class PurchaseorderResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('cust_id'),
+                Tables\Columns\TextColumn::make('customer.customer_id')->label('Customer ID'),
                 Tables\Columns\TextColumn::make('partnumber.partnumber'),
                 Tables\Columns\TextColumn::make('partnumber.revision')->label('Revision'),
                  Tables\Columns\TextColumn::make('QTY'),
                  Tables\Columns\TextColumn::make('Unit Of Measurement')
                  ->label('UM'),
-                 Tables\Columns\TextColumn::make('supplierInfo'),
+                 
                  Tables\Columns\TextColumn::make('price'),
 
             ])

@@ -53,4 +53,7 @@ public function workorders():HasMany {
        return $this->belongsToMany(User::class);
    }
 
+   public function customerinformation():HasMany {
+       return $this->hasMany(CustomerInformation::class);
+   }
 }

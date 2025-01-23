@@ -22,7 +22,7 @@ return new class extends Migration
             $table-> binary('process_flowchart')->nullable();
             $table->foreignId('machine_id')->constrained();
             $table->foreignId('operator_proficiency_id')->constrained();
-            $table->dateTime('lead_time');
+            $table->dateTime('lead_time')->nullable();
             $table->boolean('status');
             $table->timestamps();
             $table->foreignId('factory_id')->constrained();

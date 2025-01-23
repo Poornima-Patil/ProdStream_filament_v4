@@ -22,7 +22,7 @@ class CreateBom extends CreateRecord
 
         // Get the related PurchaseOrder's cust_id
         $purchaseOrder = $data['purchase_order_id']; // Assuming `purchase_order_id` is passed
-        $custId = \App\Models\PurchaseOrder::find($purchaseOrder)->cust_id;
+        $custId = \App\Models\PurchaseOrder::find($purchaseOrder)->customer->customer_id;
 
         // Get the related PartNumber's part_number and revision
         $partNumber = \App\Models\PurchaseOrder::find($purchaseOrder)->partNumber;

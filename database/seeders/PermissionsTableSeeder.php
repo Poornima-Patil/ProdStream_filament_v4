@@ -98,10 +98,10 @@ class PermissionsTableSeeder extends Seeder
                 'name' => $permission,
                 'group' => $groupName,  // Add the group attribute
                 'guard_name' => 'web',
-                'factory_id' => 1,
+                'factory_id' => 3,
             ]);
 
-            $role1 = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web', 'factory_id'=> 1]);
+            //$role1 = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web', 'factory_id'=> 1]);
 
             // Assign role
             $perm->assignRole('Super Admin');

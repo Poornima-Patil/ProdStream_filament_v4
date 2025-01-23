@@ -106,7 +106,7 @@ class BomResource extends Resource
                 }),
                 
                 Forms\Components\DatePicker::make('lead_time')
-                ->label('Cycle Time'),
+                ->label('Target Completion Time'),
                 Forms\Components\Select::make('status')->options([
                     '1' => 'Active',
                     '0' => 'InActive',
@@ -129,7 +129,7 @@ class BomResource extends Resource
 
                 Tables\Columns\TextColumn::make('machine.name'),
                 Tables\Columns\TextColumn::make('operatorproficiency.proficiency'),
-                Tables\Columns\TextColumn::make('lead_time')->label('Cycle Time'),
+                Tables\Columns\TextColumn::make('lead_time')->label('Target Completion Time'),
                 Tables\Columns\IconColumn::make('status')
                 ->boolean(),
                 
@@ -193,7 +193,7 @@ class BomResource extends Resource
                 ->schema([
                     TextEntry::make('operatorproficiency.proficiency')
                         ->label('Proficiency'),
-                    TextEntry::make('lead_time')->label('Lead Time'),
+                    TextEntry::make('lead_time')->label('Target Completiong time'),
                     IconEntry::make('status')->label('Status'),
 		    
                    ])->columns(),
