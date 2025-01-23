@@ -8,14 +8,16 @@ use Filament\Resources\Pages\CreateRecord;
 use Carbon\Carbon;
 use App\Models\Bom;
 use App\Models\WorkOrder;
+
 class CreateWorkOrder extends CreateRecord
 {
     protected static string $resource = WorkOrderResource::class;
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        // Get the current date in DDMMYY format
+        // Get the current date in MMDDYY format (Month, Day, Year)
         $currentDate = Carbon::now();
-        $dateFormat = $currentDate->format('dmy'); // DDMMYY format
+        $dateFormat = $currentDate->format('mdy'); // MMDDYY format
 
         // Get the related Bom's unique_id
         $bom = Bom::find($data['bom_id']);
@@ -36,8 +38,9 @@ class CreateWorkOrder extends CreateRecord
         // Pad the sequence number to 4 digits (e.g., 0001, 0002, ...)
         $sequenceNumber = str_pad($sequenceNumber, 4, '0', STR_PAD_LEFT);
 
-        // Generate the unique_id in WXXXX_DDMMYY_BOMUNIQUE_ID format
-        $data['unique_id'] = 'W' . $sequenceNumber . '_' . $dateFormat . '_' . $bomUniqueId;
+        // Modify the unique_id format to WXXXX_MMDDYY_BOMUNIQUE_ID
+        // Ensure to use MMDDYY format for the date
+        $data['unique_id'] = 'W' . $sequenceNumber . '_' . $dateFormat . '_' . $bomUniqueId . '_D';
 
         return $data;
     }

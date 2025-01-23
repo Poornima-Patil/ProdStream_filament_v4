@@ -50,9 +50,17 @@ class PurchaseorderResource extends Resource
             ->searchable()
             ->reactive(),
             Forms\Components\Select::make('cust_id')
-            ->label('Customer')
-            ->options(CustomerInformation::pluck('name', 'id')->toArray()) // Get name and id of customers
-            ->required(),
+    ->label('Customer')
+    ->options(function () {
+        // Get the factory_id of the currently logged-in user
+        $userFactoryId = auth()->user()->factory_id;
+
+        // Get the customers whose factory_id matches the logged-in user's factory_id
+        return CustomerInformation::where('factory_id', $userFactoryId)
+            ->pluck('name', 'id') // Pluck the name and id of the customers
+            ->toArray();
+    })
+    ->required(),
             Forms\Components\TextInput::make('QTY')
                 ->required(),
             Forms\Components\Select::make('Unit Of Measurement')
