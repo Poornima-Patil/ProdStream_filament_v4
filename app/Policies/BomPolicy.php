@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\Bom;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class BomPolicy
 {
@@ -13,7 +12,7 @@ class BomPolicy
      */
     public function viewAny(User $user): bool
     {
-       
+
         return $user->hasPermissionTo(permission: 'View Bom');
     }
 

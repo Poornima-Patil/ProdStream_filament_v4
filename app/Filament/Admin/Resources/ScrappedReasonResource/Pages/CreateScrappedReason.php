@@ -3,7 +3,6 @@
 namespace App\Filament\Admin\Resources\ScrappedReasonResource\Pages;
 
 use App\Filament\Admin\Resources\ScrappedReasonResource;
-use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateScrappedReason extends CreateRecord

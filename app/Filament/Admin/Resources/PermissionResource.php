@@ -3,7 +3,6 @@
 namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\PermissionResource\Pages;
-use App\Filament\Admin\Resources\PermissionResource\RelationManagers;
 use App\Models\Permission;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -32,7 +31,7 @@ class PermissionResource extends Resource
                 Forms\Components\TextInput::make('group')
                     ->label('Permission Group')
                     ->required(),
-                    Forms\Components\Hidden::make('factory_id')
+                Forms\Components\Hidden::make('factory_id')
                     ->default(Auth::user()->factory_id) // Set the default value dynamically
                     ->dehydrated(fn ($state) => $state ?? Auth::user()->factory_id),
             ]);
@@ -60,6 +59,7 @@ class PermissionResource extends Resource
             ])->defaultPaginationPageOption(20)
             ->defaultGroup('group');
     }
+
     public static function getRelations(): array
     {
         return [

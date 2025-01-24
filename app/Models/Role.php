@@ -2,12 +2,9 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Permission\Models\Role as ModelsRole;
-use App\Models\Factory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
-
 
 class Role extends ModelsRole
 {
@@ -17,5 +14,4 @@ class Role extends ModelsRole
     {
         return $this->belongsTo(Factory::class);
     }
-
 }

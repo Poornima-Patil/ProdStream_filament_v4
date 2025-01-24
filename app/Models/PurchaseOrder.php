@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Factory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -19,14 +18,16 @@ class PurchaseOrder extends Model
         'supplierInfo',
         'price',
         'factory_id',
-        'cust_id'
+        'cust_id',
     ];
+
     public function partNumber()
     {
-        return $this->belongsTo(PartNumber::class,'part_number_id');
+        return $this->belongsTo(PartNumber::class, 'part_number_id');
     }
 
-    public function boms() {
+    public function boms()
+    {
         return $this->hasMany(Bom::class);
     }
 
@@ -34,8 +35,9 @@ class PurchaseOrder extends Model
     {
         return $this->belongsTo(Factory::class);
     }
+
     public function customer()
-{
-    return $this->belongsTo(CustomerInformation::class, 'cust_id', 'id');
-}
+    {
+        return $this->belongsTo(CustomerInformation::class, 'cust_id', 'id');
+    }
 }

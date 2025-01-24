@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\ScrappedReason;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class ScrappedReasonPolicy
 {

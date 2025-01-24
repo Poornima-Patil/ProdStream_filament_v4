@@ -3,7 +3,6 @@
 namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\PartnumberResource\Pages;
-use App\Filament\Admin\Resources\PartnumberResource\RelationManagers;
 use App\Models\PartNumber;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -14,13 +13,14 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Validation\Rule;
 
-
 class PartnumberResource extends Resource
 {
     protected static ?string $model = PartNumber::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-tag';
+
     protected static ?string $navigationGroup = 'Admin Operations';
+
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
     public static function form(Form $form): Form
@@ -37,7 +37,7 @@ class PartnumberResource extends Resource
                         })
                         ->ignore(request()->route('record')), // Exclude current record during editing
                 ])->reactive(),
-    
+
             Forms\Components\TextInput::make('revision')
                 ->default(0)
                 ->required()
@@ -50,7 +50,7 @@ class PartnumberResource extends Resource
                         })
                         ->ignore(request()->route('record')), // Exclude current record during editing
                 ])->reactive(),
-    
+
             Forms\Components\TextInput::make('description')
                 ->required()
                 ->label('Description'), // This will now update correctly without unnecessary checks
@@ -61,19 +61,20 @@ class PartnumberResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('partnumber'),
+                Tables\Columns\TextColumn::make('partnumber')
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('revision'),
                 Tables\Columns\TextColumn::make('description'),
-               
+
             ])
             ->filters([
-                //
+                Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
-                ->label('Edit Partnumber'),
+                    ->label('Edit Partnumber'),
                 Tables\Actions\ViewAction::make()
-                ->hiddenLabel()
+                    ->hiddenLabel(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -100,16 +101,16 @@ class PartnumberResource extends Resource
         ];
     }
 
-   /* private function validateUniqueCombination($partnumber, $revision, callable $get)
-    {
-        if (PartNumber::where('partnumber', $partnumber)->where('revision', $revision)->exists()) {
-            dd($partnumber);
-            $get('unique_error', 'The combination of part number and revision must be unique.');
-        } else {
-            dd($partnumber);
-            $get('unique_error', null);
-        }
-    }*/
+    /* private function validateUniqueCombination($partnumber, $revision, callable $get)
+     {
+         if (PartNumber::where('partnumber', $partnumber)->where('revision', $revision)->exists()) {
+             dd($partnumber);
+             $get('unique_error', 'The combination of part number and revision must be unique.');
+         } else {
+             dd($partnumber);
+             $get('unique_error', null);
+         }
+     }*/
 
     public static function getEloquentQuery(): Builder
     {

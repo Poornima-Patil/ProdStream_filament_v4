@@ -3,7 +3,6 @@
 namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\DepartmentResource\Pages;
-use App\Filament\Admin\Resources\DepartmentResource\RelationManagers;
 use App\Models\Department;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -16,6 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 class DepartmentResource extends Resource
 {
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
+
     protected static ?string $model = Department::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-briefcase';
@@ -36,19 +36,19 @@ class DepartmentResource extends Resource
         return $table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
-                ->searchable()
-                ->sortable(),
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('description'),
 
             ])
             ->filters([
-                //
+                Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
-                ->label('Edit Dept'),
+                    ->label('Edit Dept'),
                 Tables\Actions\ViewAction::make()
-                ->hiddenLabel()
+                    ->hiddenLabel(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

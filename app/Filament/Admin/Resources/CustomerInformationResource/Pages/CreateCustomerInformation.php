@@ -3,9 +3,8 @@
 namespace App\Filament\Admin\Resources\CustomerInformationResource\Pages;
 
 use App\Filament\Admin\Resources\CustomerInformationResource;
-use Filament\Actions;
-use Filament\Resources\Pages\CreateRecord;
 use App\Models\CustomerInformation;
+use Filament\Resources\Pages\CreateRecord;
 
 class CreateCustomerInformation extends CreateRecord
 {

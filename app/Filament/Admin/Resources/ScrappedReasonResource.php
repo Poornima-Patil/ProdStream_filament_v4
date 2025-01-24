@@ -3,19 +3,17 @@
 namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\ScrappedReasonResource\Pages;
-use App\Filament\Admin\Resources\ScrappedReasonResource\RelationManagers;
 use App\Models\ScrappedReason;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class ScrappedReasonResource extends Resource
 {
     protected static ?string $model = ScrappedReason::class;
+
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
     protected static ?string $navigationIcon = 'heroicon-o-trash';
@@ -27,9 +25,9 @@ class ScrappedReasonResource extends Resource
         return $form
             ->schema([
                 Forms\Components\TextInput::make('code')
-                ->required(),
+                    ->required(),
                 Forms\Components\TextInput::make('description')
-                ->required(),
+                    ->required(),
             ]);
     }
 
@@ -37,16 +35,17 @@ class ScrappedReasonResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('code'),
-                Tables\Columns\TextColumn::make('description'),
+                Tables\Columns\TextColumn::make('code')->searchable()->sortable(),
+                Tables\Columns\TextColumn::make('description')
+                    ->searchable(),
 
             ])
             ->filters([
-                //
+                Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\ViewAction::make()
+                Tables\Actions\ViewAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

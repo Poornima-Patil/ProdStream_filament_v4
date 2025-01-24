@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\PartNumber;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class PartNumberPolicy
 {
@@ -37,7 +36,7 @@ class PartNumberPolicy
      */
     public function update(User $user, PartNumber $partNumber): bool
     {
-    return $user->hasPermissionTo(permission: 'Edit PartNumber');
+        return $user->hasPermissionTo(permission: 'Edit PartNumber');
     }
 
     /**

@@ -3,7 +3,6 @@
 namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\OperatorProficiencyResource\Pages;
-use App\Filament\Admin\Resources\OperatorProficiencyResource\RelationManagers;
 use App\Models\OperatorProficiency;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -16,9 +15,11 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 class OperatorProficiencyResource extends Resource
 {
     protected static ?string $model = OperatorProficiency::class;
+
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
     protected static ?string $navigationIcon = 'heroicon-o-star';
+
     protected static ?string $navigationGroup = 'Admin Operations';
 
     public static function form(Form $form): Form
@@ -26,12 +27,12 @@ class OperatorProficiencyResource extends Resource
         return $form
             ->schema([
                 Forms\Components\TextInput::make('proficiency')
-                ->label('Proficiency')
-                ->required(),
+                    ->label('Proficiency')
+                    ->required(),
                 Forms\Components\TextInput::make('description')
-                ->label('Description')
-                ->required(),
-                
+                    ->label('Description')
+                    ->required(),
+
             ]);
     }
 
@@ -39,21 +40,20 @@ class OperatorProficiencyResource extends Resource
     {
         return $table
             ->columns([
-               
-                    Tables\Columns\TextColumn::make('proficiency')
+
+                Tables\Columns\TextColumn::make('proficiency')
                     ->searchable()
                     ->sortable(),
-                    Tables\Columns\TextColumn::make('description'),
-    
-                ])
-        
+                Tables\Columns\TextColumn::make('description'),
+
+            ])
             ->filters([
-                //
+                Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\ViewAction::make()
-                ->hiddenLabel()
+                    ->hiddenLabel(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

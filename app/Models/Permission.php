@@ -2,11 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Permission\Models\Permission as ModelsPermission;
 
-use App\Models\Factory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Permission extends ModelsPermission
 {
     use SoftDeletes;
@@ -18,4 +17,3 @@ class Permission extends ModelsPermission
         return $this->belongsTo(Factory::class);
     }
 }
-

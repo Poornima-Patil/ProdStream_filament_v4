@@ -2,12 +2,8 @@
 
 namespace App\Filament\Admin\Resources;
 
-use Illuminate\Support\Facades\Auth;
-use Filament\Support\Colors\Color;
-use Illuminate\Support\Facades\Storage;
 use App\Filament\Admin\Resources\CustomerInformationResource\Pages;
-use App\Filament\Admin\Resources\CustomerInformationResource\RelationManagers;
-use App\Models\Bom;
+use App\Models\CustomerInformation;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -15,28 +11,22 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Facades\Filament;
-use Filament\Infolists\Infolist;
-use Filament\Infolists\Components\Section;
-use Filament\Infolists\Components\IconEntry;
-use Filament\Infolists\Components\TextEntry;
-use App\Models\CustomerInformation;
 
 class CustomerInformationResource extends Resource
 {
     protected static ?string $model = CustomerInformation::class;
+
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
+
     protected static ?string $navigationGroup = 'Admin Operations';
-
-
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-               Forms\Components\TextInput::make('name')->required(),
+                Forms\Components\TextInput::make('name')->required(),
                 Forms\Components\Textarea::make('address')->required(),
             ]);
     }
@@ -77,7 +67,7 @@ class CustomerInformationResource extends Resource
             'edit' => Pages\EditCustomerInformation::route('/{record}/edit'),
         ];
     }
-    
+
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()

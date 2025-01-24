@@ -3,7 +3,6 @@
 namespace App\Filament\Admin\Resources\OperatorResource\Pages;
 
 use App\Filament\Admin\Resources\OperatorResource;
-use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateOperator extends CreateRecord

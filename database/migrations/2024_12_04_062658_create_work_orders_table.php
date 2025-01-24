@@ -25,7 +25,7 @@ return new class extends Migration
             $table->timestamps();
             $table->foreignId('factory_id')->constrained();
             $table->softDeletes();
-           
+
         });
 
     }

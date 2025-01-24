@@ -3,10 +3,10 @@
 namespace Database\Seeders;
 
 use App\Models\Permission;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
-use App\Models\User;
+
 class PermissionsTableSeeder extends Seeder
 {
     /**
@@ -14,8 +14,8 @@ class PermissionsTableSeeder extends Seeder
      */
     public function run(): void
     {
-         // Define permissions
-         $permissions = [
+        // Define permissions
+        $permissions = [
             'View Bom',
             'Create Bom',
             'Edit Bom',
@@ -56,7 +56,6 @@ class PermissionsTableSeeder extends Seeder
             'Edit PurchaseOrder',
             'Delete PurchaseOrder',
 
-            
             'View Role',
             'Create Role',
             'Edit Role',
@@ -85,10 +84,10 @@ class PermissionsTableSeeder extends Seeder
             'Create Factory',
             'View Factory',
             'Edit Factory',
-            'Delete Factory'
-         ];
+            'Delete Factory',
+        ];
 
-         foreach ($permissions as $permission) {
+        foreach ($permissions as $permission) {
             // Extract group name by removing the first word
             $words = explode(' ', $permission, 2);
             $groupName = $words[1] ?? $permission; // Group name is everything after the first word
@@ -101,14 +100,13 @@ class PermissionsTableSeeder extends Seeder
                 'factory_id' => 3,
             ]);
 
-            //$role1 = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web', 'factory_id'=> 1]);
+            // $role1 = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web', 'factory_id'=> 1]);
 
             // Assign role
             $perm->assignRole('Super Admin');
 
         }
-        $user= User::find(1);
+        $user = User::find(1);
         $user->assignRole('Super Admin');
     }
-
 }

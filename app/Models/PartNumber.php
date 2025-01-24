@@ -4,18 +4,18 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\Factory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PartNumber extends Model
 {
     use HasFactory,SoftDeletes;
+
     protected $fillable = [
         'partnumber',
         'revision',
         'description',
-        'factory_id'
+        'factory_id',
     ];
 
     public function purchaseOrders()

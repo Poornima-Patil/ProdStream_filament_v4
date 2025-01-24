@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\Factory;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class FactoryPolicy
 {
@@ -13,7 +12,7 @@ class FactoryPolicy
      */
     public function viewAny(User $user): bool
     {
-        //return true;
+        // return true;
         return $user->hasPermissionTo(permission: 'View Factory');
     }
 
@@ -22,9 +21,9 @@ class FactoryPolicy
      */
     public function view(User $user, Factory $factory): bool
     {
-        //return true;
+        // return true;
 
-         return $user->hasPermissionTo(permission: 'View Factory');
+        return $user->hasPermissionTo(permission: 'View Factory');
     }
 
     /**
@@ -32,7 +31,7 @@ class FactoryPolicy
      */
     public function create(User $user): bool
     {
-        //return true;
+        // return true;
 
         return $user->hasPermissionTo(permission: 'Create Factory');
     }
@@ -42,7 +41,7 @@ class FactoryPolicy
      */
     public function update(User $user, Factory $factory): bool
     {
-        //return true;
+        // return true;
 
         return $user->hasPermissionTo(permission: 'Edit Factory');
     }
@@ -52,7 +51,7 @@ class FactoryPolicy
      */
     public function delete(User $user, Factory $factory): bool
     {
-        //return true;
+        // return true;
 
         return $user->hasPermissionTo(permission: 'Delete Factory');
     }
@@ -62,7 +61,7 @@ class FactoryPolicy
      */
     public function restore(User $user, Factory $factory): bool
     {
-     //   return true;
+        //   return true;
 
         return $user->hasPermissionTo(permission: 'Delete Factory');
     }

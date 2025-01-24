@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Filament\Resources\Resource;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CustomerInformation extends Model
@@ -21,13 +20,12 @@ class CustomerInformation extends Model
     public function factory()
     {
         return $this->belongsTo(Factory::class);
-    }   
-
+    }
 
     public function purchaseOrders()
-{
-    return $this->hasMany(PurchaseOrder::class, 'cust_id', 'id');
-}
+    {
+        return $this->hasMany(PurchaseOrder::class, 'cust_id', 'id');
+    }
 
     // Additional methods or relationships can be defined here if needed.
 }

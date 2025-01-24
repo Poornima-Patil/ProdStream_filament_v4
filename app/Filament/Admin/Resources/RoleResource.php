@@ -3,7 +3,6 @@
 namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\RoleResource\Pages;
-use App\Filament\Admin\Resources\RoleResource\RelationManagers;
 use App\Models\Role;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -31,7 +30,7 @@ class RoleResource extends Resource
                     ->multiple()
                     ->relationship('permissions', 'name')
                     ->preload(),
-                    Forms\Components\Hidden::make('factory_id')
+                Forms\Components\Hidden::make('factory_id')
                     ->default(Auth::user()->factory_id) // Set the default value dynamically
                     ->dehydrated(fn ($state) => $state ?? Auth::user()->factory_id),
             ]);
