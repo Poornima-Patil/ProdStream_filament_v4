@@ -10,6 +10,11 @@ class EditOperatorProficiency extends EditRecord
 {
     protected static string $resource = OperatorProficiencyResource::class;
 
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
+
     protected function getHeaderActions(): array
     {
         return [

@@ -6,10 +6,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Bom extends Model
+class Bom extends Model  implements HasMedia
 {
-    use HasFactory,SoftDeletes;
+    use HasFactory,SoftDeletes,InteractsWithMedia;
 
     protected $fillable = [
         'purchase_order_id',
@@ -35,7 +37,7 @@ class Bom extends Model
 
     public function machine()
     {
-        return $this->belongsTo(Machine::class, 'id');
+        return $this->belongsTo(Machine::class, 'machine_id');
     }
 
     public function workOrders()

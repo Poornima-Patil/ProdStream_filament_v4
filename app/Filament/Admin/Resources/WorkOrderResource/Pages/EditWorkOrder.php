@@ -6,6 +6,7 @@ use App\Filament\Admin\Resources\WorkOrderResource;
 use Filament\Actions;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use App\Models\Bom;
 
 class EditWorkOrder extends EditRecord
 {
@@ -44,6 +45,15 @@ class EditWorkOrder extends EditRecord
                 ->send();
 
             $this->halt(); // Stop the save process
+
+
+
         }
+       
+       
+    }
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
     }
 }

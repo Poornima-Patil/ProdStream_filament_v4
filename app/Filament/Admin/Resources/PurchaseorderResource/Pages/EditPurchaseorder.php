@@ -10,6 +10,11 @@ class EditPurchaseorder extends EditRecord
 {
     protected static string $resource = PurchaseorderResource::class;
 
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
+
     protected function getHeaderActions(): array
     {
         return [

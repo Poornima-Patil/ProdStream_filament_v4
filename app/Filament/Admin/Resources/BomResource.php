@@ -19,6 +19,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Filament\Tables\Enums\ActionsPosition;
+use Filament\Infolists\Components\Actions\Action;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
+use Filament\Forms\Components\Html;
+
 
 class BomResource extends Resource
 {
@@ -49,10 +54,17 @@ class BomResource extends Resource
                     ->required()
                     ->searchable()
                     ->reactive()
-                    ->preload(),
+                    ->preload()
+                    ->formatStateUsing(function ($record) {
+                        if ($record && $record->purchaseOrder) {
+                            return $record->purchaseOrder->partnumber->id ?? null;
+                        }
+
+                        return null; // Return null if the part number doesn't exist
+                    }),
 
                 Forms\Components\Select::make('purchase_order_id')
-                    ->label('Customer Information')
+                    ->label('Sales Order line')
                     ->options(function (callable $get) {
                         $factoryId = Auth::user()->factory_id; // Get the factory ID of the logged-in user
                         $partNumberId = $get('part_number_id'); // Get the selected PartNumber ID
@@ -81,6 +93,7 @@ class BomResource extends Resource
                         return 'tenants/'.$tenant->id;
                     })
                     ->disk('public')
+                    ->multiple()
                     ->preserveFilenames(),
 
                 Forms\Components\FileUpload::make('process_flowchart')
@@ -91,7 +104,18 @@ class BomResource extends Resource
                         return 'tenants/'.$tenant->id;
                     })
                     ->disk('public')
-                    ->preserveFilenames(),
+                    ->preserveFilenames()
+                    ->multiple(),
+                
+                /*SpatieMediaLibraryFileUpload::make('requirement_pkg')
+                    ->multiple()
+                    ->preserveFilenames()
+                    ->collection('requirement_pkg'),
+
+                    SpatieMediaLibraryFileUpload::make('process_flowchart')
+                    ->multiple()
+                    ->preserveFilenames()*/
+
                 Forms\Components\Select::make('machine_id')
                     ->label('Machine')
                     ->options(function () {
@@ -100,7 +124,7 @@ class BomResource extends Resource
                         return \App\Models\Machine::where('status', '1')
                             ->where('factory_id', $factoryId)
                             ->pluck('name', 'id');
-                    }),
+                })->required(),
 
                 Forms\Components\Select::make('operator_proficiency_id')
                     ->label('Proficiency')
@@ -116,13 +140,15 @@ class BomResource extends Resource
                 Forms\Components\Select::make('status')->options([
                     '1' => 'Active',
                     '0' => 'InActive',
-                ]),
+                ])->required(),
             ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
+
+        
             ->columns([
                 Tables\Columns\TextColumn::make('unique_id')->label('Unique ID')
                     ->searchable()
@@ -147,18 +173,21 @@ class BomResource extends Resource
                 Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([
+                Tables\Actions\ActionGroup::make([
                 Tables\Actions\EditAction::make()
                     ->label('Edit BOM'),
                 Tables\Actions\ViewAction::make()
                     ->hiddenLabel(),
-            ])
+                ])->label('Actions')
+                ->button(),
+                ], position: ActionsPosition::BeforeColumns)
+            
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
     }
-
     public static function getRelations(): array
     {
         return [
@@ -206,27 +235,34 @@ class BomResource extends Resource
                         IconEntry::make('status')->label('Status'),
 
                     ])->columns(),
-
-                // Section 2: Remaining fields
-                Section::make('Documents')
+                    Section::make('Documents')
                     ->collapsible()
                     ->schema([
                         TextEntry::make('requirement_pkg')
-                            ->formatStateUsing(fn () => 'Download Requirement Pkg')
-                                     // URL to be used for the download (link), and the second parameter is for the new tab
-                            ->url(fn ($record) => Storage::url($record->requirement_pkg), true)
-                                     // This will make the link look like a "badge" (blue)
-                            ->badge()
-                            ->color(Color::Blue),
-                        TextEntry::make('process_flowchart')
-                            ->formatStateUsing(fn () => 'Download Process Flowchart')
-                                                // URL to be used for the download (link), and the second parameter is for the new tab
-                            ->url(fn ($record) => Storage::url($record->process_flowchart), true)
-                                                // This will make the link look like a "badge" (blue)
-                            ->badge()
-                            ->color(Color::Blue),
+                        ->label('Download Requirement Package')
+                        ->state(fn ($record) => 
+                            $record->requirement_pkg 
+                                ? collect(json_decode($record->requirement_pkg, true)) // Decode JSON string to an array
+                                    ->map(fn ($file) => '<a href="' . Storage::url($file) . '" download class="block text-blue-500 underline">' . basename($file) . '</a>') // Display the file name instead of "Download"
+                                    ->implode('<br>') // Join links with line breaks
+                                : 'No files uploaded' // Fallback if no files exist
+                        )
+                        ->html(), // Enables HTML rendering
+                    
+                    TextEntry::make('process_flowchart')
+                        ->label('Download Process Flowchart')
+                        ->state(fn ($record) => 
+                            $record->process_flowchart 
+                                ? collect(json_decode($record->process_flowchart, true)) // Decode JSON string to an array
+                                    ->map(fn ($file) => '<a href="' . Storage::url($file) . '" download class="block text-blue-500 underline">' . basename($file) . '</a>') // Display the file name instead of "Download"
+                                    ->implode('<br>') // Join links with line breaks
+                                : 'No files uploaded' // Fallback if no files exist
+                        )
+                        ->html(),
+                    ])
+                    ->columns(),
 
-                    ])->columns(),
+                    
             ]);
     }
 

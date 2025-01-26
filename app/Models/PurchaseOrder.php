@@ -19,6 +19,7 @@ class PurchaseOrder extends Model
         'price',
         'factory_id',
         'cust_id',
+        'unique_id',
     ];
 
     public function partNumber()

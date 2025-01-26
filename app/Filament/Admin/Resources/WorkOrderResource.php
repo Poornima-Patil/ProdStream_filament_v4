@@ -86,19 +86,24 @@ class WorkOrderResource extends Resource
                     ->required()
                     ->reactive()
                     ->searchable()
-                    ->disabled(! $isAdminOrManager),
+                    ->disabled(! $isAdminOrManager)
+                    ->afterStateUpdated(function(callable $get, callable $set) {
+                        $bomId = $get('bom_id');
+
+                        $bom = \App\Models\Bom::find($bomId);
+                        $set('machine_id', $bom->machine_id);
+                       
+                    }),
+
+                    Forms\Components\TextInput::make('machine_id')
+                    ->readonly(),
+                    
                 Forms\Components\TextInput::make('qty')
                     ->label('Quantity')
                     ->required()
                     ->disabled(! $isAdminOrManager),
-                Forms\Components\Select::make('machine_id')
-                    ->label('Machine')
-                    ->relationship('machine', 'name', function ($query) {
-                        $factoryId = Auth::user()->factory_id; // Adjust based on how you get factory_id
-                        $query->where('factory_id', $factoryId);
-                    })
-                    ->required()
-                    ->disabled(! $isAdminOrManager),
+
+                   
                 Forms\Components\Select::make('operator_id')
                     ->label('Operator')
                     ->disabled(! $isAdminOrManager)
@@ -382,22 +387,30 @@ class WorkOrderResource extends Resource
                     ])
                     ->columns(1),
 
-                Section::make('Documents')
+                    Section::make('Documents')
                     ->collapsible()
                     ->schema([
                         TextEntry::make('requirement_pkg')
-                            ->state(fn ($record) => $record->bom ? $record->bom->requirement_pkg : null)
-                            ->formatStateUsing(fn () => 'Download Requirement Pkg')
-                            ->url(fn ($record) => Storage::url($record->bom->requirement_pkg), true)
-                            ->badge()
-                            ->color('blue'),
+                            ->state(fn ($record) => 
+                                $record->bom && $record->bom->requirement_pkg 
+                                    ? collect(json_decode($record->bom->requirement_pkg, true)) // Decode the JSON string to an array
+                                        ->map(fn ($file) => '<a href="' . Storage::url($file) . '" download class="block text-blue-500 underline">' . basename($file) . '</a>') // Display file name as link
+                                        ->implode('<br>') // Concatenate the links with line breaks
+                                    : 'No files uploaded' // Fallback if no files exist
+                            )
+                            ->html(), // Enables HTML rendering
+                
                         TextEntry::make('process_flowchart')
-                            ->state(fn ($record) => $record->bom ? $record->bom->process_flowchart : null)
-                            ->formatStateUsing(fn () => 'Download Process Flowchart')
-                            ->url(fn ($record) => Storage::url($record->bom->process_flowchart), true)
-                            ->badge()
-                            ->color('blue'),
-                    ])->columns(1),
+                            ->state(fn ($record) => 
+                                $record->bom && $record->bom->process_flowchart 
+                                    ? collect(json_decode($record->bom->process_flowchart, true)) // Decode the JSON string to an array
+                                        ->map(fn ($file) => '<a href="' . Storage::url($file) . '" download class="block text-blue-500 underline">' . basename($file) . '</a>') // Display file name as link
+                                        ->implode('<br>') // Concatenate the links with line breaks
+                                    : 'No files uploaded' // Fallback if no files exist
+                            )
+                            ->html(), // Enables HTML rendering
+                    ])
+                    ->columns(1),
             ]);
     }
 

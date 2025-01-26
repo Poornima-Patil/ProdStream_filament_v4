@@ -26,7 +26,7 @@ class PurchaseorderResource extends Resource
 
     public static function getLabel(): string
     {
-        return 'Customer Order Lines'; // This will be displayed in the left panel
+        return 'Sales Order lines'; // This will be displayed in the left panel
     }
 
     public static function form(Form $form): Form
@@ -79,6 +79,8 @@ class PurchaseorderResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('unique_id')->label('Unique ID')
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('customer.customer_id')->label('Customer ID')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('partnumber.partnumber')
@@ -96,7 +98,7 @@ class PurchaseorderResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
-                    ->label('Edit Customer Order Line'),
+                    ->label('Edit Sales Order Line'),
                 Tables\Actions\ViewAction::make()
                     ->hiddenLabel(),
             ])
