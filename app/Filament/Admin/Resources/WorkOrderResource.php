@@ -391,26 +391,47 @@ class WorkOrderResource extends Resource
                     ->collapsible()
                     ->schema([
                         TextEntry::make('requirement_pkg')
-                            ->state(fn ($record) => 
-                                $record->bom && $record->bom->requirement_pkg 
-                                    ? collect(json_decode($record->bom->requirement_pkg, true)) // Decode the JSON string to an array
-                                        ->map(fn ($file) => '<a href="' . Storage::url($file) . '" download class="block text-blue-500 underline">' . basename($file) . '</a>') // Display file name as link
-                                        ->implode('<br>') // Concatenate the links with line breaks
-                                    : 'No files uploaded' // Fallback if no files exist
-                            )
-                            ->html(), // Enables HTML rendering
-                
-                        TextEntry::make('process_flowchart')
-                            ->state(fn ($record) => 
-                                $record->bom && $record->bom->process_flowchart 
-                                    ? collect(json_decode($record->bom->process_flowchart, true)) // Decode the JSON string to an array
-                                        ->map(fn ($file) => '<a href="' . Storage::url($file) . '" download class="block text-blue-500 underline">' . basename($file) . '</a>') // Display file name as link
-                                        ->implode('<br>') // Concatenate the links with line breaks
-                                    : 'No files uploaded' // Fallback if no files exist
-                            )
-                            ->html(), // Enables HTML rendering
-                    ])
-                    ->columns(1),
+                        ->state(function ($record) {
+                            // Access the related BOM
+                            $bom = $record->bom;
+                            if (!$bom) {
+                                return 'No BOM associated'; // Fallback if no BOM is linked
+                            }
+            
+                            // Fetch media from the BOM's 'requirement_pkg' collection
+                            $mediaItems = $bom->getMedia('requirement_pkg');
+                            if ($mediaItems->isEmpty()) {
+                                return 'No files uploaded'; // Fallback if no files exist
+                            }
+            
+                            return $mediaItems->map(function ($media) {
+                                // Use target="_blank" to open in a new tab
+                                return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>"; 
+                            })->implode('<br>'); // Concatenate links with line breaks
+                        })
+                        ->html(), // Enable HTML rendering
+            
+                    TextEntry::make('process_flowchart')
+                        ->state(function ($record) {
+                            // Access the related BOM
+                            $bom = $record->bom;
+                            if (!$bom) {
+                                return 'No BOM associated'; // Fallback if no BOM is linked
+                            }
+            
+                            // Fetch media from the BOM's 'process_flowchart' collection
+                            $mediaItems = $bom->getMedia('process_flowchart');
+                            if ($mediaItems->isEmpty()) {
+                                return 'No files uploaded'; // Fallback if no files exist
+                            }
+            
+                            return $mediaItems->map(function ($media) {
+                                // Use target="_blank" to open in a new tab
+                                return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>"; 
+                            })->implode('<br>'); // Concatenate links with line breaks
+                        })
+                        ->html(),
+                    ])->columns(1),
             ]);
     }
 

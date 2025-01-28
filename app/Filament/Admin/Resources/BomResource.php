@@ -85,36 +85,18 @@ class BomResource extends Resource
                     })
                     ->required()
                     ->reactive(),
-                Forms\Components\FileUpload::make('requirement_pkg')
-                    ->label(label: 'Requirement Package')
-                    ->directory(function () {
-                        $tenant = Filament::getTenant();
-
-                        return 'tenants/'.$tenant->id;
-                    })
-                    ->disk('public')
-                    ->multiple()
-                    ->preserveFilenames(),
-
-                Forms\Components\FileUpload::make('process_flowchart')
-                    ->label(label: 'Process Flowchart')
-                    ->directory(function () {
-                        $tenant = Filament::getTenant();
-
-                        return 'tenants/'.$tenant->id;
-                    })
-                    ->disk('public')
-                    ->preserveFilenames()
-                    ->multiple(),
-                
-                /*SpatieMediaLibraryFileUpload::make('requirement_pkg')
+              
+                SpatieMediaLibraryFileUpload::make('requirement_pkg')
                     ->multiple()
                     ->preserveFilenames()
-                    ->collection('requirement_pkg'),
+                    ->collection('requirement_pkg')
+                    ->required(),
 
                     SpatieMediaLibraryFileUpload::make('process_flowchart')
                     ->multiple()
-                    ->preserveFilenames()*/
+                    ->preserveFilenames()
+                    ->collection('process_flowchart')
+                    ->required(),
 
                 Forms\Components\Select::make('machine_id')
                     ->label('Machine')
@@ -157,11 +139,39 @@ class BomResource extends Resource
                 Tables\Columns\TextColumn::make('purchaseorder.partnumber.partnumber')->label('PartNumber')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('purchaseorder.partnumber.revision')->label('Revision'),
+              
                 Tables\Columns\TextColumn::make('requirement_pkg')
-                    ->visibleOn('Edit'),
-                Tables\Columns\TextColumn::make('process_flowchart')
-                    ->visibleOn('Edit'),
+                    ->label('Download Files')
+                    ->state(function (Bom $record) {
 
+                        $mediaItems = $record->getMedia('requirement_pkg');
+                        if ($mediaItems->isEmpty()) {
+                            return 'No Files';
+                        }
+
+                        return $mediaItems->map(function ($media) {
+                            // Use target="_blank" to open in a new tab
+                            return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>"; 
+                        })->implode('<br>'); // Concatenate links with line breaks
+                    })
+                    ->html(),
+
+
+                    Tables\Columns\TextColumn::make('process_flowchart')
+                    ->label('Download Files')
+                    ->state(function (Bom $record) {
+
+                        $mediaItems = $record->getMedia('process_flowchart');
+                        if ($mediaItems->isEmpty()) {
+                            return 'No Files';
+                        }
+
+                        return $mediaItems->map(function ($media) {
+                            // Use target="_blank" to open in a new tab
+                            return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>"; 
+                        })->implode('<br>'); // Concatenate links with line breaks
+                    })
+                    ->html(),
                 Tables\Columns\TextColumn::make('machine.name'),
                 Tables\Columns\TextColumn::make('operatorproficiency.proficiency'),
                 Tables\Columns\TextColumn::make('lead_time')->label('Target Completion Time')->wrap(),
@@ -239,26 +249,38 @@ class BomResource extends Resource
                     ->collapsible()
                     ->schema([
                         TextEntry::make('requirement_pkg')
-                        ->label('Download Requirement Package')
-                        ->state(fn ($record) => 
-                            $record->requirement_pkg 
-                                ? collect(json_decode($record->requirement_pkg, true)) // Decode JSON string to an array
-                                    ->map(fn ($file) => '<a href="' . Storage::url($file) . '" download class="block text-blue-500 underline">' . basename($file) . '</a>') // Display the file name instead of "Download"
-                                    ->implode('<br>') // Join links with line breaks
-                                : 'No files uploaded' // Fallback if no files exist
-                        )
-                        ->html(), // Enables HTML rendering
+                    ->label('Download Requirement Package Files')
+                    ->state(function (Bom $record) {
+
+                        $mediaItems = $record->getMedia('requirement_pkg');
+                        if ($mediaItems->isEmpty()) {
+                            return 'No Files';
+                        }
+
+                        return $mediaItems->map(function ($media) {
+                            // Use target="_blank" to open in a new tab
+                            return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>"; 
+                        })->implode('<br>'); // Concatenate links with line breaks
+                        
+                    })
+                    ->html(),
                     
                     TextEntry::make('process_flowchart')
-                        ->label('Download Process Flowchart')
-                        ->state(fn ($record) => 
-                            $record->process_flowchart 
-                                ? collect(json_decode($record->process_flowchart, true)) // Decode JSON string to an array
-                                    ->map(fn ($file) => '<a href="' . Storage::url($file) . '" download class="block text-blue-500 underline">' . basename($file) . '</a>') // Display the file name instead of "Download"
-                                    ->implode('<br>') // Join links with line breaks
-                                : 'No files uploaded' // Fallback if no files exist
-                        )
-                        ->html(),
+                    ->label('Download Process Flowchart Files')
+                    ->state(function (Bom $record) {
+
+                        $mediaItems = $record->getMedia('process_flowchart');
+                        if ($mediaItems->isEmpty()) {
+                            return 'No Files';
+                        }
+                        return $mediaItems->map(function ($media) {
+                            // Use target="_blank" to open in a new tab
+                            return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>"; 
+                        })->implode('<br>'); // Concatenate links with line breaks
+                       
+                    })
+                    ->html(),
+                   
                     ])
                     ->columns(),
 

@@ -15,11 +15,7 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('purchase_order_id')->constrained();
-            $table->binary('requirement_pkg')
-                ->disk('public') // Specify the disk where files should be stored
-                ->directory('uploads/requirements') // Directory to store the files->nullable();
-                ->nullable;
-            $table->binary('process_flowchart')->nullable();
+         
             $table->foreignId('machine_id')->constrained();
             $table->foreignId('operator_proficiency_id')->constrained();
             $table->dateTime('lead_time')->nullable();
