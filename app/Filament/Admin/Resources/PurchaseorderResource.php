@@ -59,8 +59,12 @@ class PurchaseorderResource extends Resource
 
                         // Get the customers whose factory_id matches the logged-in user's factory_id
                         return CustomerInformation::where('factory_id', $userFactoryId)
-                            ->pluck('name', 'id') // Pluck the name and id of the customers
-                            ->toArray();
+            ->pluck('name', 'id') // Pluck the name and id of the customers
+            ->mapWithKeys(function ($name, $id) {
+                $customer = CustomerInformation::find($id);
+                return [$id => "{$customer->customer_id} - {$name}"]; // Format as unique_id - name
+            })
+            ->toArray();
                     })
                     ->required(),
                 Forms\Components\TextInput::make('QTY')

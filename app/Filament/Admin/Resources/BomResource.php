@@ -80,7 +80,7 @@ class BomResource extends Resource
                             ->mapWithKeys(function ($purchaseOrder) {
                                 $description = $purchaseOrder->partNumber->description ?? 'No description available';
 
-                                return [$purchaseOrder->id => "Purchase Order ID: {$purchaseOrder->id} - {$description}"];
+                                return [$purchaseOrder->id => "Sales Order ID: {$purchaseOrder->unique_id} - {$description}"];
                             });
                     })
                     ->required()
@@ -140,41 +140,18 @@ class BomResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('purchaseorder.partnumber.revision')->label('Revision'),
               
-                Tables\Columns\TextColumn::make('requirement_pkg')
-                    ->label('Download Files')
-                    ->state(function (Bom $record) {
-
-                        $mediaItems = $record->getMedia('requirement_pkg');
-                        if ($mediaItems->isEmpty()) {
-                            return 'No Files';
-                        }
-
-                        return $mediaItems->map(function ($media) {
-                            // Use target="_blank" to open in a new tab
-                            return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>"; 
-                        })->implode('<br>'); // Concatenate links with line breaks
-                    })
-                    ->html(),
+              
 
 
-                    Tables\Columns\TextColumn::make('process_flowchart')
-                    ->label('Download Files')
-                    ->state(function (Bom $record) {
-
-                        $mediaItems = $record->getMedia('process_flowchart');
-                        if ($mediaItems->isEmpty()) {
-                            return 'No Files';
-                        }
-
-                        return $mediaItems->map(function ($media) {
-                            // Use target="_blank" to open in a new tab
-                            return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>"; 
-                        })->implode('<br>'); // Concatenate links with line breaks
-                    })
-                    ->html(),
+                   
                 Tables\Columns\TextColumn::make('machine.name'),
                 Tables\Columns\TextColumn::make('operatorproficiency.proficiency'),
-                Tables\Columns\TextColumn::make('lead_time')->label('Target Completion Time')->wrap(),
+                Tables\Columns\TextColumn::make('lead_time')
+    ->label('Target Completion Time')
+
+                ->formatStateUsing(function ($state) {
+                    return \Carbon\Carbon::parse($state)->format('d M Y'); // Format as d M Y
+                }),
                 Tables\Columns\IconColumn::make('status')
                     ->boolean(),
 
@@ -188,7 +165,7 @@ class BomResource extends Resource
                     ->label('Edit BOM'),
                 Tables\Actions\ViewAction::make()
                     ->hiddenLabel(),
-                ])->label('Actions')
+                ])->label('')
                 ->button(),
                 ], position: ActionsPosition::BeforeColumns)
             

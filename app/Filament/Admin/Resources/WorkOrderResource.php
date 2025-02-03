@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use App\Models\Machine;
+use Filament\Tables\Filters\SelectFilter;
 
 class WorkOrderResource extends Resource
 {
@@ -86,17 +88,27 @@ class WorkOrderResource extends Resource
                     ->required()
                     ->reactive()
                     ->searchable()
-                    ->disabled(! $isAdminOrManager)
-                    ->afterStateUpdated(function(callable $get, callable $set) {
-                        $bomId = $get('bom_id');
+                    ->disabled(! $isAdminOrManager),
 
-                        $bom = \App\Models\Bom::find($bomId);
-                        $set('machine_id', $bom->machine_id);
-                       
-                    }),
+                    Forms\Components\Select::make('machine_id')
+    ->label('Machine')
+    ->options(function (callable $get) {
+        $bomId = $get('bom_id'); // Get the selected BOM ID
+        if (! $bomId) {
+            return []; // No BOM selected, return empty options
+        }
 
-                    Forms\Components\TextInput::make('machine_id')
-                    ->readonly(),
+        // Get the associated machines for the selected BOM
+        $bom = \App\Models\Bom::find($bomId);
+        $machine = $bom->machine; // Assuming the BOM has a 'machines' relationship
+
+        return $machine 
+            ? [$machine->id => "Asset ID: {$machine->assetId} - Name: {$machine->name}"] 
+            : [];
+
+    })
+    ->reactive() // Make this reactive to BOM selection
+    ->required(),
                     
                 Forms\Components\TextInput::make('qty')
                     ->label('Quantity')
@@ -258,9 +270,12 @@ class WorkOrderResource extends Resource
                 Tables\Columns\TextColumn::make('machine.name')->label('Machine'),
                 Tables\Columns\TextColumn::make('operator.user.first_name')->label('Operator')
                     ->hidden(! $isAdminOrManager)
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('qty'),
-                Tables\Columns\TextColumn::make('status'),
+                Tables\Columns\TextColumn::make('status')
+                ->sortable()
+                ->searchable(),
                 Tables\Columns\TextColumn::make('start_time'),
                 Tables\Columns\TextColumn::make('end_time'),
                 Tables\Columns\TextColumn::make('ok_qtys'),
@@ -289,6 +304,14 @@ class WorkOrderResource extends Resource
             })
             ->filters([
                 Tables\Filters\TrashedFilter::make(),
+                SelectFilter::make('status')
+                ->options([
+                    'Assigned' => 'Assigned',
+                    'Start' => 'Start',
+                    'Hold' => 'Hold',
+                    'Completed' => 'Completed',
+                ])
+                ->attribute('status')
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
@@ -334,7 +357,16 @@ class WorkOrderResource extends Resource
                             ->label('BOM')
                             ->hidden(! $isAdminOrManager),
                         TextEntry::make('qty')->label('Quantity'),
-                        TextEntry::make('machine.name')->label('Machine'),
+                      
+                        TextEntry::make('machine.name')->label('Machine')
+                        ->formatStateUsing(function ($record) {
+                            // Ensure the machine relationship is loaded and exists
+                            if ($record && $record->machine) {
+                                $machine = $record->machine; // Access the machine relationship
+                                return "{$machine->assetId} - {$machine->name}"; // Display asset_id and name
+                            }
+                            return 'No Machine'; // Default value if no machine found
+                        }),
                         TextEntry::make('operator.user.first_name')
                             ->label('Operator')
                             ->hidden(! $isAdminOrManager),
