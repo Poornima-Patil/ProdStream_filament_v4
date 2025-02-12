@@ -46,7 +46,10 @@ class RolePolicy
     {
         return $user->hasPermissionTo(permission: 'Delete Role');
     }
-
+    public function deleteAny(User $user): bool
+    {
+        return $user->hasPermissionTo(permission: 'Delete Role');
+    }
     /**
      * Determine whether the user can restore the model.
      */

@@ -49,6 +49,10 @@ class BomPolicy
         return $user->hasPermissionTo(permission: 'Delete Bom');
     }
 
+    public function deleteAny(User $user): bool
+    {
+        return $user->hasPermissionTo(permission: 'Delete Bom');
+    }
     /**
      * Determine whether the user can restore the model.
      */

@@ -47,6 +47,11 @@ class DepartmentPolicy
         return $user->hasPermissionTo(permission: 'Delete Department');
     }
 
+    public function deleteAny(User $user): bool
+    {
+        return $user->hasPermissionTo(permission: 'Delete Department');
+    }
+
     /**
      * Determine whether the user can restore the model.
      */

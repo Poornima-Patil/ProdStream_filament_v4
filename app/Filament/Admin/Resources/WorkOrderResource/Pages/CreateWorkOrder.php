@@ -23,7 +23,7 @@ class CreateWorkOrder extends CreateRecord
         $bomUniqueId = $bom ? $bom->unique_id : 'UNKNOWN'; // Get the Bom's unique_id
 
         // Get the latest WorkOrder created in the current month to determine the next sequential number
-        $lastWorkOrder = WorkOrder::whereDate('created_at', 'like', $currentDate->format('Y-m').'%') // Filter by year and month
+        $lastWorkOrder = WorkOrder::withTrashed()->whereDate('created_at', 'like', $currentDate->format('Y-m').'%') // Filter by year and month
             ->orderByDesc('unique_id') // Sort by unique_id to get the last one
             ->first();
 
@@ -43,6 +43,7 @@ class CreateWorkOrder extends CreateRecord
         $data['machine_id'] = Bom::find($this->data['bom_id'])->machine_id;
        // dd($data);
 
+     
         return $data;
     }
 

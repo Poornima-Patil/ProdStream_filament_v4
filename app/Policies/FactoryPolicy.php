@@ -56,6 +56,13 @@ class FactoryPolicy
         return $user->hasPermissionTo(permission: 'Delete Factory');
     }
 
+    public function deleteAny(User $user): bool
+    {
+        // return true;
+
+        return $user->hasPermissionTo(permission: 'Delete Factory');
+    }
+
     /**
      * Determine whether the user can restore the model.
      */

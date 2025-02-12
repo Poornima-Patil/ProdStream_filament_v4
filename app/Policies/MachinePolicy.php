@@ -47,8 +47,13 @@ class MachinePolicy
         return $user->hasPermissionTo(permission: 'Delete Machine');
     }
 
+    public function deleteAny(User $user): bool
+    {
+        return $user->hasPermissionTo(permission: 'Delete Machine');
+    }
     /**
-     * Determine whether the user can restore the model.
+     * 
+     *Determine whether the user can restore the model.
      */
     public function restore(User $user, Machine $machine): bool
     {

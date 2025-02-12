@@ -47,6 +47,11 @@ class OperatorPolicy
         return $user->hasPermissionTo(permission: 'Delete Operator');
     }
 
+    public function deleteAny(User $user): bool
+    {
+        return $user->hasPermissionTo(permission: 'Delete Operator');
+    }
+
     /**
      * Determine whether the user can restore the model.
      */

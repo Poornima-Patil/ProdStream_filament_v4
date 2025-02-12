@@ -74,4 +74,10 @@ class Factory extends Model
     {
         return $this->hasMany(CustomerInformation::class);
     }
+
+    public function holdreasons(): HasMany
+    {
+        return $this->hasMany(HoldReason::class);
+    }
 }
+

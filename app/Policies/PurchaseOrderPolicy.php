@@ -47,6 +47,11 @@ class PurchaseOrderPolicy
         return $user->hasPermissionTo(permission: 'Delete PurchaseOrder');
     }
 
+    public function deleteAny(User $user): bool
+    {
+        return $user->hasPermissionTo(permission: 'Delete PurchaseOrder');
+    }
+
     /**
      * Determine whether the user can restore the model.
      */

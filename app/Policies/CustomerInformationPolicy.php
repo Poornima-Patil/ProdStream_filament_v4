@@ -47,6 +47,10 @@ class CustomerInformationPolicy
         return $user->hasPermissionTo('Delete Customer Information');
     }
 
+    public function deleteAny(User $user): bool
+    {
+        return $user->hasPermissionTo('Delete Customer Information');
+    }
     /**
      * Determine whether the user can restore the model.
      */

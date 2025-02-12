@@ -47,6 +47,10 @@ class PermissionPolicy
         return $user->hasPermissionTo(permission: 'Delete Permission');
     }
 
+    public function deleteAny(User $user): bool
+    {
+        return $user->hasPermissionTo(permission: 'Delete Permission');
+    }
     /**
      * Determine whether the user can restore the model.
      */

@@ -47,6 +47,10 @@ class OperatorProficiencyPolicy
         return $user->hasPermissionTo(permission: 'Delete OperatorProficiency');
     }
 
+    public function deleteAny(User $user): bool
+    {
+        return $user->hasPermissionTo(permission: 'Delete OperatorProficiency');
+    }
     /**
      * Determine whether the user can restore the model.
      */

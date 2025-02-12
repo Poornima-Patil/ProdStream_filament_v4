@@ -48,6 +48,10 @@ class ShiftPolicy
         return $user->hasPermissionTo(permission: 'Delete Shift');
     }
 
+    public function deleteAny(User $user): bool
+    {
+        return $user->hasPermissionTo(permission: 'Delete Shift');
+    }
     /**
      * Determine whether the user can restore the model.
      */

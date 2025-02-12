@@ -47,6 +47,11 @@ class ScrappedReasonPolicy
         return $user->hasPermissionTo(permission: 'Delete ScrappedReason');
     }
 
+    public function deleteAny(User $user): bool
+    {
+        return $user->hasPermissionTo(permission: 'Delete ScrappedReason');
+    }
+
     /**
      * Determine whether the user can restore the model.
      */

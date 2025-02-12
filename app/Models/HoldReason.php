@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-class ScrappedReason extends Model
+class HoldReason extends Model
 {
     use HasFactory,SoftDeletes;
 
@@ -25,10 +25,5 @@ class ScrappedReason extends Model
     public function factory(): BelongsTo
     {
         return $this->belongsTo(Factory::class);
-    }
-
-    public function workOrderLogs()
-    {
-        return $this->hasMany(WorkOrderLog::class);
     }
 }

@@ -46,6 +46,10 @@ class UserPolicy
         return $user->hasPermissionTo(permission: 'Delete User');
     }
 
+    public function deleteAny(User $user): bool
+    {
+        return $user->hasPermissionTo(permission: 'Delete User');
+    }
     /**
      * Determine whether the user can restore the model.
      */

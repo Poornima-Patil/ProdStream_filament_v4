@@ -22,6 +22,13 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\Machine;
 use Filament\Tables\Filters\SelectFilter;
 
+use Filament\Notifications\Notification;
+use Filament\Forms\Components\Actions\Action;
+use Filament\Forms\Components\Textarea;
+use Filament\Tables\Actions\CreateAction;
+use Filament\Forms\Components\Select;
+use App\Models\WorkOrderLog;
+
 class WorkOrderResource extends Resource
 {
     protected static ?string $model = Workorder::class;
@@ -143,34 +150,74 @@ class WorkOrderResource extends Resource
                     ->searchable()
                     ->required(),
 
+                
                 Forms\Components\DateTimePicker::make('start_time')
-                    ->label('Start Time')
-                    ->required(fn (callable $get) => in_array($get('status'), ['Hold', 'Completed'])),
+                ->disabled(! $isAdminOrManager)
+                    ->label('Planned Start Time')
+                    ->required(),
                 Forms\Components\DateTimePicker::make('end_time')
-                    ->label('End Time')
-                    ->required(fn (callable $get) => in_array($get('status'), ['Hold', 'Completed'])),
+                    ->label('Planned End Time')
+                    ->disabled(! $isAdminOrManager)
+                    ->required(),
                 Forms\Components\Select::make('status')
                     ->label('Status')
-                    ->options(function () {
-                        // Check if the logged-in user's role is 'Operator'
-                        $user = Auth::user(); // Adjust based on how roles are stored in your app
-
-                        // Define default status options
-                        $options = [
+                    ->required()
+                    ->options(function ($record) {
+                        if($record) {
+                        $user = Auth::user(); // Get the logged-in user
+                        $currentStatus = $record->status; // Get the current status
+                
+                        if ($user->hasRole('Operator')) {
+                            if ($currentStatus === 'Assigned') {
+                                return ['Start' => 'Start']; // Only "Start" should be visible
+                            } elseif ($currentStatus === 'Start') {
+                                return [
+                                    'Hold' => 'Hold',
+                                    'Completed' => 'Completed',
+                                ]; // Show "Hold" and "Completed"
+                            } elseif ($currentStatus === 'Hold') {
+                                return ['Start' => 'Start']; // Only "Start" should be visible
+                            }  elseif ($currentStatus === 'Completed') {
+                                return ['Completed' => 'Completed']; // Only "Start" should be visible
+                            }
+                        }
+                    }
+                        // Default options for non-operators
+                        return [
                             'Assigned' => 'Assigned',
                             'Start' => 'Start',
                             'Hold' => 'Hold',
                             'Completed' => 'Completed',
                         ];
-
-                        // If the user is an Operator, exclude 'Assigned' from the options
-                        if ($user->hasRole('Operator')) {
-                            unset($options['Assigned']);
-                        }
-
-                        return $options;
                     })
-                    ->reactive(),
+                    ->reactive()
+                    ->afterStateUpdated(function ($set, $get, $livewire,$record) {
+                        $status = $get('status');
+                        if ($status !== 'Hold') {
+                            $livewire->data['hold_reason_id'] = NULL;
+                            $set('hold_reason_id', NULL);  
+                            if($record) {
+                           $record->hold_reason_id = NULL;
+                           $record->save();
+                            }
+                        }
+                    }),
+                    Forms\Components\Select::make('hold_reason_id')
+                    ->label('Hold Reason')
+                    ->relationship('holdReason', 'description') // Assumes a relationship with the ScrappedReason model
+                    ->visible(fn ($get) => in_array($get('status'), ['Hold']))
+                    ->reactive()
+                    ->required(fn ($get) => in_array($get('status'), ['Hold'])),
+
+
+                    Forms\Components\TextInput::make('material_batch')
+                    ->label('Material batch ID')
+                    // Assumes a relationship with the ScrappedReason model
+                    ->visible(fn ($get) => in_array($get('status'), ['Start']))
+                    ->reactive()
+                    ->required(fn ($get) => in_array($get('status'), ['Start'])),
+
+
                 Forms\Components\TextInput::make('ok_qtys')
                     ->label('Ok Qtys')
                     ->default(0)
@@ -224,7 +271,6 @@ class WorkOrderResource extends Resource
                     ->default(0)
                     ->readonly() // Make it non-editable
                     ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
-
             ]);
     }
 
@@ -318,6 +364,9 @@ class WorkOrderResource extends Resource
                 Tables\Actions\ViewAction::make()
                     ->hiddenLabel(),
             ])
+            ->headerActions([
+              
+            ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
@@ -380,11 +429,12 @@ class WorkOrderResource extends Resource
                         TextEntry::make('bom.purchaseorder.partnumber.partnumber')->label('Part Number'),
                         TextEntry::make('bom.purchaseorder.partnumber.revision')->label('Revision'),
                         TextEntry::make('status')->label('Status'),
-                        TextEntry::make('start_time')->label('Start Time'),
-                        TextEntry::make('end_time')->label('End Time'),
+                        TextEntry::make('start_time')->label('Planned Start Time'),
+                        TextEntry::make('end_time')->label('Planned End Time'),
                         TextEntry::make('ok_qtys')->label('OK Quantities'),
                         TextEntry::make('scrapped_qtys')->label('Scrapped Quantities'),
                         TextEntry::make('scrappedReason.description')->label('Scrapped Reason'),
+                        TextEntry::make('material_batch')->label('Material Batch ID'),
                     ])->columns(2),
                 Section::make('Scrapped Quantities Details')
                     ->collapsible()
@@ -464,7 +514,68 @@ class WorkOrderResource extends Resource
                         })
                         ->html(),
                     ])->columns(1),
-            ]);
+
+                
+                        
+                        Section::make('Work Order Logs')
+                            ->collapsible()
+                            ->schema([
+                                TextEntry::make('work_order_logs_table')
+                                    ->label('Work Order Logs')
+                                    ->state(function ($record) {
+                                        // Ensure logs are loaded with user details
+                                        $record->load('workOrderLogs.user');
+            
+                                        $logs = $record->workOrderLogs->map(function ($log) {
+                                            return [
+                                                'status' => $log->status,
+                                                'user' => $log->user->getFilamentname() ?? 'N/A',
+                                                'changed_at' => $log->changed_at->format('Y-m-d H:i:s'),
+                                                'ok_qtys' => $log->ok_qtys,
+                                                'scrapped_qtys' => $log->scrapped_qtys,
+                                                'remaining' => $log->remaining,
+                                                'scrapped_reason' => $log->scrappedReason->description ?? 'NA',
+                                                'hold_reason'    => $log->holdReason->description ?? 'NA'
+                                            ];
+                                        });
+            
+                                        // Create the HTML table
+                                        $html = '<table class="table-auto w-full text-left border border-gray-300">';
+                                        $html .= '<thead class="bg-gray-200"><tr>';
+                                        $html .= '<th class="border px-2 py-1">Status</th>';
+                                        $html .= '<th class="border px-2 py-1">User</th>';
+                                        $html .= '<th class="border px-2 py-1">Changed At</th>';
+                                        $html .= '<th class="border px-2 py-1">OK Qty</th>';
+                                        $html .= '<th class="border px-2 py-1">Scrapped Qty</th>';
+                                        $html .= '<th class="border px-2 py-1">Remaining</th>';
+                                        $html .= '<th class="border px-2 py-1">Scrapped Reason</th>';
+                                        $html .= '<th class="border px-2 py-1">Hold Reason</th>';
+                                        $html .= '</tr></thead><tbody>';
+            
+                                        foreach ($logs as $log) {
+                                            $html .= '<tr>';
+                                            $html .= '<td class="border px-2 py-1">'.e($log['status']).'</td>';
+                                            $html .= '<td class="border px-2 py-1">'.e($log['user']).'</td>';
+                                            $html .= '<td class="border px-2 py-1">'.e($log['changed_at']).'</td>';
+                                            $html .= '<td class="border px-2 py-1">'.e($log['ok_qtys']).'</td>';
+                                            $html .= '<td class="border px-2 py-1">'.e($log['scrapped_qtys']).'</td>';
+                                            $html .= '<td class="border px-2 py-1">'.e($log['remaining']).'</td>';
+                                            $html .= '<td class="border px-2 py-1">'.e($log['scrapped_reason']).'</td>';
+                                            $html .= '<td class="border px-2 py-1">'.e($log['hold_reason']).'</td>';
+
+                                            $html .= '</tr>';
+                                        }
+            
+                                        $html .= '</tbody></table>';
+                                        return $html;
+                                    })
+                                    ->html(), // Enable raw HTML rendering
+                            ])
+                            ->columns(1),
+                    ]);
+            
+
+            
     }
 
     public static function getEloquentQuery(): Builder
