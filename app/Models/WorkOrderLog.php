@@ -51,6 +51,6 @@ class WorkOrderLog extends Model
 
     public function holdReason()
     {
-        return $this->belongsTo(holdReason::class);
+        return $this->belongsTo(HoldReason::class);
     }
 }
