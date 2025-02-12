@@ -352,10 +352,7 @@ class WorkOrderResource extends Resource
             ->groups([
                 Tables\Grouping\Group::make('status')
                     ->collapsible()
-                    ->orderQueryUsing(fn (Builder $query, string $direction) => 
-                    $query->orderBy('created_at', 'desc') // Ensures newest records appear first within each group
-                ),
-                   
+                  
             ])
            
             ->filters([
