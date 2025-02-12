@@ -19,7 +19,7 @@ class PartnumberResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-tag';
 
-    protected static ?string $navigationGroup = 'Admin Operations';
+    protected static ?string $navigationGroup =  'Process Operations';
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 

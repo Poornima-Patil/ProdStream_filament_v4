@@ -374,6 +374,8 @@ class WorkOrderResource extends Resource
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\ViewAction::make()
                     ->hiddenLabel(),
+                
+            
             ])
             ->headerActions([
               
