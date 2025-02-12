@@ -270,6 +270,8 @@ class BomResource extends Resource
         return parent::getEloquentQuery()
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
-            ]);
+            ])
+            ->orderByDesc('created_at'); // Ensures latest records appear first
     }
+    
 }

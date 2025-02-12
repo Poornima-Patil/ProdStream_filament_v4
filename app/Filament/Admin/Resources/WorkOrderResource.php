@@ -348,6 +348,12 @@ class WorkOrderResource extends Resource
                 // Return the query unfiltered if the user is not an operator or missing required data
                 return $query;
             })
+            ->defaultGroup('status')
+            ->groups([
+                Tables\Grouping\Group::make('status')
+                    ->collapsible()
+                   
+            ])
             ->filters([
                 Tables\Filters\TrashedFilter::make(),
                 SelectFilter::make('status')
@@ -583,7 +589,7 @@ class WorkOrderResource extends Resource
         $query = parent::getEloquentQuery()
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
-            ]);
+            ])->orderByDesc('created_at');
 
         $user = Auth::user();
 
