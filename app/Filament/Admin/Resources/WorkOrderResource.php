@@ -354,6 +354,9 @@ class WorkOrderResource extends Resource
                     ->collapsible()
                    
             ])
+            ->modifyQueryUsing(function (Builder $query) {
+                return $query->orderByDesc('created_at');
+            })
             ->filters([
                 Tables\Filters\TrashedFilter::make(),
                 SelectFilter::make('status')
@@ -589,7 +592,7 @@ class WorkOrderResource extends Resource
         $query = parent::getEloquentQuery()
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
-            ])->orderByDesc('created_at');
+            ]);
 
         $user = Auth::user();
 
