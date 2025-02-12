@@ -204,7 +204,9 @@ class WorkOrderResource extends Resource
                     }),
                     Forms\Components\Select::make('hold_reason_id')
                     ->label('Hold Reason')
-                    ->relationship('holdReason', 'description') // Assumes a relationship with the ScrappedReason model
+                    ->relationship('holdReason', 'description', function ($query) {
+                        return $query->where('factory_id', auth()->user()->factory_id);
+                    }) // Assumes a relationship with the ScrappedReason model
                     ->visible(fn ($get) => in_array($get('status'), ['Hold']))
                     ->reactive()
                     ->required(fn ($get) => in_array($get('status'), ['Hold'])),
@@ -212,7 +214,7 @@ class WorkOrderResource extends Resource
 
                     Forms\Components\TextInput::make('material_batch')
                     ->label('Material batch ID')
-                    // Assumes a relationship with the ScrappedReason model
+                   
                     ->visible(fn ($get) => in_array($get('status'), ['Start']))
                     ->reactive()
                     ->required(fn ($get) => in_array($get('status'), ['Start'])),
@@ -248,7 +250,9 @@ class WorkOrderResource extends Resource
 
                         Forms\Components\Select::make('reason_id')
                             ->label('Scrapped Reason')
-                            ->relationship('reason', 'description') // Assumes a relationship with the ScrappedReason model
+                            ->relationship('reason', 'description', function ($query) {
+        return $query->where('factory_id', auth()->user()->factory_id);
+    }) // Assumes a relationship with the ScrappedReason model
                             ->required()
                             ->reactive(),
 

@@ -35,10 +35,14 @@ class MachineResource extends Resource
                 ])->default(0),
 
                 Forms\Components\Select::make('department_id')
-                    ->label('Department')
-                    ->relationship('department', 'name')
-                    ->default(1)
-                    ->required(),
+                ->label('Department')
+                ->relationship('department', 'name', function ($query) {
+                    return $query->where('factory_id', auth()->user()->factory_id);
+                })
+                ->searchable()
+                ->preload()
+                ->default(1)
+                ->required(),
             ]);
 
     }
