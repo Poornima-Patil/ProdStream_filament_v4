@@ -147,7 +147,8 @@ class WorkOrderResource extends Resource
               if ($purchaseOrder && $qty > $purchaseOrder->QTY) {
                 \Filament\Notifications\Notification::make()
                 ->title('Quantity Exceeded')
-                ->body('The entered quantity cannot exceed the Purchase Order quantity.')
+                ->body("The entered quantity cannot exceed the Sales Order quantity: {$purchaseOrder->QTY}.")
+
                 ->danger() // Red notification
                 ->send();
 
@@ -422,7 +423,11 @@ class WorkOrderResource extends Resource
             ])
             ->actions([
                 ActionGroup::make([
-                    EditAction::make(),
+                    EditAction::make()
+                    ->visible(fn ($record) => 
+                    (auth()->user()->hasRole('Operator') && $record->status !== 'Closed') ||
+                    $isAdminOrManager
+                ),
                     ViewAction::make()->hiddenLabel(),
                     Action::make('Alert Manager')
                         ->visible(fn () => Auth::check() && Auth::user()->hasRole('Operator'))
