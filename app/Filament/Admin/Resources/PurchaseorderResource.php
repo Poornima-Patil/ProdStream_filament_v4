@@ -69,12 +69,20 @@ class PurchaseorderResource extends Resource
                     ->required(),
                 Forms\Components\TextInput::make('QTY')
                     ->required(),
+                    Forms\Components\DatePicker::make('delivery_target_date')
+    ->required() // Make it required if needed
+    ->label('Delivery Target Date')
+    ->nullable() // Make it nullable if you want to allow empty values
+    ->hint('Select the delivery target date')
+    ->displayFormat('Y-m-d'), // You can adjust the date format
+
                 Forms\Components\Select::make('Unit Of Measurement')
                     ->options([
                         'Kgs' => 'Kgs',
                         'Numbers' => 'Numbers',
                     ])
                     ->required(),
+
                 Forms\Components\TextInput::make('price'),
             ]);
     }
@@ -93,6 +101,10 @@ class PurchaseorderResource extends Resource
                 Tables\Columns\TextColumn::make('QTY'),
                 Tables\Columns\TextColumn::make('Unit Of Measurement')
                     ->label('UM'),
+                    Tables\Columns\TextColumn::make('delivery_target_date') // The column for Delivery Target Date
+    ->label('Delivery Target Date')
+    ->date(), // Only show the date part
+
 
                 Tables\Columns\TextColumn::make('price'),
 

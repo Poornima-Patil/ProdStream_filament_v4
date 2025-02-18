@@ -21,13 +21,17 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Machine;
 use Filament\Tables\Filters\SelectFilter;
-
+use App\Models\InfoMessage;
 use Filament\Notifications\Notification;
-use Filament\Forms\Components\Actions\Action;
+use Filament\Tables\Actions\Action;
 use Filament\Forms\Components\Textarea;
 use Filament\Tables\Actions\CreateAction;
 use Filament\Forms\Components\Select;
 use App\Models\WorkOrderLog;
+use Filament\Tables\Enums\ActionsPosition;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Actions\ActionGroup;
 
 class WorkOrderResource extends Resource
 {
@@ -117,15 +121,62 @@ class WorkOrderResource extends Resource
     ->reactive() // Make this reactive to BOM selection
     ->required(),
                     
-                Forms\Components\TextInput::make('qty')
-                    ->label('Quantity')
-                    ->required()
-                    ->disabled(! $isAdminOrManager),
+    Forms\Components\TextInput::make('qty')
+    ->label('Quantity')
+    ->required()
+    ->disabled(! $isAdminOrManager)
+    ->reactive()
+    ->afterStateUpdated(function (callable $get, callable $set) {
+        $partNumberId = $get('part_number_id'); // Get selected Part Number ID
+        $qty = (int) $get('qty'); // Get entered quantity
+
+        if (!$partNumberId || !$qty) {
+            $set('time_to_complete', '00:00:00'); // Reset if no part number or qty
+            return;
+        }
+
+
+          // Get the BOM associated with this Work Order
+          $bom = \App\Models\Bom::find($get('bom_id'));
+
+          if ($bom) {
+              // Get the related Purchase Order and its quantity
+              $purchaseOrder = $bom->purchaseOrder;
+              
+              // Check if the entered quantity exceeds the Purchase Order quantity
+              if ($purchaseOrder && $qty > $purchaseOrder->QTY) {
+                \Filament\Notifications\Notification::make()
+                ->title('Quantity Exceeded')
+                ->body('The entered quantity cannot exceed the Purchase Order quantity.')
+                ->danger() // Red notification
+                ->send();
+
+            // Reset the qty field to 0
+            $set('qty', 0);
+
+           
+                  return;
+              }
+          }
+
+
+        // Get the cycle time from the part number
+        $cycleTimeInSeconds = \App\Models\PartNumber::where('id', $partNumberId)->value('cycle_time');
+
+        if (!$cycleTimeInSeconds) {
+            $set('time_to_complete', '00:00:00'); // Default if no cycle time is set
+            return;
+        }
+
+        // Calculate total time
+        $totalSeconds = $cycleTimeInSeconds * $qty;
+        $set('time_to_complete', self::convertSecondsToTime($totalSeconds));
+    }),
 
                    
                 Forms\Components\Select::make('operator_id')
                     ->label('Operator')
-                    ->disabled(! $isAdminOrManager)
+                    ->disabled(!$isAdminOrManager)
                     ->options(function (callable $get) {
                         $bomId = $get('bom_id'); // Get selected BOM ID
 
@@ -150,7 +201,14 @@ class WorkOrderResource extends Resource
                     ->searchable()
                     ->required(),
 
-                
+                    
+
+                    Forms\Components\TextInput::make('time_to_complete')
+                    ->label('Approx time required')
+                    ->hint('Time is calculated based on the cycle time provided in the Part number')
+                    ->visible($isAdminOrManager)
+                    ->disabled(),
+
                 Forms\Components\DateTimePicker::make('start_time')
                 ->disabled(! $isAdminOrManager)
                     ->label('Planned Start Time')
@@ -307,10 +365,10 @@ class WorkOrderResource extends Resource
     public static function table(Table $table): Table
     {
         $user = Auth::user();
-        $isAdminOrManager = $user && $user->can(abilities: 'Edit Bom');
-
+        $isAdminOrManager = $user && $user->can('Edit Bom');
+    
         return $table
-            ->Columns([
+            ->columns([
                 Tables\Columns\TextColumn::make('unique_id')->label('Unique ID')->searchable(),
                 Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.description')->label('BOM')
                     ->hidden(! $isAdminOrManager),
@@ -323,68 +381,113 @@ class WorkOrderResource extends Resource
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('qty'),
+                
                 Tables\Columns\TextColumn::make('status')
-                ->sortable()
-                ->searchable(),
+                    ->sortable()
+                    ->searchable(),
+
                 Tables\Columns\TextColumn::make('start_time'),
                 Tables\Columns\TextColumn::make('end_time'),
                 Tables\Columns\TextColumn::make('ok_qtys'),
                 Tables\Columns\TextColumn::make('scrapped_qtys'),
-
-            ]
-            )
+            ])
             ->modifyQueryUsing(function (Builder $query) {
-                // Check if the authenticated user has the 'operator' role
                 $userId = Auth::id();
                 $user = User::find($userId);
-                if ($user->hasRole('operator')) {
-                    // Retrieve the operator record linked to the user
-                    $operator = Operator::where('user_id', Auth::id())->first();
-
-                    // Check if the operator and factory_id are valid
+                if ($user && $user->hasRole('operator')) {
+                    $operator = Operator::where('user_id', $userId)->first();
+    
                     if ($operator && $user->factory_id) {
-                        // Apply filter to the query to include both operator_id and factory_id
                         return $query->where('operator_id', $operator->id)
                             ->where('factory_id', $user->factory_id);
                     }
                 }
-
-                // Return the query unfiltered if the user is not an operator or missing required data
                 return $query;
             })
             ->defaultGroup('status')
             ->groups([
                 Tables\Grouping\Group::make('status')
-                    ->collapsible()
-                  
+                    ->collapsible(),
             ])
-           
             ->filters([
                 Tables\Filters\TrashedFilter::make(),
                 SelectFilter::make('status')
-                ->options([
-                    'Assigned' => 'Assigned',
-                    'Start' => 'Start',
-                    'Hold' => 'Hold',
-                    'Completed' => 'Completed',
-                ])
-                ->attribute('status')
+                    ->options([
+                        'Assigned' => 'Assigned',
+                        'Start' => 'Start',
+                        'Hold' => 'Hold',
+                        'Completed' => 'Completed',
+                    ])
+                    ->attribute('status'),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\ViewAction::make()
-                    ->hiddenLabel(),
-                
-            
+                ActionGroup::make([
+                    EditAction::make(),
+                    ViewAction::make()->hiddenLabel(),
+                    Action::make('Alert Manager')
+                        ->visible(fn () => Auth::check() && Auth::user()->hasRole('Operator'))
+                        ->form([
+                            Forms\Components\Textarea::make('comments')
+                                ->label('Comments')
+                                ->required(),
+                            Forms\Components\Select::make('priority')
+                                ->label('Priority')
+                                ->options([
+                                    'High' => 'High',
+                                    'Medium' => 'Medium',
+                                    'Low' => 'Low',
+                                ])
+                                ->required(),
+                        ])
+                        ->modalHeading('Send Alert to Manager') // Title of the modal
+                        ->action(function (array $data, $record) {
+                            self::sendAlert($data,$record);
+                        })
+                        ->button(), // Ensures it's a button, not a link
+
+
+                        Action::make('Alert Operator')
+                        ->visible(fn () => Auth::check() && (Auth::user()->hasRole('Manager') || Auth::user()->hasRole('Factory Admin')))
+                        ->form([
+                            Forms\Components\Textarea::make('comments')
+                                ->label('Comments')
+                                ->required(),
+                            Forms\Components\Select::make('priority')
+                                ->label('Priority')
+                                ->options([
+                                    'High' => 'High',
+                                    'Medium' => 'Medium',
+                                    'Low' => 'Low',
+                                ])
+                                ->required(),
+                        ])
+                        ->modalHeading('Send Alert to Operator') // Title of the modal
+                        ->action(function (array $data, $record) {
+                            self::sendAlert($data,$record);
+                        })
+                        ->button(),
+                ])
             ])
-            ->headerActions([
-              
-            ])
+            ->headerActions([])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+    
+
+
+    protected static function sendAlert(array $data, WorkOrder $record)
+    {
+            
+
+        InfoMessage::create([
+            'work_order_id' => $record->id,
+            'user_id' => auth()->id(), // Assuming the logged-in user sends the alert
+            'message' => $data['comments'],
+            'priority' => $data['priority'],
+        ]);
     }
 
     public static function getRelations(): array
@@ -585,6 +688,50 @@ class WorkOrderResource extends Resource
                                     ->html(), // Enable raw HTML rendering
                             ])
                             ->columns(1),
+
+                            Section::make('Work Order Info Messages')
+    ->collapsible()
+    ->schema([
+        TextEntry::make('info_messages_table')
+            ->label('Info Messages')
+            ->state(function ($record) {
+                // Ensure info messages are loaded with user details
+                $record->load('infoMessages.user');
+
+                $messages = $record->infoMessages->map(function ($message) {
+                    return [
+                        'user' => $message->user->getFilamentname() ?? 'N/A',
+                        'message' => $message->message,
+                        'priority' => ucfirst($message->priority), // Capitalize first letter
+                        'sent_at' => $message->created_at->format('Y-m-d H:i:s'),
+                    ];
+                });
+
+                // Create the HTML table
+                $html = '<table class="table-auto w-full text-left border border-gray-300">';
+                $html .= '<thead class="bg-gray-200"><tr>';
+                $html .= '<th class="border px-2 py-1">User</th>';
+                $html .= '<th class="border px-2 py-1">Message</th>';
+                $html .= '<th class="border px-2 py-1">Priority</th>';
+                $html .= '<th class="border px-2 py-1">Sent At</th>';
+                $html .= '</tr></thead><tbody>';
+
+                foreach ($messages as $message) {
+                    $html .= '<tr>';
+                    $html .= '<td class="border px-2 py-1">' . e($message['user']) . '</td>';
+                    $html .= '<td class="border px-2 py-1">' . e($message['message']) . '</td>';
+                    $html .= '<td class="border px-2 py-1 font-bold text-' . ($message['priority'] === 'High' ? 'red-500' : ($message['priority'] === 'Medium' ? 'yellow-500' : 'green-500')) . '">' . e($message['priority']) . '</td>';
+                    $html .= '<td class="border px-2 py-1">' . e($message['sent_at']) . '</td>';
+                    $html .= '</tr>';
+                }
+
+                $html .= '</tbody></table>';
+                return $html;
+            })
+            ->html(), // Enable raw HTML rendering
+    ])
+    ->columns(1),
+
                     ]);
             
 
@@ -610,4 +757,19 @@ class WorkOrderResource extends Resource
 
         return $query;
     }
+
+    protected static function convertSecondsToTime($seconds): string
+{
+    if (!$seconds) return '00:00:00';
+
+    $hours = floor($seconds / 3600);
+    $minutes = floor(($seconds % 3600) / 60);
+    $remainingSeconds = $seconds % 60;
+
+    return sprintf('%02d:%02d:%02d', $hours, $minutes, $remainingSeconds);
+}
+
+
+
+
 }

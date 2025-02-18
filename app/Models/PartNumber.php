@@ -15,6 +15,7 @@ class PartNumber extends Model
         'partnumber',
         'revision',
         'description',
+        'cycle_time',
         'factory_id',
     ];
 

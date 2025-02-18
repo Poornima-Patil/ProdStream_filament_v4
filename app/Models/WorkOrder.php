@@ -113,4 +113,10 @@ class WorkOrder extends Model
         });
     }
 
+    // Define the relationship with InfoMessage
+    public function infoMessages()
+    {
+        return $this->hasMany(InfoMessage::class);
+    }
+
 }

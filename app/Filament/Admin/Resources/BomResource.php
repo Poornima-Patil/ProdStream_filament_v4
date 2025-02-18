@@ -23,7 +23,7 @@ use Filament\Tables\Enums\ActionsPosition;
 use Filament\Infolists\Components\Actions\Action;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Html;
-
+use App\Models\WorkOrder;
 
 class BomResource extends Resource
 {
@@ -122,9 +122,28 @@ class BomResource extends Resource
                 Forms\Components\Select::make('status')->options([
                     '1' => 'Active',
                     '0' => 'InActive',
-                ])->required(),
+                ])->required()
+                ->reactive()
+                ->afterStateUpdated(function (callable $get , $record) {
+                   if( $get('status') === '0' ) {
+                        self::close_WO($record);
+                    }
+                }),
             ]);
     }
+
+
+    protected static function close_WO(Bom $record)
+{
+    // Fetch all work orders associated with the given BOM
+    $workOrders = WorkOrder::where('bom_id', $record->id)->get();
+
+    // Update the status of all fetched work orders to 'Closed'
+    foreach ($workOrders as $workOrder) {
+        $workOrder->update(['status' => 'Closed']);
+    }
+}
+
 
     public static function table(Table $table): Table
     {
@@ -209,8 +228,7 @@ class BomResource extends Resource
                         TextEntry::make('purchaseorder.partnumber.revision')->label('Revision'),
                         TextEntry::make('machine.name')
                             ->label('Machine'),
-                        TextEntry::make('purchaseorder.partnumber.revision')->label('Revision'),
-
+                     
                     ])->columns(),
 
                 Section::make('Operational Information')
