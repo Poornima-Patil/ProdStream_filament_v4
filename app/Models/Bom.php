@@ -18,7 +18,7 @@ class Bom extends Model implements HasMedia
         'purchase_order_id',
         'requirement_pkg',
         'process_flowchart',
-        'machine_id',
+        'machine_group_id',
         'operator_proficiency_id',
         'lead_time',
         'status',
@@ -36,9 +36,9 @@ class Bom extends Model implements HasMedia
         return $this->belongsTo(OperatorProficiency::class, 'operator_proficiency_id');
     }
 
-    public function machine()
+    public function machineGroup()
     {
-        return $this->belongsTo(Machine::class, 'machine_id');
+        return $this->belongsTo(MachineGroup::class, 'machine_group_id');
     }
 
     public function workOrders()

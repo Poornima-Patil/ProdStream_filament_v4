@@ -34,7 +34,8 @@ class WorkOrder extends Model
     ];
 
     protected $casts = [
-        'hold_reason_id' => 'integer', // Ensures it's treated as an integer
+        'hold_reason_id' => 'integer', 
+            'machine_id' => 'integer' // Ensures it's treated as an integer
     ];
 
     public function bom()

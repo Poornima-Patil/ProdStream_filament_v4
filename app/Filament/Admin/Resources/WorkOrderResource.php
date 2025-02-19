@@ -102,24 +102,33 @@ class WorkOrderResource extends Resource
                     ->disabled(! $isAdminOrManager),
 
                     Forms\Components\Select::make('machine_id')
-    ->label('Machine')
-    ->options(function (callable $get) {
-        $bomId = $get('bom_id'); // Get the selected BOM ID
-        if (! $bomId) {
-            return []; // No BOM selected, return empty options
-        }
-
-        // Get the associated machines for the selected BOM
-        $bom = \App\Models\Bom::find($bomId);
-        $machine = $bom->machine; // Assuming the BOM has a 'machines' relationship
-
-        return $machine 
-            ? [$machine->id => "Asset ID: {$machine->assetId} - Name: {$machine->name}"] 
-            : [];
-
-    })
-    ->reactive() // Make this reactive to BOM selection
-    ->required(),
+                    ->label('Machine')
+                    ->options(function (callable $get) {
+                        $bomId = $get('bom_id'); // Get the selected BOM ID
+                    
+                        if (! $bomId) {
+                            return []; // No BOM selected, return empty options
+                        }
+                    
+                        // Find the BOM and get its machine group
+                        $bom = \App\Models\Bom::find($bomId);
+                        if (! $bom || !$bom->machine_group_id) {
+                            return []; // BOM not found or has no associated machine group
+                        }
+                    
+                        // Fetch all active machines in the machine group
+                        return \App\Models\Machine::where('machine_group_id', $bom->machine_group_id)
+                        ->active()
+                        ->get()
+                        ->mapWithKeys(fn ($machine) => [
+                            (int) $machine->id => "Asset ID: {$machine->assetId} - Name: {$machine->name}"
+                        ])
+                        ->toArray();
+                    })
+                    ->reactive()
+                    ->required()
+                    ->disabled(!$isAdminOrManager),
+                    
                     
     Forms\Components\TextInput::make('qty')
     ->label('Quantity')
@@ -376,7 +385,9 @@ class WorkOrderResource extends Resource
                 Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.partnumber')->label('Part Number')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.revision')->label('Revision'),
-                Tables\Columns\TextColumn::make('machine.name')->label('Machine'),
+                Tables\Columns\TextColumn::make('machine.name')->label('Machine')
+                ->formatStateUsing(fn ($record) => "Asset ID: {$record->machine->assetId} - Name: {$record->machine->name}"),
+               
                 Tables\Columns\TextColumn::make('operator.user.first_name')->label('Operator')
                     ->hidden(! $isAdminOrManager)
                     ->searchable()

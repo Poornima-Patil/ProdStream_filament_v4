@@ -98,14 +98,13 @@ class BomResource extends Resource
                     ->collection('process_flowchart')
                     ->required(),
 
-                Forms\Components\Select::make('machine_id')
-                    ->label('Machine')
+                Forms\Components\Select::make('machine_group_id')
+                    ->label('Machine Group')
                     ->options(function () {
                         $factoryId = Auth::user()->factory_id;
 
-                        return \App\Models\Machine::where('status', '1')
-                            ->where('factory_id', $factoryId)
-                            ->pluck('name', 'id');
+                        return \App\Models\MachineGroup::where('factory_id', $factoryId)
+                            ->pluck('group_name', 'id');
                 })->required(),
 
                 Forms\Components\Select::make('operator_proficiency_id')
@@ -163,10 +162,10 @@ class BomResource extends Resource
 
 
                    
-                Tables\Columns\TextColumn::make('machine.name'),
+                Tables\Columns\TextColumn::make('machineGroup.group_name'),
                 Tables\Columns\TextColumn::make('operatorproficiency.proficiency'),
                 Tables\Columns\TextColumn::make('lead_time')
-    ->label('Target Completion Time')
+                    ->label('Target Completion Time')
 
                 ->formatStateUsing(function ($state) {
                     return \Carbon\Carbon::parse($state)->format('d M Y'); // Format as d M Y
@@ -226,8 +225,8 @@ class BomResource extends Resource
                             ->label('Purchase Order'),
                         TextEntry::make('purchaseorder.partnumber.partnumber')->label('Part Number'),
                         TextEntry::make('purchaseorder.partnumber.revision')->label('Revision'),
-                        TextEntry::make('machine.name')
-                            ->label('Machine'),
+                        TextEntry::make('machineGroup.group_name')
+                            ->label('Machine Group'),
                      
                     ])->columns(),
 
@@ -236,7 +235,7 @@ class BomResource extends Resource
                     ->schema([
                         TextEntry::make('operatorproficiency.proficiency')
                             ->label('Proficiency'),
-                        TextEntry::make('lead_time')->label('Target Completiong time'),
+                        TextEntry::make('lead_time')->label('Target Completion time'),
                         IconEntry::make('status')->label('Status'),
 
                     ])->columns(),

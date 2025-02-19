@@ -11,6 +11,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use App\Models\MachineGroup;
 
 class MachineResource extends Resource
 {
@@ -28,7 +29,7 @@ class MachineResource extends Resource
             ->schema([
                 Forms\Components\TextInput::make('assetId')->required(),
                 Forms\Components\TextInput::make('name')
-                    ->unique()->required(),
+                    ->unique(ignoreRecord:true)->required(),
                 Forms\Components\Select::make('status')->options([
                     1 => 'Active',
                     0 => 'Inactive',
@@ -43,6 +44,11 @@ class MachineResource extends Resource
                 ->preload()
                 ->default(1)
                 ->required(),
+                Forms\Components\Select::make('machine_group_id')
+                ->label('Machine Group')
+                ->options(MachineGroup::all()->pluck('group_name', 'id'))
+                ->required()  // You can make this required or optional
+                ->searchable(),
             ]);
 
     }
@@ -57,6 +63,10 @@ class MachineResource extends Resource
                     ->label('Status')
                     ->boolean(),
                 Tables\Columns\TextColumn::make('department.name')->label('Department Name'),
+                Tables\Columns\TextColumn::make('machineGroup.group_name')  // Display the group name
+                ->label('Machine Group')
+                ->searchable()
+                ->sortable(),
             ])
             ->filters([
                 Tables\Filters\TrashedFilter::make(),
