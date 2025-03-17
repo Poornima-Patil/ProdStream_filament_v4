@@ -53,4 +53,9 @@ class WorkOrderLog extends Model
     {
         return $this->belongsTo(HoldReason::class);
     }
+
+    public function okQuantities()
+    {
+        return $this->hasMany(OkQuantity::class, 'work_order_log_id', 'id');
+    }
 }

@@ -288,11 +288,39 @@ class WorkOrderResource extends Resource
                     ->required(fn ($get) => in_array($get('status'), ['Start'])),
 
 
+                    Forms\Components\Repeater::make('ok_quantities')
+                    ->label('OK Quantities')
+                    ->relationship('okQuantities') // Define the relationship
+                    ->schema([
+                        Forms\Components\TextInput::make('quantity')
+                            ->label('Quantity')
+                            ->numeric()
+                            ->required()
+                            ->minValue(1)
+                            ->reactive(),
+
+                    ])
+                    ->defaultItems(0)
+                    ->minItems(0)
+                    ->columnSpan('full')
+                    ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed']))
+                    ->afterStateUpdated(function ($livewire, $state, callable $set) {
+                        $total = collect($state)
+                            ->pluck('quantity')
+                            ->filter(fn ($value) => is_numeric($value))
+                            ->sum();
+                        $set('ok_qtys', $total);
+                    }),
+
+                // Total Ok Quantities Display
                 Forms\Components\TextInput::make('ok_qtys')
-                    ->label('Ok Qtys')
+                    ->label('Total OK Quantities')
                     ->default(0)
-                    ->reactive()
+                    ->readonly()
                     ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
+                
+
+
 
                 Forms\Components\Repeater::make('scrapped_quantities')
                     ->label('Scrapped Quantities')
@@ -649,61 +677,97 @@ class WorkOrderResource extends Resource
 
                 
                         
-                        Section::make('Work Order Logs')
-                            ->collapsible()
-                            ->schema([
-                                TextEntry::make('work_order_logs_table')
-                                    ->label('Work Order Logs')
-                                    ->state(function ($record) {
-                                        // Ensure logs are loaded with user details
-                                        $record->load('workOrderLogs.user');
-            
-                                        $logs = $record->workOrderLogs->map(function ($log) {
-                                            return [
-                                                'status' => $log->status,
-                                                'user' => $log->user->getFilamentname() ?? 'N/A',
-                                                'changed_at' => $log->changed_at->format('Y-m-d H:i:s'),
-                                                'ok_qtys' => $log->ok_qtys,
-                                                'scrapped_qtys' => $log->scrapped_qtys,
-                                                'remaining' => $log->remaining,
-                                                'scrapped_reason' => $log->scrappedReason->description ?? 'NA',
-                                                'hold_reason'    => $log->holdReason->description ?? 'NA'
-                                            ];
-                                        });
-            
-                                        // Create the HTML table
-                                        $html = '<table class="table-auto w-full text-left border border-gray-300">';
-                                        $html .= '<thead class="bg-gray-200"><tr>';
-                                        $html .= '<th class="border px-2 py-1">Status</th>';
-                                        $html .= '<th class="border px-2 py-1">User</th>';
-                                        $html .= '<th class="border px-2 py-1">Changed At</th>';
-                                        $html .= '<th class="border px-2 py-1">OK Qty</th>';
-                                        $html .= '<th class="border px-2 py-1">Scrapped Qty</th>';
-                                        $html .= '<th class="border px-2 py-1">Remaining</th>';
-                                        $html .= '<th class="border px-2 py-1">Scrapped Reason</th>';
-                                        $html .= '<th class="border px-2 py-1">Hold Reason</th>';
-                                        $html .= '</tr></thead><tbody>';
-            
-                                        foreach ($logs as $log) {
-                                            $html .= '<tr>';
-                                            $html .= '<td class="border px-2 py-1">'.e($log['status']).'</td>';
-                                            $html .= '<td class="border px-2 py-1">'.e($log['user']).'</td>';
-                                            $html .= '<td class="border px-2 py-1">'.e($log['changed_at']).'</td>';
-                                            $html .= '<td class="border px-2 py-1">'.e($log['ok_qtys']).'</td>';
-                                            $html .= '<td class="border px-2 py-1">'.e($log['scrapped_qtys']).'</td>';
-                                            $html .= '<td class="border px-2 py-1">'.e($log['remaining']).'</td>';
-                                            $html .= '<td class="border px-2 py-1">'.e($log['scrapped_reason']).'</td>';
-                                            $html .= '<td class="border px-2 py-1">'.e($log['hold_reason']).'</td>';
+                    Section::make('Work Order Logs')
+                    ->collapsible()
+                    ->schema([
+                        TextEntry::make('work_order_logs_table')
+                            ->label('Work Order Logs')
+                            ->state(function ($record) {
+                                // Load necessary relationships
+                                $record->load(['workOrderLogs.user', 'workOrderLogs.okQuantities']);
+                                $okdetail = $record->okQuantities;
+                                $okdetailIndex = 0; // To track which OK Quantity we are using for each Hold status
 
-                                            $html .= '</tr>';
+                                $logs = $record->workOrderLogs->map(function ($log) use ($okdetail, &$okdetailIndex) {
+                                    $okQuantityEntry = null;
+                                    $qrCodeUrl = null;
+                                
+                                    if (in_array($log->status, ['Hold', 'Completed']) && $okdetail->isNotEmpty() && isset($okdetail[$okdetailIndex])) {
+                                        $okQuantityEntry = $okdetail[$okdetailIndex]->quantity;
+                                
+                                        // ✅ Fetch the specific QR Code image for this OK Quantity
+                                        $qrCodeMedia = $okdetail[$okdetailIndex]->getMedia('qr_code');
+                                
+                                        if ($qrCodeMedia->isNotEmpty()) {
+                                            $qrCodeUrl = $qrCodeMedia->first()->getUrl(); // Get the first image of the current OK Quantity
                                         }
-            
-                                        $html .= '</tbody></table>';
-                                        return $html;
-                                    })
-                                    ->html(), // Enable raw HTML rendering
-                            ])
-                            ->columns(1),
+                                
+                                        $okdetailIndex++; // Increment for the next log
+                                    }
+                                
+                                    return [
+                                        'status' => $log->status,
+                                        'user' => $log->user->getFilamentName() ?? 'N/A',
+                                        'changed_at' => $log->changed_at->format('Y-m-d H:i:s'),
+                                        'ok_qtys' => $log->ok_qtys,
+                                        'ok_detail' => $okQuantityEntry,
+                                        'qr_code' => $qrCodeUrl, // ✅ Correctly mapped unique QR Code per OK Quantity
+                                        'scrapped_qtys' => $log->scrapped_qtys,
+                                        'remaining' => $log->remaining,
+                                        'scrapped_reason' => $log->scrappedReason->description ?? 'NA',
+                                        'hold_reason' => $log->holdReason->description ?? 'NA'
+                                    ];
+                                });
+                                
+                                // Create the HTML table
+                                $html = '<table class="table-auto w-full text-left border border-gray-300">';
+                                $html .= '<thead class="bg-gray-200"><tr>';
+                                $html .= '<th class="border px-2 py-1">Status</th>';
+                                $html .= '<th class="border px-2 py-1">User</th>';
+                                $html .= '<th class="border px-2 py-1">Changed At</th>';
+                                $html .= '<th class="border px-2 py-1">Total OK Qty</th>';
+                                $html .= '<th class="border px-2 py-1">OK Quantity Details</th>';
+                                $html .= '<th class="border px-2 py-1">QR Code</th>'; 
+                                $html .= '<th class="border px-2 py-1">Scrapped Qty</th>';
+                                $html .= '<th class="border px-2 py-1">Remaining</th>';
+                                $html .= '<th class="border px-2 py-1">Scrapped Reason</th>';
+                                $html .= '<th class="border px-2 py-1">Hold Reason</th>';
+                                $html .= '</tr></thead><tbody>';
+                
+                                foreach ($logs as $log) {
+                                    $html .= '<tr>';
+                                    $html .= '<td class="border px-2 py-1">'.e($log['status']).'</td>';
+                                    $html .= '<td class="border px-2 py-1">'.e($log['user']).'</td>';
+                                    $html .= '<td class="border px-2 py-1">'.e($log['changed_at']).'</td>';
+                                    $html .= '<td class="border px-2 py-1">'.e($log['ok_qtys']).'</td>';
+                                    $html .= '<td class="border px-2 py-1">';
+                                    if (in_array($log['status'], ['Hold', 'Completed']) && $log['ok_detail']) {
+                                        $html .= e($log['ok_detail']); // Display OK Quantity for Hold and Completed statuses
+                                    } else {
+                                        $html .= ''; // Blank for all other statuses
+                                    }
+                                    $html .= '</td>';
+                                    $html .= '</td>';  
+                                    $html .= '<td class="border px-2 py-1 text-center">';
+                                    if (!empty($log['qr_code'])) {
+                                        $html .= '<a href="'.$log['qr_code'].'" download="qr_code.png" class="text-blue-500 underline">Download QR Code</a>';
+                                    }
+                                    $html .= '</td>';
+                                     // QR Code column                              
+                                    $html .= '<td class="border px-2 py-1">'.e($log['scrapped_qtys']).'</td>';
+                                    $html .= '<td class="border px-2 py-1">'.e($log['remaining']).'</td>';
+                                    $html .= '<td class="border px-2 py-1">'.e($log['scrapped_reason']).'</td>';
+                                    $html .= '<td class="border px-2 py-1">'.e($log['hold_reason']).'</td>';
+                                    $html .= '</tr>';
+                                }
+                
+                                $html .= '</tbody></table>';
+                                return $html;
+                            })
+                            ->html(), // Enable raw HTML rendering
+                    ])
+                    ->columns(1),
+                
 
                             Section::make('Work Order Info Messages')
     ->collapsible()
@@ -784,8 +848,6 @@ class WorkOrderResource extends Resource
 
     return sprintf('%02d:%02d:%02d', $hours, $minutes, $remainingSeconds);
 }
-
-
 
 
 }
