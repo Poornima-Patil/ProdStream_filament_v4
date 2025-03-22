@@ -32,6 +32,7 @@ use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Actions\ActionGroup;
+use Filament\Forms\Components\Grid;
 
 class WorkOrderResource extends Resource
 {
@@ -288,88 +289,96 @@ class WorkOrderResource extends Resource
                     ->required(fn ($get) => in_array($get('status'), ['Start'])),
 
 
-                    Forms\Components\Repeater::make('ok_quantities')
-                    ->label('OK Quantities')
-                    ->relationship('okQuantities') // Define the relationship
+                    Forms\Components\Repeater::make('quantities')
+                    ->label('Quantities')
+                    ->relationship('quantities')
                     ->schema([
-                        Forms\Components\TextInput::make('quantity')
-                            ->label('Quantity')
-                            ->numeric()
-                            ->required()
-                            ->minValue(1)
-                            ->reactive(),
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\TextInput::make('quantity')
+                                    ->label('Quantity')
+                                    ->numeric()
+                                    ->required()
+                                    ->minValue(1)
+                                    ->reactive()
+                                    ->disabled(fn ($record) => $record && $record->exists)
+                                    ->afterStateUpdated(function ($livewire, $state, callable $set) {
+                                        $total = collect($livewire->data['quantities'] ?? [])
+                                            ->pluck('quantity')
+                                            ->filter(fn ($value) => is_numeric($value))
+                                            ->sum();
+                                        $set('ok_qtys', $total);
+                                    }),
 
+                                Forms\Components\Select::make('type')
+                                    ->label('Type')
+                                    ->options([
+                                        'ok' => 'OK',
+                                        'scrapped' => 'Scrapped'
+                                    ])
+                                    ->required()
+                                    ->disabled(fn ($record) => $record && $record->exists)
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                        if ($state === 'scrapped') {
+                                            $set('reason_id', null);
+                                        }
+                                    }),
+
+                                Forms\Components\Select::make('reason_id')
+                                    ->label('Scrapped Reason')
+                                    ->relationship('reason', 'description', function ($query) {
+                                        return $query->where('factory_id', auth()->user()->factory_id);
+                                    })
+                                    ->required(fn ($get) => $get('type') === 'scrapped')
+                                    ->visible(fn ($get) => $get('type') === 'scrapped')
+                                    ->disabled(fn ($record) => $record && $record->exists)
+                                    ->columnSpan(2),
+                            ]),
                     ])
                     ->defaultItems(0)
                     ->minItems(0)
+                    ->maxItems(50)
                     ->columnSpan('full')
                     ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed']))
                     ->afterStateUpdated(function ($livewire, $state, callable $set) {
-                        $total = collect($state)
+                        $okTotal = collect($state)
+                            ->filter(fn ($item) => ($item['type'] ?? '') === 'ok')
                             ->pluck('quantity')
                             ->filter(fn ($value) => is_numeric($value))
                             ->sum();
-                        $set('ok_qtys', $total);
-                    }),
+                        
+                        $scrappedTotal = collect($state)
+                            ->filter(fn ($item) => ($item['type'] ?? '') === 'scrapped')
+                            ->pluck('quantity')
+                            ->filter(fn ($value) => is_numeric($value))
+                            ->sum();
+                        
+                        $set('ok_qtys', $okTotal);
+                        $set('scrapped_qtys', $scrappedTotal);
+                    })
+                    ->collapsible()
+                    ->itemLabel(fn (array $state): ?string => 
+                        $state['type'] === 'ok' 
+                            ? "OK Quantity: {$state['quantity']}"
+                            : "Scrapped Quantity: {$state['quantity']}"
+                    )
+                    ->collapsed(fn ($record) => $record && $record->exists)
+                    ->reorderable()
+                    ->reorderableWithButtons()
+                    ->cloneable(),
 
-                // Total Ok Quantities Display
+                // Total Quantities Display
                 Forms\Components\TextInput::make('ok_qtys')
                     ->label('Total OK Quantities')
                     ->default(0)
                     ->readonly()
                     ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
-                
-
-
-
-                Forms\Components\Repeater::make('scrapped_quantities')
-                    ->label('Scrapped Quantities')
-                    ->relationship('scrappedQuantities') // Assumes the WorkOrder model has a `scrappedQuantities` relationship
-                    ->schema([
-                        Forms\Components\TextInput::make('quantity')
-                            ->label('Quantity')
-                            ->numeric()
-                            ->required()
-                            ->minValue(1)
-
-                            ->reactive() // Trigger updates when the quantity is changed
-                            ->afterStateUpdated(function ($livewire, $record, callable $get, callable $set) {
-                                $formState = $livewire->data;
-                                $scrappedQuantities = $formState['scrapped_quantities'] ?? [];
-                                $total = collect($scrappedQuantities)
-                                    ->pluck('quantity') // Extract only the quantity values
-                                    ->filter(fn ($value) => is_numeric($value)) // Filter out non-numeric values
-                                    ->sum();
-                                $livewire->data['scrapped_qtys'] = $total;
-                                $set('scrapped_qtys', $total);
-                            }),
-
-                        Forms\Components\Select::make('reason_id')
-                            ->label('Scrapped Reason')
-                            ->relationship('reason', 'description', function ($query) {
-        return $query->where('factory_id', auth()->user()->factory_id);
-    }) // Assumes a relationship with the ScrappedReason model
-                            ->required()
-                            ->reactive(),
-
-                    ])
-                    ->defaultItems(0) // Optional: Number of default entries to show
-                    ->minItems(0) // Optional: Minimum number of entries
-                    ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed']))
-                    ->columnSpan('full')
-                    ->afterStateUpdated(function ($livewire, $state, callable $set) {
-                        // Recalculate the total whenever the state of the repeater changes (including deletions)
-                        $total = collect($state)
-                            ->pluck('quantity') // Extract only the quantity values
-                            ->filter(fn ($value) => is_numeric($value)) // Include only numeric values
-                            ->sum();
-                        $set('scrapped_qtys', $total);
-                    }),
 
                 Forms\Components\TextInput::make('scrapped_qtys')
-                    ->label('Scrapped Qtys')
+                    ->label('Total Scrapped Quantities')
                     ->default(0)
-                    ->readonly() // Make it non-editable
+                    ->readonly()
                     ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
             ]);
     }
@@ -596,27 +605,30 @@ class WorkOrderResource extends Resource
                         TextEntry::make('scrappedReason.description')->label('Scrapped Reason'),
                         TextEntry::make('material_batch')->label('Material Batch ID'),
                     ])->columns(2),
-                Section::make('Scrapped Quantities Details')
+
+                Section::make('Quantities Details')
                     ->collapsible()
                     ->schema([
-                        TextEntry::make('scrapped_quantities_table')
-                            ->label('Scrapped Quantities')
+                        TextEntry::make('quantities_table')
+                            ->label('Quantities')
                             ->state(function ($record) {
-                                $record->load('scrappedQuantities.reason');
+                                $record->load('quantities.reason');
 
-                                $data = $record->scrappedQuantities->map(function ($item) {
+                                $data = $record->quantities->map(function ($item) {
                                     return [
                                         'quantity' => $item->quantity,
-                                        'reason_description' => $item->reason->description ?? '',
+                                        'type' => ucfirst($item->type),
+                                        'reason_description' => $item->type === 'scrapped' ? ($item->reason->description ?? '') : '',
                                     ];
                                 });
 
                                 // Render the data as an HTML table
                                 $html = '<table class="table-auto w-full text-left border border-gray-300">';
-                                $html .= '<thead><tr><th class="border px-2 py-1">Quantity</th><th class="border px-2 py-1">Reason Description</th></tr></thead>';
+                                $html .= '<thead><tr><th class="border px-2 py-1">Type</th><th class="border px-2 py-1">Quantity</th><th class="border px-2 py-1">Reason</th></tr></thead>';
                                 $html .= '<tbody>';
                                 foreach ($data as $row) {
                                     $html .= '<tr>';
+                                    $html .= '<td class="border px-2 py-1">'.e($row['type']).'</td>';
                                     $html .= '<td class="border px-2 py-1">'.e($row['quantity']).'</td>';
                                     $html .= '<td class="border px-2 py-1">'.e($row['reason_description']).'</td>';
                                     $html .= '</tr>';
@@ -625,7 +637,7 @@ class WorkOrderResource extends Resource
 
                                 return $html;
                             })
-                            ->html(), // Render raw HTML
+                            ->html(),
                     ])
                     ->columns(1),
 
