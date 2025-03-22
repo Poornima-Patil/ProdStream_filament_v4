@@ -56,7 +56,7 @@ class CustomerInformationPolicy
      */
     public function restore(User $user, CustomerInformation $customerInformation): bool
     {
-        return $user->hasPermissionTo('Restore Customer Information');
+        return $user->hasPermissionTo('Delete Customer Information');
     }
 
     /**
@@ -64,6 +64,6 @@ class CustomerInformationPolicy
      */
     public function forceDelete(User $user, CustomerInformation $customerInformation): bool
     {
-        return $user->hasPermissionTo('Force Delete Customer Information');
+        return $user->hasPermissionTo('Delete Customer Information');
     }
 }
