@@ -13,7 +13,7 @@ class CreateCustomerInformation extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         // Get the latest customer record to determine the next unique ID
-        $lastCustomer = CustomerInformation::latest('customer_id')->first();
+        $lastCustomer = CustomerInformation::withTrashed()->latest('customer_id')->first();
 
         // Generate the next customer ID by adding 10 to the last one or starting at 1010
         $lastId = $lastCustomer ? (int) $lastCustomer->customer_id : 1000;
