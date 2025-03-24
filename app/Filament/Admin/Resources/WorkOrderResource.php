@@ -218,7 +218,44 @@ class WorkOrderResource extends Resource
                     ->label('Approx time required')
                     ->hint('Time is calculated based on the cycle time provided in the Part number')
                     ->visible($isAdminOrManager)
-                    ->disabled(),
+                    ->disabled()
+                    ->dehydrated()
+                    ->afterStateHydrated(function ($component, $state, $record) {
+                        if ($record) {
+                            $partNumberId = $record->bom->purchaseOrder->part_number_id;
+                            $qty = $record->qty;
+                            
+                            if ($partNumberId && $qty) {
+                                $cycleTimeInSeconds = \App\Models\PartNumber::where('id', $partNumberId)->value('cycle_time');
+                                if ($cycleTimeInSeconds) {
+                                    $totalSeconds = $cycleTimeInSeconds * $qty;
+                                    $component->state(self::convertSecondsToTime($totalSeconds));
+                                }
+                            }
+                        }
+                    })
+                    ->reactive()
+                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                        $partNumberId = $get('part_number_id');
+                        $qty = (int) $get('qty');
+
+                        if (!$partNumberId || !$qty) {
+                            $set('time_to_complete', '00:00:00');
+                            return;
+                        }
+
+                        // Get the cycle time from the part number
+                        $cycleTimeInSeconds = \App\Models\PartNumber::where('id', $partNumberId)->value('cycle_time');
+
+                        if (!$cycleTimeInSeconds) {
+                            $set('time_to_complete', '00:00:00');
+                            return;
+                        }
+
+                        // Calculate total time
+                        $totalSeconds = $cycleTimeInSeconds * $qty;
+                        $set('time_to_complete', self::convertSecondsToTime($totalSeconds));
+                    }),
 
                 Forms\Components\DateTimePicker::make('start_time')
                 ->disabled(! $isAdminOrManager)
