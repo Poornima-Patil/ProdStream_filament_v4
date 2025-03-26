@@ -71,6 +71,9 @@
         <div class="info-row">
             <span class="info-label">Date:</span> {{ $workOrderQuantity->created_at->format('Y-m-d H:i:s') }}
         </div>
+        <div class="info-row">
+            <span class="info-label">Material Batch:</span> {{ $workOrderQuantity->workOrder->material_batch ?? 'N/A' }}
+        </div>
     </div>
 
     <table>
