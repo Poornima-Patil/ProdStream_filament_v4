@@ -338,8 +338,11 @@ class WorkOrderResource extends Resource
                                                 ->disabled(fn ($record) => $record && $record->exists),
                                             Forms\Components\Select::make('reason_id')
                                                 ->label('Scrapped Reason')
-                                                ->relationship('reason', 'description')
-                                                ->visible(fn ($get) => $get('scrapped_quantity') > 0)
+                                                ->relationship(
+                                                    'reason', 
+                                                    'description',
+                                                    fn ($query) => $query->where('factory_id', Auth::user()->factory_id) // Filter reasons by factory
+                                                )                                                ->visible(fn ($get) => $get('scrapped_quantity') > 0)
                                                 ->required(fn ($get) => $get('scrapped_quantity') > 0)
                                                 ->disabled(fn ($record) => $record && $record->exists),
                                         ])
@@ -658,46 +661,12 @@ class WorkOrderResource extends Resource
                         TextEntry::make('status')->label('Status'),
                         TextEntry::make('start_time')->label('Planned Start Time'),
                         TextEntry::make('end_time')->label('Planned End Time'),
-                        TextEntry::make('total_ok_quantity')->label('OK Quantities'),
-                        TextEntry::make('total_scrapped_quantity')->label('Scrapped Quantities'),
-                        TextEntry::make('scrappedReason.description')->label('Scrapped Reason'),
+                        TextEntry::make('ok_qtys')->label('OK Quantities'),
+                        TextEntry::make('scrapped_qtys')->label('Scrapped Quantities'),
                         TextEntry::make('material_batch')->label('Material Batch ID'),
                     ])->columns(2),
 
-                Section::make('Quantities Details')
-                    ->collapsible()
-                    ->schema([
-                        TextEntry::make('quantities_table')
-                            ->label('Quantities')
-                            ->state(function ($record) {
-                                $record->load('quantities.reason');
-
-                                $data = $record->quantities->map(function ($item) {
-                                    return [
-                                        'quantity' => $item->quantity,
-                                        'type' => ucfirst($item->type),
-                                        'reason_description' => $item->type === 'scrapped' ? ($item->reason->description ?? '') : '',
-                                    ];
-                                });
-
-                                // Render the data as an HTML table
-                                $html = '<table class="table-auto w-full text-left border border-gray-300">';
-                                $html .= '<thead><tr><th class="border px-2 py-1">Type</th><th class="border px-2 py-1">Quantity</th><th class="border px-2 py-1">Reason</th></tr></thead>';
-                                $html .= '<tbody>';
-                                foreach ($data as $row) {
-                                    $html .= '<tr>';
-                                    $html .= '<td class="border px-2 py-1">'.e($row['type']).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($row['quantity']).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($row['reason_description']).'</td>';
-                                    $html .= '</tr>';
-                                }
-                                $html .= '</tbody></table>';
-
-                                return $html;
-                            })
-                            ->html(),
-                    ])
-                    ->columns(1),
+                
 
                     Section::make('Documents')
                     ->collapsible()
@@ -764,7 +733,10 @@ class WorkOrderResource extends Resource
                                 $html .= '<th class="border px-2 py-1">Status</th>';
                                 $html .= '<th class="border px-2 py-1">User</th>';
                                 $html .= '<th class="border px-2 py-1">Timestamp</th>';
-                                $html .= '<th class="border px-2 py-1">Quantities</th>';
+                                $html .= '<th class="border px-2 py-1">OK QTY</th>';
+                                $html .= '<th class="border px-2 py-1">Scrapped QTY</th>';
+                                $html .= '<th class="border px-2 py-1">Remaining QTY</th>';
+                                $html .= '<th class="border px-2 py-1">Scrapped Reason</th>';
                                 $html .= '<th class="border px-2 py-1">Documents</th>';
                                 $html .= '</tr></thead><tbody>';
 
@@ -772,15 +744,20 @@ class WorkOrderResource extends Resource
                                     $status = $log->status;
                                     $user = $log->user ? $log->user->first_name . ' ' . $log->user->last_name : 'N/A';
                                     $timestamp = $log->created_at->format('Y-m-d H:i:s');
-                                    $quantityInfo = '';
+                                    $okQty = '';
+                                    $scrappedQty = '';
+                                    $remainingQty = '';
+                                    $scrappedReason = '';
                                     $documents = '';
 
                                     if ($status === 'Hold') {
                                         if (isset($quantities[$quantitiesIndex])) {
                                             $quantity = $quantities[$quantitiesIndex];
-                                            $quantityInfo = "OK: {$quantity->ok_quantity}, Scrapped: {$quantity->scrapped_quantity}";
+                                            $okQty = $quantity->ok_quantity;
+                                            $scrappedQty = $quantity->scrapped_quantity;
+                                            $remainingQty = $record->qty - ($okQty + $scrappedQty);
                                             if ($quantity->scrapped_quantity > 0) {
-                                                $quantityInfo .= " (Reason: {$quantity->reason->description})";
+                                                $scrappedReason = $quantity->reason->description;
                                             }
 
                                             // Get QR code and PDF links
@@ -798,7 +775,10 @@ class WorkOrderResource extends Resource
                                     $html .= '<td class="border px-2 py-1">' . e($status) . '</td>';
                                     $html .= '<td class="border px-2 py-1">' . e($user) . '</td>';
                                     $html .= '<td class="border px-2 py-1">' . e($timestamp) . '</td>';
-                                    $html .= '<td class="border px-2 py-1">' . e($quantityInfo) . '</td>';
+                                    $html .= '<td class="border px-2 py-1">' . e($okQty) . '</td>';
+                                    $html .= '<td class="border px-2 py-1">' . e($scrappedQty) . '</td>';
+                                    $html .= '<td class="border px-2 py-1">' . e($remainingQty) . '</td>';
+                                    $html .= '<td class="border px-2 py-1">' . e($scrappedReason) . '</td>';
                                     $html .= '<td class="border px-2 py-1">' . $documents . '</td>';
                                     $html .= '</tr>';
                                 }
