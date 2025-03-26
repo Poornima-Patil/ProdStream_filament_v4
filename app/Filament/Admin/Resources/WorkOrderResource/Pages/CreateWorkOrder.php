@@ -39,7 +39,7 @@ class CreateWorkOrder extends CreateRecord
 
         // Modify the unique_id format to WXXXX_MMDDYY_BOMUNIQUE_ID
         // Ensure to use MMDDYY format for the date
-        $data['unique_id'] = 'W'.$sequenceNumber.'_'.$dateFormat.'_'.$bomUniqueId.'_D';
+        $data['unique_id'] = 'W'.$sequenceNumber.'_'.$dateFormat.'_'.$bomUniqueId;
        
        // dd($data);
 

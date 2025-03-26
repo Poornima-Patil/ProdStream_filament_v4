@@ -206,7 +206,7 @@ class WorkOrderResource extends Resource
                             ->with('user') // Get the associated user (operator)
                             ->get()
                             ->mapWithKeys(function ($operator) {
-                                return [$operator->id => $operator->user->first_name];
+                                return [$operator->id => $operator->user->first_name . ' ' . $operator->user->last_name];
                             });
                     })
                     ->searchable()
@@ -312,111 +312,128 @@ class WorkOrderResource extends Resource
                     ->label('Hold Reason')
                     ->relationship('holdReason', 'description', function ($query) {
                         return $query->where('factory_id', auth()->user()->factory_id);
-                    }) // Assumes a relationship with the ScrappedReason model
+                    })
                     ->visible(fn ($get) => in_array($get('status'), ['Hold']))
                     ->reactive()
-                    ->required(fn ($get) => in_array($get('status'), ['Hold'])),
+                    ->required(fn ($get) => in_array($get('status'), ['Hold']))
+                    ->columnSpanFull(),
 
+                    Forms\Components\Section::make('Quantities')
+                        ->schema([
+                            Forms\Components\Repeater::make('quantities')
+                                ->schema([
+                                    Forms\Components\Grid::make(2)
+                                        ->schema([
+                                            Forms\Components\TextInput::make('ok_quantity')
+                                                ->label('OK Quantity')
+                                                ->numeric()
+                                                ->required()
+                                                ->default(0)
+                                                ->disabled(fn ($record) => $record && $record->exists),
+                                            Forms\Components\TextInput::make('scrapped_quantity')
+                                                ->label('Scrapped Quantity')
+                                                ->numeric()
+                                                ->required()
+                                                ->default(0)
+                                                ->disabled(fn ($record) => $record && $record->exists),
+                                            Forms\Components\Select::make('reason_id')
+                                                ->label('Scrapped Reason')
+                                                ->relationship('reason', 'description')
+                                                ->visible(fn ($get) => $get('scrapped_quantity') > 0)
+                                                ->required(fn ($get) => $get('scrapped_quantity') > 0)
+                                                ->disabled(fn ($record) => $record && $record->exists),
+                                        ])
+                                ])
+                                ->columns(1)
+                                ->defaultItems(1)
+                                ->reorderable()
+                                ->collapsible()
+                                ->itemLabel(fn (array $state): ?string => 
+                                    $state['ok_quantity'] > 0 || $state['scrapped_quantity'] > 0 
+                                        ? "OK: {$state['ok_quantity']}, Scrapped: {$state['scrapped_quantity']}" 
+                                        : null
+                                )
+                                ->live()
+                                ->afterStateUpdated(function ($livewire, $state, $set, $get) {
+                                    // Calculate totals from all quantities
+                                    $totalOk = 0;
+                                    $totalScrapped = 0;
+                                    
+                                    foreach ($state as $item) {
+                                        $totalOk += (int)($item['ok_quantity'] ?? 0);
+                                        $totalScrapped += (int)($item['scrapped_quantity'] ?? 0);
+                                    }
+                                    
+                                    // Update the work order's total quantities
+                                    $workOrder = $get('record');
+                                    if ($workOrder) {
+                                        $workOrder->ok_qtys = $totalOk;
+                                        $workOrder->scrapped_qtys = $totalScrapped;
+                                        $workOrder->save();
+                                    }
+                                    
+                                    // Update both form state and Livewire data
+                                    $set('ok_qtys', $totalOk);
+                                    $set('scrapped_qtys', $totalScrapped);
+                                    
+                                    $livewire->data['ok_qtys'] = $totalOk;
+                                    $livewire->data['scrapped_qtys'] = $totalScrapped;
+                                })
+                                ->relationship('quantities', function ($query) {
+                                    return $query->orderBy('created_at', 'desc');
+                                })
+                                ->createItemButtonLabel('Add Quantities')
+                                ->defaultItems(1)
+                                ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed']))
+                                ->beforeStateDehydrated(function ($state, $record, $get) {
+                                    if ($record && $record->exists) {
+                                        return;
+                                    }
 
-                    Forms\Components\TextInput::make('material_batch')
-                    ->label('Material batch ID')
-                   
-                    ->visible(fn ($get) => in_array($get('status'), ['Start']))
-                    ->reactive()
-                    ->required(fn ($get) => in_array($get('status'), ['Start'])),
+                                    // Get the work order instance
+                                    $workOrder = $get('record');
+                                    
+                                    // Get the latest work order log
+                                    $latestLog = $workOrder->workOrderLogs()->latest()->first();
+                                    
+                                    if (!$latestLog) {
+                                        // If no log exists, create one
+                                        $latestLog = $workOrder->createWorkOrderLog($workOrder->status);
+                                    }
+                                    
+                                    // Add the work_order_log_id to the state
+                                    return array_merge($state, ['work_order_log_id' => $latestLog->id]);
+                                })
+                                ->afterStateHydrated(function ($state, $record, $set) {
+                                    if ($record) {
+                                        // Calculate totals from existing quantities
+                                        $totalOk = $record->quantities->sum('ok_quantity');
+                                        $totalScrapped = $record->quantities->sum('scrapped_quantity');
+                                        
+                                        // Update the form state
+                                        $set('ok_qtys', $totalOk);
+                                        $set('scrapped_qtys', $totalScrapped);
+                                    }
+                                }),
+ 
 
+                            Forms\Components\Grid::make(2)
+                                ->schema([
+                                    Forms\Components\TextInput::make('ok_qtys')
+                                        ->label('Total OK Quantities')
+                                        ->default(0)
+                                        ->readonly()
+                                        ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
 
-                    Forms\Components\Repeater::make('quantities')
-                    ->label('Quantities')
-                    ->relationship('quantities')
-                    ->schema([
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\TextInput::make('quantity')
-                                    ->label('Quantity')
-                                    ->numeric()
-                                    ->required()
-                                    ->minValue(1)
-                                    ->reactive()
-                                    ->disabled(fn ($record) => $record && $record->exists)
-                                    ->afterStateUpdated(function ($livewire, $state, callable $set) {
-                                        $total = collect($livewire->data['quantities'] ?? [])
-                                            ->pluck('quantity')
-                                            ->filter(fn ($value) => is_numeric($value))
-                                            ->sum();
-                                        $set('ok_qtys', $total);
-                                    }),
-
-                                Forms\Components\Select::make('type')
-                                    ->label('Type')
-                                    ->options([
-                                        'ok' => 'OK',
-                                        'scrapped' => 'Scrapped'
-                                    ])
-                                    ->required()
-                                    ->disabled(fn ($record) => $record && $record->exists)
-                                    ->reactive()
-                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        if ($state === 'scrapped') {
-                                            $set('reason_id', null);
-                                        }
-                                    }),
-
-                                Forms\Components\Select::make('reason_id')
-                                    ->label('Scrapped Reason')
-                                    ->relationship('reason', 'description', function ($query) {
-                                        return $query->where('factory_id', auth()->user()->factory_id);
-                                    })
-                                    ->required(fn ($get) => $get('type') === 'scrapped')
-                                    ->visible(fn ($get) => $get('type') === 'scrapped')
-                                    ->disabled(fn ($record) => $record && $record->exists)
-                                    ->columnSpan(2),
-                            ]),
-                    ])
-                    ->defaultItems(0)
-                    ->minItems(0)
-                    ->maxItems(50)
-                    ->columnSpan('full')
-                    ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed']))
-                    ->afterStateUpdated(function ($livewire, $state, callable $set) {
-                        $okTotal = collect($state)
-                            ->filter(fn ($item) => ($item['type'] ?? '') === 'ok')
-                            ->pluck('quantity')
-                            ->filter(fn ($value) => is_numeric($value))
-                            ->sum();
-                        
-                        $scrappedTotal = collect($state)
-                            ->filter(fn ($item) => ($item['type'] ?? '') === 'scrapped')
-                            ->pluck('quantity')
-                            ->filter(fn ($value) => is_numeric($value))
-                            ->sum();
-                        
-                        $set('ok_qtys', $okTotal);
-                        $set('scrapped_qtys', $scrappedTotal);
-                    })
-                    ->collapsible()
-                    ->itemLabel(fn (array $state): ?string => 
-                        $state['type'] === 'ok' 
-                            ? "OK Quantity: {$state['quantity']}"
-                            : "Scrapped Quantity: {$state['quantity']}"
-                    )
-                    ->collapsed(fn ($record) => $record && $record->exists)
-                    ->reorderable()
-                    ->reorderableWithButtons()
-                    ->cloneable(),
-
-                // Total Quantities Display
-                Forms\Components\TextInput::make('ok_qtys')
-                    ->label('Total OK Quantities')
-                    ->default(0)
-                    ->readonly()
-                    ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
-
-                Forms\Components\TextInput::make('scrapped_qtys')
-                    ->label('Total Scrapped Quantities')
-                    ->default(0)
-                    ->readonly()
-                    ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
+                                    Forms\Components\TextInput::make('scrapped_qtys')
+                                        ->label('Total Scrapped Quantities')
+                                        ->default(0)
+                                        ->readonly()
+                                        ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
+                                ]),
+                        ])
+                        ->columnSpanFull()
+                        ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
             ]);
     }
 
@@ -474,8 +491,12 @@ class WorkOrderResource extends Resource
 
                 Tables\Columns\TextColumn::make('start_time'),
                 Tables\Columns\TextColumn::make('end_time'),
-                Tables\Columns\TextColumn::make('ok_qtys'),
-                Tables\Columns\TextColumn::make('scrapped_qtys'),
+                Tables\Columns\TextColumn::make('ok_qtys')
+                    ->label('OK Quantities')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('scrapped_qtys')
+                    ->label('Scrapped Quantities')
+                    ->sortable(),
             ])
             ->modifyQueryUsing(function (Builder $query) {
                 $userId = Auth::id();
@@ -637,8 +658,8 @@ class WorkOrderResource extends Resource
                         TextEntry::make('status')->label('Status'),
                         TextEntry::make('start_time')->label('Planned Start Time'),
                         TextEntry::make('end_time')->label('Planned End Time'),
-                        TextEntry::make('ok_qtys')->label('OK Quantities'),
-                        TextEntry::make('scrapped_qtys')->label('Scrapped Quantities'),
+                        TextEntry::make('total_ok_quantity')->label('OK Quantities'),
+                        TextEntry::make('total_scrapped_quantity')->label('Scrapped Quantities'),
                         TextEntry::make('scrappedReason.description')->label('Scrapped Reason'),
                         TextEntry::make('material_batch')->label('Material Batch ID'),
                     ])->columns(2),
@@ -733,87 +754,59 @@ class WorkOrderResource extends Resource
                             ->label('Work Order Logs')
                             ->state(function ($record) {
                                 // Load necessary relationships
-                                $record->load(['workOrderLogs.user', 'workOrderLogs.okQuantities']);
-                                $okdetail = $record->okQuantities;
-                                $okdetailIndex = 0; // To track which OK Quantity we are using for each Hold status
+                                $record->load(['workOrderLogs.user', 'quantities']);
+                                $quantities = $record->quantities;
+                                $quantitiesIndex = 0;
 
-                                $logs = $record->workOrderLogs->map(function ($log) use ($okdetail, &$okdetailIndex) {
-                                    $okQuantityEntry = null;
-                                    $qrCodeUrl = null;
-                                
-                                    if (in_array($log->status, ['Hold', 'Completed']) && $okdetail->isNotEmpty() && isset($okdetail[$okdetailIndex])) {
-                                        $okQuantityEntry = $okdetail[$okdetailIndex]->quantity;
-                                
-                                        // ✅ Fetch the specific QR Code image for this OK Quantity
-                                        $qrCodeMedia = $okdetail[$okdetailIndex]->getMedia('qr_code');
-                                
-                                        if ($qrCodeMedia->isNotEmpty()) {
-                                            $qrCodeUrl = $qrCodeMedia->first()->getUrl(); // Get the first image of the current OK Quantity
-                                        }
-                                
-                                        $okdetailIndex++; // Increment for the next log
-                                    }
-                                
-                                    return [
-                                        'status' => $log->status,
-                                        'user' => $log->user->getFilamentName() ?? 'N/A',
-                                        'changed_at' => $log->changed_at->format('Y-m-d H:i:s'),
-                                        'ok_qtys' => $log->ok_qtys,
-                                        'ok_detail' => $okQuantityEntry,
-                                        'qr_code' => $qrCodeUrl, // ✅ Correctly mapped unique QR Code per OK Quantity
-                                        'scrapped_qtys' => $log->scrapped_qtys,
-                                        'remaining' => $log->remaining,
-                                        'scrapped_reason' => $log->scrappedReason->description ?? 'NA',
-                                        'hold_reason' => $log->holdReason->description ?? 'NA'
-                                    ];
-                                });
-                                
                                 // Create the HTML table
                                 $html = '<table class="table-auto w-full text-left border border-gray-300">';
                                 $html .= '<thead class="bg-gray-200"><tr>';
                                 $html .= '<th class="border px-2 py-1">Status</th>';
                                 $html .= '<th class="border px-2 py-1">User</th>';
-                                $html .= '<th class="border px-2 py-1">Changed At</th>';
-                                $html .= '<th class="border px-2 py-1">Total OK Qty</th>';
-                                $html .= '<th class="border px-2 py-1">OK Quantity Details</th>';
-                                $html .= '<th class="border px-2 py-1">QR Code</th>'; 
-                                $html .= '<th class="border px-2 py-1">Scrapped Qty</th>';
-                                $html .= '<th class="border px-2 py-1">Remaining</th>';
-                                $html .= '<th class="border px-2 py-1">Scrapped Reason</th>';
-                                $html .= '<th class="border px-2 py-1">Hold Reason</th>';
+                                $html .= '<th class="border px-2 py-1">Timestamp</th>';
+                                $html .= '<th class="border px-2 py-1">Quantities</th>';
+                                $html .= '<th class="border px-2 py-1">Documents</th>';
                                 $html .= '</tr></thead><tbody>';
-                
-                                foreach ($logs as $log) {
+
+                                foreach ($record->workOrderLogs as $log) {
+                                    $status = $log->status;
+                                    $user = $log->user ? $log->user->first_name . ' ' . $log->user->last_name : 'N/A';
+                                    $timestamp = $log->created_at->format('Y-m-d H:i:s');
+                                    $quantityInfo = '';
+                                    $documents = '';
+
+                                    if ($status === 'Hold') {
+                                        if (isset($quantities[$quantitiesIndex])) {
+                                            $quantity = $quantities[$quantitiesIndex];
+                                            $quantityInfo = "OK: {$quantity->ok_quantity}, Scrapped: {$quantity->scrapped_quantity}";
+                                            if ($quantity->scrapped_quantity > 0) {
+                                                $quantityInfo .= " (Reason: {$quantity->reason->description})";
+                                            }
+
+                                            // Get QR code and PDF links
+                                            $qrCodeMedia = $quantity->getMedia('qr_code')->first();
+
+                                            if ($qrCodeMedia) {
+                                                $documents .= "<a href='{$qrCodeMedia->getUrl()}' download='qr_code.png' class='text-blue-500 underline'>Download QR Code</a>";
+                                            }
+
+                                            $quantitiesIndex++;
+                                        }
+                                    }
+
                                     $html .= '<tr>';
-                                    $html .= '<td class="border px-2 py-1">'.e($log['status']).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($log['user']).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($log['changed_at']).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($log['ok_qtys']).'</td>';
-                                    $html .= '<td class="border px-2 py-1">';
-                                    if (in_array($log['status'], ['Hold', 'Completed']) && $log['ok_detail']) {
-                                        $html .= e($log['ok_detail']); // Display OK Quantity for Hold and Completed statuses
-                                    } else {
-                                        $html .= ''; // Blank for all other statuses
-                                    }
-                                    $html .= '</td>';
-                                    $html .= '</td>';  
-                                    $html .= '<td class="border px-2 py-1 text-center">';
-                                    if (!empty($log['qr_code'])) {
-                                        $html .= '<a href="'.$log['qr_code'].'" download="qr_code.png" class="text-blue-500 underline">Download QR Code</a>';
-                                    }
-                                    $html .= '</td>';
-                                     // QR Code column                              
-                                    $html .= '<td class="border px-2 py-1">'.e($log['scrapped_qtys']).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($log['remaining']).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($log['scrapped_reason']).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($log['hold_reason']).'</td>';
+                                    $html .= '<td class="border px-2 py-1">' . e($status) . '</td>';
+                                    $html .= '<td class="border px-2 py-1">' . e($user) . '</td>';
+                                    $html .= '<td class="border px-2 py-1">' . e($timestamp) . '</td>';
+                                    $html .= '<td class="border px-2 py-1">' . e($quantityInfo) . '</td>';
+                                    $html .= '<td class="border px-2 py-1">' . $documents . '</td>';
                                     $html .= '</tr>';
                                 }
-                
+
                                 $html .= '</tbody></table>';
                                 return $html;
                             })
-                            ->html(), // Enable raw HTML rendering
+                            ->html(),
                     ])
                     ->columns(1),
                 

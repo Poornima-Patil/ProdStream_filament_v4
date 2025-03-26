@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Models\OkQuantity;
 use Illuminate\Support\Facades\URL;
+use App\Models\WorkOrderQuantity;
 
 
 Route::get('/', function () {
@@ -28,7 +29,7 @@ Route::get('/work-order-quantity/{id}/download', function ($id) {
         
         // Get the media item from the report_pdf collection
         $media = $workOrderQuantity->getFirstMedia('report_pdf');
-        
+
         if (!$media) {
             \Illuminate\Support\Facades\Log::error("Report not found for WorkOrderQuantity ID: {$id}");
             abort(404, 'Report not found');

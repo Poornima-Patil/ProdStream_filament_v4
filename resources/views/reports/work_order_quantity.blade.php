@@ -22,18 +22,19 @@
             margin-bottom: 20px;
         }
         .info-section {
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
         .info-row {
             margin-bottom: 10px;
         }
         .info-label {
             font-weight: bold;
+            margin-right: 10px;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
+            margin: 20px 0;
         }
         th, td {
             border: 1px solid #ddd;
@@ -48,12 +49,6 @@
             text-align: center;
             font-size: 12px;
             color: #666;
-        }
-        .quantities-table {
-            margin-top: 30px;
-        }
-        .quantities-table th {
-            background-color: #f5f5f5;
         }
     </style>
 </head>
@@ -78,56 +73,31 @@
         </div>
     </div>
 
-    <table class="quantities-table">
-        <thead>
-            <tr>
-                <th>Type</th>
-                <th>Quantity</th>
-                <th>Scrapped Reason</th>
-            </tr>
-        </thead>
-        <tbody>
-            @php
-                $latestCreatedAt = $workOrderQuantity->workOrder->quantities()
-                    ->latest('created_at')
-                    ->first()
-                    ->created_at;
-
-                $quantities = $workOrderQuantity->workOrder->quantities()
-                    ->where('created_at', '>=', $latestCreatedAt->subSeconds(5))
-                    ->orderBy('type')
-                    ->get();
-            @endphp
-            @foreach($quantities as $quantity)
-                <tr>
-                    <td>{{ ucfirst($quantity->type) }}</td>
-                    <td>{{ $quantity->quantity }}</td>
-                    <td>{{ $quantity->type === 'scrapped' ? ($quantity->reason->description ?? 'N/A') : '-' }}</td>
-                </tr>
-            @endforeach
-        </tbody>
-    </table>
-
     <table>
         <thead>
             <tr>
                 <th>Machine</th>
                 <th>Operator</th>
                 <th>Material Batch</th>
+                <th>OK Quantity</th>
+                <th>Scrapped Quantity</th>
+                <th>Scrapped Reason</th>
             </tr>
         </thead>
         <tbody>
             <tr>
                 <td>{{ $workOrderQuantity->workOrder->machine->name }}</td>
-                <td>{{ $workOrderQuantity->workOrder->operator->user->first_name }}</td>
+                <td>{{ $workOrderQuantity->workOrder->operator->user->first_name }} {{ $workOrderQuantity->workOrder->operator->user->last_name }}</td>
                 <td>{{ $workOrderQuantity->workOrder->material_batch }}</td>
+                <td>{{ $workOrderQuantity->ok_quantity }}</td>
+                <td>{{ $workOrderQuantity->scrapped_quantity }}</td>
+                <td>{{ $workOrderQuantity->reason->description ?? 'N/A' }}</td>
             </tr>
         </tbody>
     </table>
 
     <div class="footer">
-        <p>Generated on: {{ now()->format('Y-m-d H:i:s') }}</p>
-        <p>This is a computer-generated report and does not require a signature.</p>
+        <p>Report generated on: {{ now()->format('Y-m-d H:i:s') }}</p>
     </div>
 </body>
 </html> 

@@ -85,40 +85,53 @@ class WorkOrder extends Model
 
     public function createWorkOrderLog($newStatus)
     {
+        // Get the latest quantity entry for this work order
+        $latestQuantity = $this->quantities()->latest()->first();
+        
+        // Calculate totals from the latest quantity entry
+        $okQtys = $latestQuantity ? $latestQuantity->ok_quantity : 0;
+        $scrappedQtys = $latestQuantity ? $latestQuantity->scrapped_quantity : 0;
+        $scrappedReasonId = $latestQuantity ? $latestQuantity->reason_id : null;
 
-                    // Assumes the WorkOrder model has a `scrappedQuantities` relationship
-                    $scrappedQuantity = $this->scrappedQuantities->first(); // Retrieves the first item in the collection
-
-                    // Extract the reason_id (scrapped_reason_id)
-                    $scrappedReasonId = $scrappedQuantity ? $scrappedQuantity->reason_id : null;
         $log = WorkOrderLog::create([
             'work_order_id' => $this->id,
             'status' => $newStatus,
             'changed_at' => now(),
             'user_id' => Auth::id(),
-            'ok_qtys' => $this->ok_qtys ?? 0,
-            'scrapped_qtys' => $this->scrapped_qtys ?? 0,
-            'remaining' => $this->qty - (($this->ok_qtys ?? 0) + ($this->scrapped_qtys ?? 0)),
+            'ok_qtys' => $okQtys,
+            'scrapped_qtys' => $scrappedQtys,
+            'remaining' => $this->qty - ($okQtys + $scrappedQtys),
             'scrapped_reason_id' => $scrappedReasonId,
-            'hold_reason_id' => $this->hold_reason_id
+            'hold_reason_id' => $this->hold_reason_id,
         ]);
-        $log->save();
+
+        return $log;
     }
    
     protected static function booted()
     {
         static::created(function ($workOrder) {
-            DB::afterCommit(function () use ($workOrder) {
-                $workOrder->createWorkOrderLog('Assigned');
-            });
+            $workOrder->createWorkOrderLog('Assigned');
         });
     
         static::updated(function ($workOrder) {
             if ($workOrder->isDirty('status')) {
-                DB::afterCommit(function () use ($workOrder) {
-                    $workOrder->createWorkOrderLog($workOrder->status);
-                });
+                $workOrder->createWorkOrderLog($workOrder->status);
             }
+        });
+
+        // Add observer for WorkOrderQuantity
+        static::created(function ($workOrder) {
+            // Get the latest work order log
+            $latestLog = $workOrder->workOrderLogs()->latest()->first();
+            
+            if (!$latestLog) {
+                // If no log exists, create one
+                $latestLog = $workOrder->createWorkOrderLog($workOrder->status);
+            }
+
+            // Update any existing quantities with the work_order_log_id
+            $workOrder->quantities()->update(['work_order_log_id' => $latestLog->id]);
         });
     }
 
@@ -126,6 +139,24 @@ class WorkOrder extends Model
     public function infoMessages()
     {
         return $this->hasMany(InfoMessage::class);
+    }
+
+    // Add this new method to handle quantity creation
+    public function createQuantity(array $data)
+    {
+        // Get the latest work order log
+        $latestLog = $this->workOrderLogs()->latest()->first();
+        
+        if (!$latestLog) {
+            // If no log exists, create one
+            $latestLog = $this->createWorkOrderLog($this->status);
+        }
+        
+        // Add the work_order_log_id to the data
+        $data['work_order_log_id'] = $latestLog->id;
+        
+        // Create the quantity
+        return $this->quantities()->create($data);
     }
 
 }

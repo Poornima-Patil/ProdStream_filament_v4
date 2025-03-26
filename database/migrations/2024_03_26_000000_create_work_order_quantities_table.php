@@ -11,9 +11,9 @@ return new class extends Migration
         Schema::create('work_order_quantities', function (Blueprint $table) {
             $table->id();
             $table->foreignId('work_order_id')->constrained()->onDelete('cascade');
-            $table->foreignId('work_order_log_id')->nullable()->constrained()->onDelete('set null');
-            $table->integer('quantity');
-            $table->enum('type', ['ok', 'scrapped']);
+            $table->foreignId('work_order_log_id')->constrained()->onDelete('cascade');
+            $table->integer('ok_quantity')->default(0);
+            $table->integer('scrapped_quantity')->default(0);
             $table->foreignId('reason_id')->nullable()->constrained('scrapped_reasons')->onDelete('set null');
             $table->timestamps();
             $table->softDeletes();
