@@ -210,13 +210,13 @@ class BomResource extends Resource
         return $infoList
             ->schema([
 
-                Section::make('Purchase Order Infomation')
+                Section::make('Sales Order Infomation')
                     ->collapsible()
                     ->schema([
                         TextEntry::make('unique_id')
                             ->label('Unique ID'),
                         TextEntry::make('purchaseorder.description')
-                            ->label('Purchase Order'),
+                            ->label('Sales Order'),
                         TextEntry::make('purchaseorder.partnumber.partnumber')->label('Part Number'),
                         TextEntry::make('purchaseorder.partnumber.revision')->label('Revision'),
                         TextEntry::make('machineGroup.group_name')
