@@ -541,6 +541,28 @@ class WorkOrderResource extends Resource
                         'Completed' => 'Completed',
                     ])
                     ->attribute('status'),
+                    SelectFilter::make('operator_id')
+                    ->label('Operator')
+                    ->relationship('operator.user', 'first_name', function ($query) {
+                        $query->whereHas('roles', function ($roleQuery) {
+                            $roleQuery->where('name', 'operator');
+                        });
+                    })
+                    ->searchable()
+                    ->preload()
+                    ->multiple(),
+            
+                    SelectFilter::make('machine_id')
+    ->label('Machine') // Correct label
+    ->relationship('machine', 'assetId') // Ensure correct relationship & column
+    ->searchable()
+    ->preload()
+    ->multiple(),
+    SelectFilter::make('part_number_id')
+    ->label('Part Number')
+    ->relationship('bom.purchaseorder.partnumber', 'partnumber')
+    ->searchable()
+    ->preload(),
             ])
             ->actions([
                 ActionGroup::make([
