@@ -25,6 +25,8 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use Filament\Tables\Enums\ActionsPosition;
+
 
 class WorkOrderResource extends Resource
 {
@@ -606,8 +608,8 @@ class WorkOrderResource extends Resource
                             self::sendAlert($data, $record);
                         })
                         ->button(),
-                ]),
-            ])
+                    ])
+                    ],position: ActionsPosition::BeforeColumns)
             ->headerActions([])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
