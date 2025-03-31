@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\MachineGroup;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class MachineGroupPolicy
 {
@@ -21,7 +20,8 @@ class MachineGroupPolicy
      */
     public function view(User $user, MachineGroup $machineGroup): bool
     {
-        return $user->hasPermissionTo(permission: 'View MachineGroup');    }
+        return $user->hasPermissionTo(permission: 'View MachineGroup');
+    }
 
     /**
      * Determine whether the user can create models.
@@ -51,6 +51,7 @@ class MachineGroupPolicy
     {
         return $user->hasPermissionTo(permission: 'Delete MachineGroup');
     }
+
     /**
      * Determine whether the user can restore the model.
      */

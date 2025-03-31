@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('purchase_order_id')->constrained();
-         
+
             $table->foreignId('machine_group_id')->constrained();
             $table->foreignId('operator_proficiency_id')->constrained();
             $table->dateTime('lead_time')->nullable();

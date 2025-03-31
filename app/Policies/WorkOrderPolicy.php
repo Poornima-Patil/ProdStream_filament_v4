@@ -62,8 +62,9 @@ class WorkOrderPolicy
     {
         return false;
     }
+
     public function deleteAny(User $user): bool
-{
-    return $user->hasPermissionTo(permission: 'Delete WorkOrder'); // Restrict bulk delete too
-}
+    {
+        return $user->hasPermissionTo(permission: 'Delete WorkOrder'); // Restrict bulk delete too
+    }
 }

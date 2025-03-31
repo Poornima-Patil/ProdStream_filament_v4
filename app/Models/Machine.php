@@ -18,7 +18,7 @@ class Machine extends Model
         'status',
         'department_id',
         'factory_id',
-        'machine_group_id'
+        'machine_group_id',
     ];
 
     public function department()
@@ -30,7 +30,7 @@ class Machine extends Model
     {
         return $this->belongsTo(MachineGroup::class);
     }
-    
+
     public function workOrders()
     {
         return $this->hasMany(WorkOrder::class);

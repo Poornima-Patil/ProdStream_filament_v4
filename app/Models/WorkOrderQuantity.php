@@ -2,17 +2,17 @@
 
 namespace App\Models;
 
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\ImageManager;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
-use SimpleSoftwareIO\QrCode\Facades\QrCode;
-use Illuminate\Support\Facades\Storage;
-use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Facades\Log;
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver;
 
 class WorkOrderQuantity extends Model implements HasMedia
 {
@@ -23,7 +23,7 @@ class WorkOrderQuantity extends Model implements HasMedia
         'ok_quantity',
         'scrapped_quantity',
         'reason_id',
-        'work_order_log_id'
+        'work_order_log_id',
     ];
 
     protected $casts = [
@@ -59,15 +59,15 @@ class WorkOrderQuantity extends Model implements HasMedia
             $latestLog = WorkOrderLog::where('work_order_id', $quantity->work_order_id)
                 ->latest()
                 ->first();
-            
-            if (!$latestLog) {
+
+            if (! $latestLog) {
                 // If no log exists, create one
                 $workOrder = WorkOrder::find($quantity->work_order_id);
                 if ($workOrder) {
                     $latestLog = $workOrder->createWorkOrderLog($workOrder->status);
                 }
             }
-            
+
             // Set the work_order_log_id
             if ($latestLog) {
                 $quantity->work_order_log_id = $latestLog->id;
@@ -82,7 +82,7 @@ class WorkOrderQuantity extends Model implements HasMedia
 
     public function generateQRCode()
     {
-        Log::info('generateQRCode called for ID: ' . $this->id);
+        Log::info('generateQRCode called for ID: '.$this->id);
 
         // Generate the correct URL format
         $url = url("/work-order-quantity/{$this->id}/download");
@@ -91,13 +91,13 @@ class WorkOrderQuantity extends Model implements HasMedia
         $qrCodeImage = QrCode::size(300)->format('png')->generate($url);
 
         // Define file path
-        $qrPath = 'qr_codes/work_order_quantity_' . $this->id . '.png';
+        $qrPath = 'qr_codes/work_order_quantity_'.$this->id.'.png';
 
         // Store raw QR code image temporarily
         Storage::disk('public')->put($qrPath, $qrCodeImage);
 
         // Initialize ImageManager (GD Driver)
-        $manager = new ImageManager(new Driver());
+        $manager = new ImageManager(new Driver);
 
         // Load the stored QR code image with Intervention Image
         $image = $manager->read(Storage::disk('public')->path($qrPath));
@@ -124,7 +124,7 @@ class WorkOrderQuantity extends Model implements HasMedia
         $finalImage->place($image, 'top-center');
 
         // Add Work Order Number Below QR Code
-        $finalImage->text("WO#: " . $workOrderNumber, 10, $imageHeight + ($fontSize / 2) + $padding, function ($font) {
+        $finalImage->text('WO#: '.$workOrderNumber, 10, $imageHeight + ($fontSize / 2) + $padding, function ($font) {
             $font->size(24);
             $font->color('#000000');
             $font->align('left');
@@ -132,7 +132,7 @@ class WorkOrderQuantity extends Model implements HasMedia
         });
 
         // Add Part Number and Revision Below WO Number
-        $finalImage->text("Part#: " . $partNumber . " Rev: " . $revision, 10, $imageHeight + (2 * $fontSize) + $padding, function ($font) {
+        $finalImage->text('Part#: '.$partNumber.' Rev: '.$revision, 10, $imageHeight + (2 * $fontSize) + $padding, function ($font) {
             $font->size(24);
             $font->color('#000000');
             $font->align('left');
@@ -142,18 +142,18 @@ class WorkOrderQuantity extends Model implements HasMedia
         // Save the final image
         $finalImage->save(Storage::disk('public')->path($qrPath));
 
-        Log::info('Final QR Code with Work Order saved at: ' . Storage::disk('public')->path($qrPath));
+        Log::info('Final QR Code with Work Order saved at: '.Storage::disk('public')->path($qrPath));
 
         // Attach to Media Library
         $this->addMedia(Storage::disk('public')->path($qrPath))->toMediaCollection('qr_code');
 
-        Log::info('QR Code added to media library for ID: ' . $this->id);
+        Log::info('QR Code added to media library for ID: '.$this->id);
     }
 
     public function generateReport()
     {
         $pdf = Pdf::loadView('reports.work_order_quantity', ['workOrderQuantity' => $this]);
-        $pdfPath = 'reports/work_order_quantity_' . $this->id . '.pdf';
+        $pdfPath = 'reports/work_order_quantity_'.$this->id.'.pdf';
 
         // Store PDF in Public Storage
         $success = Storage::disk('public')->put($pdfPath, $pdf->output());
@@ -161,4 +161,4 @@ class WorkOrderQuantity extends Model implements HasMedia
         // Attach to Media Library
         $this->addMedia(Storage::disk('public')->path($pdfPath))->toMediaCollection('report_pdf');
     }
-} 
+}

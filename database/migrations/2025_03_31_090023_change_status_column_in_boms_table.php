@@ -1,5 +1,4 @@
 <?php
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -11,8 +10,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('work_orders', function (Blueprint $table) {
-            $table->string('material_batch')->nullable()->after('scrapped_qtys');
+        Schema::table('boms', function (Blueprint $table) {
+            $table->integer('status')->change(); // Change boolean to integer
         });
     }
 
@@ -21,8 +20,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('work_orders', function (Blueprint $table) {
-            $table->dropColumn('material_batch');
+        Schema::table('boms', function (Blueprint $table) {
+            $table->boolean('status')->change(); // Revert back to boolean if needed
         });
     }
 };

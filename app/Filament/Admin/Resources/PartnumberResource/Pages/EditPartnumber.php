@@ -9,6 +9,7 @@ use Filament\Resources\Pages\EditRecord;
 class EditPartnumber extends EditRecord
 {
     protected static string $resource = PartnumberResource::class;
+
     protected function getRedirectUrl(): string
     {
         return $this->getResource()::getUrl('index');

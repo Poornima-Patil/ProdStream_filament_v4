@@ -7,8 +7,6 @@ use App\Models\MachineGroup;
 use Filament\Forms;
 use Filament\Resources\Resource;
 use Filament\Tables;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class MachineGroupResource extends Resource
 {
@@ -16,8 +14,7 @@ class MachineGroupResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-       protected static ?string $navigationIcon = 'heroicon-o-cog';
-
+    protected static ?string $navigationIcon = 'heroicon-o-cog';
 
     protected static ?string $navigationGroup = 'Admin Operations';
 
@@ -32,7 +29,7 @@ class MachineGroupResource extends Resource
                 Forms\Components\Textarea::make('description')
                     ->label('Description')
                     ->required(),
-                 
+
             ]);
     }
 
@@ -46,8 +43,7 @@ class MachineGroupResource extends Resource
                 Tables\Columns\TextColumn::make('description')
                     ->label('Description')
                     ->limit(50),
-                   
-               
+
             ])
             ->filters([
                 Tables\Filters\TrashedFilter::make(),

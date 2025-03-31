@@ -51,6 +51,7 @@ class CustomerInformationPolicy
     {
         return $user->hasPermissionTo('Delete Customer Information');
     }
+
     /**
      * Determine whether the user can restore the model.
      */

@@ -4,6 +4,7 @@ namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\MachineResource\Pages;
 use App\Models\Machine;
+use App\Models\MachineGroup;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -11,7 +12,6 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use App\Models\MachineGroup;
 
 class MachineResource extends Resource
 {
@@ -29,26 +29,26 @@ class MachineResource extends Resource
             ->schema([
                 Forms\Components\TextInput::make('assetId')->required(),
                 Forms\Components\TextInput::make('name')
-                    ->unique(ignoreRecord:true)->required(),
+                    ->unique(ignoreRecord: true)->required(),
                 Forms\Components\Select::make('status')->options([
                     1 => 'Active',
                     0 => 'Inactive',
                 ])->default(0),
 
                 Forms\Components\Select::make('department_id')
-                ->label('Department')
-                ->relationship('department', 'name', function ($query) {
-                    return $query->where('factory_id', auth()->user()->factory_id);
-                })
-                ->searchable()
-                ->preload()
-                ->default(1)
-                ->required(),
+                    ->label('Department')
+                    ->relationship('department', 'name', function ($query) {
+                        return $query->where('factory_id', auth()->user()->factory_id);
+                    })
+                    ->searchable()
+                    ->preload()
+                    ->default(1)
+                    ->required(),
                 Forms\Components\Select::make('machine_group_id')
-                ->label('Machine Group')
-                ->options(MachineGroup::all()->pluck('group_name', 'id'))
-                ->required()  // You can make this required or optional
-                ->searchable(),
+                    ->label('Machine Group')
+                    ->options(MachineGroup::all()->pluck('group_name', 'id'))
+                    ->required()  // You can make this required or optional
+                    ->searchable(),
             ]);
 
     }
@@ -64,9 +64,9 @@ class MachineResource extends Resource
                     ->boolean(),
                 Tables\Columns\TextColumn::make('department.name')->label('Department Name'),
                 Tables\Columns\TextColumn::make('machineGroup.group_name')  // Display the group name
-                ->label('Machine Group')
-                ->searchable()
-                ->sortable(),
+                    ->label('Machine Group')
+                    ->searchable()
+                    ->sortable(),
             ])
             ->filters([
                 Tables\Filters\TrashedFilter::make(),

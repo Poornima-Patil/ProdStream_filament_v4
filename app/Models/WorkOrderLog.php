@@ -1,7 +1,5 @@
 <?php
 
-
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -24,13 +22,12 @@ class WorkOrderLog extends Model
         'scrapped_qtys',
         'remaining',
         'scrapped_reason_id',
-        'hold_reason_id'
+        'hold_reason_id',
     ];
 
     protected $casts = [
         'changed_at' => 'datetime',
     ];
-
 
     // Define the relationship to the WorkOrder model
     public function workOrder()

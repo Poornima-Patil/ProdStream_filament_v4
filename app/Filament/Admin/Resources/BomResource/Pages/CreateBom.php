@@ -32,11 +32,10 @@ class CreateBom extends CreateRecord
         $revision = $partNumber->revision;
 
         // Get the latest Bom created in the current MMYY to determine the next sequential number
-        $lastBom = Bom::whereDate('created_at', 'like', $currentDate->format('Y-m').'%') 
-                ->withTrashed() // Filter by year and month
+        $lastBom = Bom::whereDate('created_at', 'like', $currentDate->format('Y-m').'%')
+            ->withTrashed() // Filter by year and month
             ->orderByDesc('unique_id') // Sort by unique_id to get the last one
             ->first();
-           
 
         // Generate the sequence number (reset to 1 if no record is found for the current month)
         $sequenceNumber = 1;

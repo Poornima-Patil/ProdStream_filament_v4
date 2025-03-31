@@ -6,12 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use App\Models\WorkOrderLog;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-
-
-
 
 class WorkOrder extends Model
 {
@@ -34,8 +29,8 @@ class WorkOrder extends Model
     ];
 
     protected $casts = [
-        'hold_reason_id' => 'integer', 
-            'machine_id' => 'integer' // Ensures it's treated as an integer
+        'hold_reason_id' => 'integer',
+        'machine_id' => 'integer', // Ensures it's treated as an integer
     ];
 
     public function bom()
@@ -87,7 +82,7 @@ class WorkOrder extends Model
     {
         // Get the latest quantity entry for this work order
         $latestQuantity = $this->quantities()->latest()->first();
-        
+
         // Calculate totals from the latest quantity entry
         $okQtys = $latestQuantity ? $latestQuantity->ok_quantity : 0;
         $scrappedQtys = $latestQuantity ? $latestQuantity->scrapped_quantity : 0;
@@ -107,13 +102,13 @@ class WorkOrder extends Model
 
         return $log;
     }
-   
+
     protected static function booted()
     {
         static::created(function ($workOrder) {
             $workOrder->createWorkOrderLog('Assigned');
         });
-    
+
         static::updated(function ($workOrder) {
             if ($workOrder->isDirty('status')) {
                 $workOrder->createWorkOrderLog($workOrder->status);
@@ -124,8 +119,8 @@ class WorkOrder extends Model
         static::created(function ($workOrder) {
             // Get the latest work order log
             $latestLog = $workOrder->workOrderLogs()->latest()->first();
-            
-            if (!$latestLog) {
+
+            if (! $latestLog) {
                 // If no log exists, create one
                 $latestLog = $workOrder->createWorkOrderLog($workOrder->status);
             }
@@ -146,17 +141,16 @@ class WorkOrder extends Model
     {
         // Get the latest work order log
         $latestLog = $this->workOrderLogs()->latest()->first();
-        
-        if (!$latestLog) {
+
+        if (! $latestLog) {
             // If no log exists, create one
             $latestLog = $this->createWorkOrderLog($this->status);
         }
-        
+
         // Add the work_order_log_id to the data
         $data['work_order_log_id'] = $latestLog->id;
-        
+
         // Create the quantity
         return $this->quantities()->create($data);
     }
-
 }

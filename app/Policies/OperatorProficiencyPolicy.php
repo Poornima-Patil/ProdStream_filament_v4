@@ -51,6 +51,7 @@ class OperatorProficiencyPolicy
     {
         return $user->hasPermissionTo(permission: 'Delete OperatorProficiency');
     }
+
     /**
      * Determine whether the user can restore the model.
      */

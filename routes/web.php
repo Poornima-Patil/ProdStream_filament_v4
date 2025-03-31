@@ -1,22 +1,19 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Models\OkQuantity;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
-use App\Models\WorkOrderQuantity;
-
 
 Route::get('/', function () {
     return view('welcome');
 });
-
 
 Route::get('/okquantity/download/{id}', function ($id) {
     $okQuantity = OkQuantity::findOrFail($id);
 
     // Get the report from media library
     $media = $okQuantity->getFirstMedia('report_pdf');
-    if (!$media) {
+    if (! $media) {
         abort(404, 'Report not found.');
     }
 
@@ -26,19 +23,19 @@ Route::get('/okquantity/download/{id}', function ($id) {
 Route::get('/work-order-quantity/{id}/download', function ($id) {
     try {
         $workOrderQuantity = \App\Models\WorkOrderQuantity::findOrFail($id);
-        
+
         // Get the media item from the report_pdf collection
         $media = $workOrderQuantity->getFirstMedia('report_pdf');
 
-        if (!$media) {
+        if (! $media) {
             \Illuminate\Support\Facades\Log::error("Report not found for WorkOrderQuantity ID: {$id}");
             abort(404, 'Report not found');
         }
 
         // Get the file path and ensure it exists
         $filePath = $media->getPath();
-        
-        if (!file_exists($filePath)) {
+
+        if (! file_exists($filePath)) {
             \Illuminate\Support\Facades\Log::error("File not found at path: {$filePath}");
             abort(404, 'Report file not found');
         }
@@ -48,28 +45,28 @@ Route::get('/work-order-quantity/{id}/download', function ($id) {
             'work_order_quantity_report_%s.pdf',
             $workOrderQuantity->id
         );
-        
+
         // Return the file as a download
         return response()->download(
             $filePath,
             $filename,
             [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'attachment'
+                'Content-Disposition' => 'attachment',
             ]
         );
     } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
         \Illuminate\Support\Facades\Log::error("WorkOrderQuantity not found: {$id}");
         abort(404, 'Work Order Quantity not found');
     } catch (\Exception $e) {
-        \Illuminate\Support\Facades\Log::error("Error downloading report: " . $e->getMessage());
+        \Illuminate\Support\Facades\Log::error('Error downloading report: '.$e->getMessage());
         abort(500, 'Error downloading report');
     }
 })->name('workorderquantity.download');
 
 // Add a direct file access route for testing
 Route::get('/storage/{path}', function ($path) {
-    $fullPath = storage_path('app/public/' . $path);
+    $fullPath = storage_path('app/public/'.$path);
     if (file_exists($fullPath)) {
         return response()->download($fullPath);
     }

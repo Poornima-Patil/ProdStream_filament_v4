@@ -79,9 +79,9 @@ class Factory extends Model
     {
         return $this->hasMany(HoldReason::class);
     }
+
     public function machineGroups()
     {
         return $this->hasMany(MachineGroup::class);
     }
 }
-

@@ -2,10 +2,9 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-
 
 class InfoMessage extends Model
 {
@@ -15,7 +14,7 @@ class InfoMessage extends Model
         'work_order_id',
         'user_id',
         'message',
-        'priority'
+        'priority',
     ];
 
     public function workOrder()

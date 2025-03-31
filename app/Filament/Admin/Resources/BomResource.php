@@ -4,26 +4,21 @@ namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\BomResource\Pages;
 use App\Models\Bom;
-use Filament\Facades\Filament;
+use App\Models\WorkOrder;
 use Filament\Forms;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Form;
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
-use Filament\Support\Colors\Color;
 use Filament\Tables;
+use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Storage;
-use Filament\Tables\Enums\ActionsPosition;
-use Filament\Infolists\Components\Actions\Action;
-use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
-use Filament\Forms\Components\Html;
-use App\Models\WorkOrder;
 
 class BomResource extends Resource
 {
@@ -85,14 +80,14 @@ class BomResource extends Resource
                     })
                     ->required()
                     ->reactive(),
-              
+
                 SpatieMediaLibraryFileUpload::make('requirement_pkg')
                     ->multiple()
                     ->preserveFilenames()
                     ->collection('requirement_pkg')
                     ->required(),
 
-                    SpatieMediaLibraryFileUpload::make('process_flowchart')
+                SpatieMediaLibraryFileUpload::make('process_flowchart')
                     ->multiple()
                     ->preserveFilenames()
                     ->collection('process_flowchart')
@@ -105,7 +100,7 @@ class BomResource extends Resource
 
                         return \App\Models\MachineGroup::where('factory_id', $factoryId)
                             ->pluck('group_name', 'id');
-                })->required(),
+                    })->required(),
 
                 Forms\Components\Select::make('operator_proficiency_id')
                     ->label('Proficiency')
@@ -121,34 +116,32 @@ class BomResource extends Resource
                 Forms\Components\Select::make('status')->options([
                     '1' => 'Active',
                     '0' => 'InActive',
+                    '2' => 'Complete'
                 ])->required()
-                ->reactive()
-                ->afterStateUpdated(function (callable $get , $record) {
-                   if( $get('status') === '0' ) {
-                        self::close_WO($record);
-                    }
-                }),
+                    ->reactive()
+                    ->afterStateUpdated(function (callable $get, $record) {
+                        if ($get('status') === '2') {
+                            self::close_WO($record);
+                        }
+                    }),
             ]);
     }
 
-
     protected static function close_WO(Bom $record)
-{
-    // Fetch all work orders associated with the given BOM
-    $workOrders = WorkOrder::where('bom_id', $record->id)->get();
+    {
+        // Fetch all work orders associated with the given BOM
+        $workOrders = WorkOrder::where('bom_id', $record->id)->get();
 
-    // Update the status of all fetched work orders to 'Closed'
-    foreach ($workOrders as $workOrder) {
-        $workOrder->update(['status' => 'Closed']);
+        // Update the status of all fetched work orders to 'Closed'
+        foreach ($workOrders as $workOrder) {
+            $workOrder->update(['status' => 'Closed']);
+        }
     }
-}
-
 
     public static function table(Table $table): Table
     {
         return $table
 
-        
             ->columns([
                 Tables\Columns\TextColumn::make('unique_id')->label('Unique ID')
                     ->searchable()
@@ -157,42 +150,43 @@ class BomResource extends Resource
                 Tables\Columns\TextColumn::make('purchaseorder.partnumber.partnumber')->label('PartNumber')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('purchaseorder.partnumber.revision')->label('Revision'),
-              
-              
 
-
-                   
                 Tables\Columns\TextColumn::make('machineGroup.group_name'),
                 Tables\Columns\TextColumn::make('operatorproficiency.proficiency'),
                 Tables\Columns\TextColumn::make('lead_time')
                     ->label('Target Completion Time')
-
-                ->formatStateUsing(function ($state) {
-                    return \Carbon\Carbon::parse($state)->format('d M Y'); // Format as d M Y
-                }),
-                Tables\Columns\IconColumn::make('status')
-                    ->boolean(),
-
+                    ->formatStateUsing(function ($state) {
+                        return \Carbon\Carbon::parse($state)->format('d M Y'); // Format as d M Y
+                    }),
+                    Tables\Columns\TextColumn::make('status')
+                    ->label('Status')
+                    ->formatStateUsing(fn ($state) => match ($state) {
+                        1 => 'Active',
+                        0 => 'Inactive',
+                        2 => 'Complete',
+                        default => 'Unknown',
+                    }),
             ])
             ->filters([
                 Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
-                Tables\Actions\EditAction::make()
-                    ->label('Edit BOM'),
-                Tables\Actions\ViewAction::make()
-                    ->hiddenLabel(),
+                    Tables\Actions\EditAction::make()
+                        ->label('Edit BOM'),
+                    Tables\Actions\ViewAction::make()
+                        ->hiddenLabel(),
                 ])->label('')
-                ->button(),
-                ], position: ActionsPosition::BeforeColumns)
-            
+                    ->button(),
+            ], position: ActionsPosition::BeforeColumns)
+
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
     }
+
     public static function getRelations(): array
     {
         return [
@@ -227,7 +221,7 @@ class BomResource extends Resource
                         TextEntry::make('purchaseorder.partnumber.revision')->label('Revision'),
                         TextEntry::make('machineGroup.group_name')
                             ->label('Machine Group'),
-                     
+
                     ])->columns(),
 
                 Section::make('Operational Information')
@@ -239,46 +233,46 @@ class BomResource extends Resource
                         IconEntry::make('status')->label('Status'),
 
                     ])->columns(),
-                    Section::make('Documents')
+                Section::make('Documents')
                     ->collapsible()
                     ->schema([
                         TextEntry::make('requirement_pkg')
-                    ->label('Download Requirement Package Files')
-                    ->state(function (Bom $record) {
+                            ->label('Download Requirement Package Files')
+                            ->state(function (Bom $record) {
 
-                        $mediaItems = $record->getMedia('requirement_pkg');
-                        if ($mediaItems->isEmpty()) {
-                            return 'No Files';
-                        }
+                                $mediaItems = $record->getMedia('requirement_pkg');
+                                if ($mediaItems->isEmpty()) {
+                                    return 'No Files';
+                                }
 
-                        return $mediaItems->map(function ($media) {
-                            // Use target="_blank" to open in a new tab
-                            return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>"; 
-                        })->implode('<br>'); // Concatenate links with line breaks
-                        
-                    })
-                    ->html(),
-                    
-                    TextEntry::make('process_flowchart')
-                    ->label('Download Process Flowchart Files')
-                    ->state(function (Bom $record) {
+                                return $mediaItems->map(function ($media) {
+                                    // Use target="_blank" to open in a new tab
+                                    return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>";
+                                })->implode('<br>'); // Concatenate links with line breaks
 
-                        $mediaItems = $record->getMedia('process_flowchart');
-                        if ($mediaItems->isEmpty()) {
-                            return 'No Files';
-                        }
-                        return $mediaItems->map(function ($media) {
-                            // Use target="_blank" to open in a new tab
-                            return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>"; 
-                        })->implode('<br>'); // Concatenate links with line breaks
-                       
-                    })
-                    ->html(),
-                   
+                            })
+                            ->html(),
+
+                        TextEntry::make('process_flowchart')
+                            ->label('Download Process Flowchart Files')
+                            ->state(function (Bom $record) {
+
+                                $mediaItems = $record->getMedia('process_flowchart');
+                                if ($mediaItems->isEmpty()) {
+                                    return 'No Files';
+                                }
+
+                                return $mediaItems->map(function ($media) {
+                                    // Use target="_blank" to open in a new tab
+                                    return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>";
+                                })->implode('<br>'); // Concatenate links with line breaks
+
+                            })
+                            ->html(),
+
                     ])
                     ->columns(),
 
-                    
             ]);
     }
 
@@ -290,5 +284,4 @@ class BomResource extends Resource
             ])
             ->orderByDesc('created_at'); // Ensures latest records appear first
     }
-    
 }

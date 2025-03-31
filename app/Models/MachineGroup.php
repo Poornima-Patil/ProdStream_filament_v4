@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-
 class MachineGroup extends Model
 {
     use HasFactory, SoftDeletes;
@@ -18,7 +17,7 @@ class MachineGroup extends Model
     protected $fillable = [
         'group_name',
         'description',
-        'factory_id'
+        'factory_id',
     ];
 
     // Specify the attributes that are not mass assignable (if needed)
@@ -26,7 +25,6 @@ class MachineGroup extends Model
 
     // Optionally, specify the date format for the softDeletes column
     protected $dates = ['deleted_at'];
-
 
     public function factory()
     {
@@ -37,9 +35,9 @@ class MachineGroup extends Model
     {
         return $this->hasMany(Machine::class);
     }
+
     public function boms()
     {
         return $this->hasMany(Bom::class); // Adjusted to use 'Bom' instead of 'BOM'
     }
-
 }

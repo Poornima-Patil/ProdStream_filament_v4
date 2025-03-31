@@ -16,7 +16,7 @@ class PermissionsTableSeeder_new extends Seeder
     {
         // Define permissions
         $permissions = [
-           /* 'View Bom',
+            /* 'View Bom',
             'Create Bom',
             'Edit Bom',
             'Delete Bom',
@@ -92,10 +92,10 @@ class PermissionsTableSeeder_new extends Seeder
             'Edit HoldReason',
             'Delete HoldReason',*/
 
-	   'Create MachineGroup',
-	   'Edit MachineGroup',
-	   'View MachineGroup',
-	   'Delete MachineGroup',
+            'Create MachineGroup',
+            'Edit MachineGroup',
+            'View MachineGroup',
+            'Delete MachineGroup',
         ];
 
         foreach ($permissions as $permission) {

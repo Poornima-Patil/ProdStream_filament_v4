@@ -4,7 +4,6 @@ namespace App\Policies;
 
 use App\Models\HoldReason;
 use App\Models\User;
-use Illuminate\Auth\Access\Response;
 
 class HoldReasonPolicy
 {
@@ -47,7 +46,6 @@ class HoldReasonPolicy
     {
         return $user->hasPermissionTo(permission: 'Delete HoldReason');
     }
-
 
     public function deleteAny(User $user): bool
     {

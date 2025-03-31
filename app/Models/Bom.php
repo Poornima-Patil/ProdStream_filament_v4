@@ -9,10 +9,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
-
-class Bom extends Model implements HasMedia 
+class Bom extends Model implements HasMedia
 {
-    use HasFactory,SoftDeletes,InteractsWithMedia;
+    use HasFactory,InteractsWithMedia,SoftDeletes;
 
     protected $fillable = [
         'purchase_order_id',

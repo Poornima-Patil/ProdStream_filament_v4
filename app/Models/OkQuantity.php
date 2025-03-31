@@ -1,19 +1,18 @@
 <?php
+
 namespace App\Models;
 
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\ImageManager;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
-use SimpleSoftwareIO\QrCode\Facades\QrCode;
-use Illuminate\Support\Facades\Storage;
-use Barryvdh\DomPDF\Facade\Pdf;
-use Illuminate\Support\Facades\Log;
-use Intervention\Image\ImageManager;
-use Intervention\Image\Drivers\Gd\Driver;
-
-
 
 class OkQuantity extends Model implements HasMedia
 {
@@ -46,109 +45,105 @@ class OkQuantity extends Model implements HasMedia
     }
 
     // Generate a QR Code
-   /* public function generateQRCode()
+    /* public function generateQRCode()
 {
-    Log::info('generateQRCode called for ID: ' . $this->id);
+     Log::info('generateQRCode called for ID: ' . $this->id);
 
-    $url = str_replace('https://', 'http://', route('okquantity.download', ['id' => $this->id]));  
+     $url = str_replace('https://', 'http://', route('okquantity.download', ['id' => $this->id]));
 
-    $qrCodeImage = QrCode::size(300)->format('png')->generate($url);
+     $qrCodeImage = QrCode::size(300)->format('png')->generate($url);
 
-    $qrPath = 'qr_codes/ok_quantity_' . $this->id . '.png';
+     $qrPath = 'qr_codes/ok_quantity_' . $this->id . '.png';
 
-    $success = Storage::disk('public')->put($qrPath, $qrCodeImage);
- 
-    Log::info('QR Code stored at: ' . Storage::disk('public')->path($qrPath));
+     $success = Storage::disk('public')->put($qrPath, $qrCodeImage);
 
-    // Attach to Media Library
-    $this->addMedia(Storage::disk('public')->path($qrPath))->toMediaCollection('qr_code');
+     Log::info('QR Code stored at: ' . Storage::disk('public')->path($qrPath));
 
-    Log::info('QR Code added to media library for ID: ' . $this->id);   
+     // Attach to Media Library
+     $this->addMedia(Storage::disk('public')->path($qrPath))->toMediaCollection('qr_code');
+
+     Log::info('QR Code added to media library for ID: ' . $this->id);
 }*/
 
+    public function generateQRCode()
+    {
+        Log::info('generateQRCode called for ID: '.$this->id);
 
+        // Ensure URL uses HTTP instead of HTTPS
+        $url = str_replace('https://', 'http://', route('okquantity.download', ['id' => $this->id]));
 
-public function generateQRCode()
-{
-    Log::info('generateQRCode called for ID: ' . $this->id);
+        // Generate QR code image
+        $qrCodeImage = QrCode::size(300)->format('png')->generate($url);
 
-    // Ensure URL uses HTTP instead of HTTPS
-    $url = str_replace('https://', 'http://', route('okquantity.download', ['id' => $this->id]));  
+        // Define file path
+        $qrPath = 'qr_codes/ok_quantity_'.$this->id.'.png';
 
-    // Generate QR code image
-    $qrCodeImage = QrCode::size(300)->format('png')->generate($url);
+        // Store raw QR code image temporarily
+        Storage::disk('public')->put($qrPath, $qrCodeImage);
 
-    // Define file path
-    $qrPath = 'qr_codes/ok_quantity_' . $this->id . '.png';
+        // Initialize ImageManager (GD Driver)
+        $manager = new ImageManager(new Driver);
 
-    // Store raw QR code image temporarily
-    Storage::disk('public')->put($qrPath, $qrCodeImage);
+        // Load the stored QR code image with Intervention Image
+        $image = $manager->read(Storage::disk('public')->path($qrPath));
 
-    // Initialize ImageManager (GD Driver)
-    $manager = new ImageManager(new Driver());
+        // Get Work Order Unique ID
+        $workOrderNumber = $this->workOrder->unique_id ?? 'N/A';
 
-    // Load the stored QR code image with Intervention Image
-    $image = $manager->read(Storage::disk('public')->path($qrPath));
+        // Get Part Number and Revision (Ensure relationships are correctly defined)
+        $partNumber = $this->workOrder->bom->purchaseOrder->partNumber->partnumber ?? 'N/A';
+        $revision = $this->workOrder->bom->purchaseOrder->partNumber->revision ?? 'N/A';
 
-   // Get Work Order Unique ID
-$workOrderNumber = $this->workOrder->unique_id ?? 'N/A';
+        // Define text properties
+        $fontSize = 24;
+        $textColor = '#000000'; // Black color
+        $imageWidth = $image->width();
+        $imageHeight = $image->height();
+        $padding = 10; // Reduced padding
 
-// Get Part Number and Revision (Ensure relationships are correctly defined)
-$partNumber = $this->workOrder->bom->purchaseOrder->partNumber->partnumber ?? 'N/A';
-$revision = $this->workOrder->bom->purchaseOrder->partNumber->revision ?? 'N/A';
+        // Create a new blank image with additional height for text
+        $newHeight = $imageHeight + (2 * $fontSize) + (2 * $padding);
+        $finalImage = $manager->create($imageWidth, $newHeight)->fill('#ffffff');
 
-// Define text properties
-$fontSize = 24;
-$textColor = '#000000'; // Black color
-$imageWidth = $image->width();
-$imageHeight = $image->height();
-$padding = 10; // Reduced padding
+        // Merge QR Code and Text Image
+        $finalImage->place($image, 'top-center');
 
-// Create a new blank image with additional height for text
-$newHeight = $imageHeight + (2 * $fontSize) + (2 * $padding);
-$finalImage = $manager->create($imageWidth, $newHeight)->fill('#ffffff');
+        // Add Work Order Number Below QR Code
+        $finalImage->text('WO#: '.$workOrderNumber, 10, $imageHeight + ($fontSize / 2) + $padding, function ($font) {
+            $font->size(24);
+            $font->color('#000000');
+            $font->align('left'); // Align text to the left
+            $font->valign('middle');
+        });
 
-// Merge QR Code and Text Image
-$finalImage->place($image, 'top-center');
+        // Add Part Number and Revision Below WO Number
+        $finalImage->text('Part#: '.$partNumber.' Rev: '.$revision, 10, $imageHeight + (2 * $fontSize) + $padding, function ($font) {
+            $font->size(24);
+            $font->color('#000000');
+            $font->align('left');
+            $font->valign('middle');
+        });
 
-// Add Work Order Number Below QR Code
-$finalImage->text("WO#: " . $workOrderNumber, 10, $imageHeight + ($fontSize / 2) + $padding, function ($font) {
-    $font->size(24);
-    $font->color('#000000');
-    $font->align('left'); // Align text to the left
-    $font->valign('middle');
-});
+        // Save the final image
+        $finalImage->save(Storage::disk('public')->path($qrPath));
 
-// Add Part Number and Revision Below WO Number
-$finalImage->text("Part#: " . $partNumber . " Rev: " . $revision, 10, $imageHeight + (2 * $fontSize) + $padding, function ($font) {
-    $font->size(24);
-    $font->color('#000000');
-    $font->align('left');
-    $font->valign('middle');
-});
+        Log::info('Final QR Code with Work Order saved at: '.Storage::disk('public')->path($qrPath));
 
+        // Attach to Media Library
+        $this->addMedia(Storage::disk('public')->path($qrPath))->toMediaCollection('qr_code');
 
-    // Save the final image
-    $finalImage->save(Storage::disk('public')->path($qrPath));
-
-    Log::info('Final QR Code with Work Order saved at: ' . Storage::disk('public')->path($qrPath));
-
-    // Attach to Media Library
-    $this->addMedia(Storage::disk('public')->path($qrPath))->toMediaCollection('qr_code');
-
-    Log::info('QR Code added to media library for ID: ' . $this->id);
-}
-
+        Log::info('QR Code added to media library for ID: '.$this->id);
+    }
 
     // Generate Report PDF
     public function generateReport()
     {
         $pdf = Pdf::loadView('reports.ok_quantity', ['okQuantity' => $this]);
-        $pdfPath = 'reports/ok_quantity_' . $this->id . '.pdf';
+        $pdfPath = 'reports/ok_quantity_'.$this->id.'.pdf';
 
         // Store PDF in Public Storage
         $success = Storage::disk('public')->put($pdfPath, $pdf->output());
-       // dd($success);
+        // dd($success);
 
         // Attach to Media Library
         $this->addMedia(Storage::disk('public')->path($pdfPath))->toMediaCollection('report_pdf');

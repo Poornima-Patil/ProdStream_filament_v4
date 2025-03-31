@@ -51,6 +51,7 @@ class PartNumberPolicy
     {
         return $user->hasPermissionTo(permission: 'Delete PartNumber');
     }
+
     /**
      * Determine whether the user can restore the model.
      */

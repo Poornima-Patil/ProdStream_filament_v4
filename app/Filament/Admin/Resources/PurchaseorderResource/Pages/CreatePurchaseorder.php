@@ -3,15 +3,15 @@
 namespace App\Filament\Admin\Resources\PurchaseorderResource\Pages;
 
 use App\Filament\Admin\Resources\PurchaseorderResource;
-use Filament\Resources\Pages\CreateRecord;
-use Carbon\Carbon;
-use App\Models\PurchaseOrder;
-use App\Models\PartNumber;
 use App\Models\CustomerInformation;
+use App\Models\PartNumber;
+use App\Models\PurchaseOrder;
+use Carbon\Carbon;
+use Filament\Resources\Pages\CreateRecord;
+
 class CreatePurchaseorder extends CreateRecord
 {
     protected static string $resource = PurchaseorderResource::class;
-
 
     protected function getRedirectUrl(): string
     {
@@ -25,14 +25,14 @@ class CreatePurchaseorder extends CreateRecord
         $monthYear = $currentDate->format('mY'); // MMYY format
 
         // Get the related PurchaseOrder's cust_id
-       
+
         $cust_id = $data['cust_id'];
         $custId = CustomerInformation::find($cust_id)->customer_id;
 
         // Get the related PartNumber's part_number and revision
-       
+
         $partNumber_id = $data['part_number_id'];
-        $partnumber =PartNumber::find($partNumber_id)->partnumber;
+        $partnumber = PartNumber::find($partNumber_id)->partnumber;
         $revision = PartNumber::find($partNumber_id)->revision;
 
         // Get the latest Bom created in the current MMYY to determine the next sequential number

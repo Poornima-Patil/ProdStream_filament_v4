@@ -24,4 +24,4 @@ return new class extends Migration
     {
         Schema::dropIfExists('work_order_quantities');
     }
-}; 
+};

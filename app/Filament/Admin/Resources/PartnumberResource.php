@@ -19,7 +19,7 @@ class PartnumberResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-tag';
 
-    protected static ?string $navigationGroup =  'Process Operations';
+    protected static ?string $navigationGroup = 'Process Operations';
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
@@ -55,15 +55,14 @@ class PartnumberResource extends Resource
                 ->required()
                 ->label('Description'), // This will now update correctly without unnecessary checks
 
-
-                Forms\Components\TextInput::make('cycle_time')
-    ->label('Cycle Time (MM:SS)') // Display label
-    ->required()
-    ->mask('99:99') // Mask to ensure correct input format
-    ->placeholder('MM:SS') // Placeholder example
-    ->live() // Updates value dynamically
-    ->dehydrateStateUsing(fn ($state) => self::convertTimeToSeconds($state)) // Convert MM:SS to seconds before saving
-    ->formatStateUsing(fn ($state) => self::convertSecondsToTime($state)), // Convert seconds to MM:SS when displaying
+            Forms\Components\TextInput::make('cycle_time')
+                ->label('Cycle Time (MM:SS)') // Display label
+                ->required()
+                ->mask('99:99') // Mask to ensure correct input format
+                ->placeholder('MM:SS') // Placeholder example
+                ->live() // Updates value dynamically
+                ->dehydrateStateUsing(fn ($state) => self::convertTimeToSeconds($state)) // Convert MM:SS to seconds before saving
+                ->formatStateUsing(fn ($state) => self::convertSecondsToTime($state)), // Convert seconds to MM:SS when displaying
 
         ]);
     }
@@ -77,10 +76,10 @@ class PartnumberResource extends Resource
                 Tables\Columns\TextColumn::make('revision'),
                 Tables\Columns\TextColumn::make('description'),
                 Tables\Columns\TextColumn::make('cycle_time')
-    ->label('Cycle Time (MM:SS)')
-    ->formatStateUsing(function ($state) {
-        return self::convertSecondsToTime($state); // Convert seconds to MM:SS for display
-    }),
+                    ->label('Cycle Time (MM:SS)')
+                    ->formatStateUsing(function ($state) {
+                        return self::convertSecondsToTime($state); // Convert seconds to MM:SS for display
+                    }),
 
             ])
             ->filters([
@@ -137,21 +136,25 @@ class PartnumberResource extends Resource
     }
 
     public static function convertTimeToSeconds($time): ?int
-{
-    if (!$time) return null;
+    {
+        if (! $time) {
+            return null;
+        }
 
-    [$minutes, $seconds] = explode(':', $time);
-    return ((int)$minutes * 60) + (int)$seconds;
-}
+        [$minutes, $seconds] = explode(':', $time);
 
-public static function convertSecondsToTime($seconds): ?string
-{
-    if (!$seconds) return '00:00';
+        return ((int) $minutes * 60) + (int) $seconds;
+    }
 
-    $minutes = floor($seconds / 60);
-    $seconds = $seconds % 60;
-    
-    return sprintf('%02d:%02d', $minutes, $seconds);
-}
+    public static function convertSecondsToTime($seconds): ?string
+    {
+        if (! $seconds) {
+            return '00:00';
+        }
 
+        $minutes = floor($seconds / 60);
+        $seconds = $seconds % 60;
+
+        return sprintf('%02d:%02d', $minutes, $seconds);
+    }
 }
