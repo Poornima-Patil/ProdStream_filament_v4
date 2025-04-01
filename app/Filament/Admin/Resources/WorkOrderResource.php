@@ -128,7 +128,8 @@ class WorkOrderResource extends Resource
                     ->label('Quantity')
                     ->required()
                     ->disabled(! $isAdminOrManager)
-                    ->reactive()
+                    ->live(onBlur: true)
+                    ->numeric()
                     ->afterStateUpdated(function (callable $get, callable $set) {
                         $partNumberId = $get('part_number_id'); // Get selected Part Number ID
                         $qty = (int) $get('qty'); // Get entered quantity
@@ -778,7 +779,36 @@ class WorkOrderResource extends Resource
                                             $quantity = $quantities[$quantitiesIndex];
                                             $okQty = $quantity->ok_quantity;
                                             $scrappedQty = $quantity->scrapped_quantity;
-                                            $remainingQty = $record->qty - ($okQty + $scrappedQty);
+                                            
+                                            // Calculate cumulative quantities up to this cycle
+                                            $cumulativeOkQty = 0;
+                                            $cumulativeScrappedQty = 0;
+                                            
+                                            // Sum up quantities from previous cycles
+                                            for ($i = 0; $i <= $quantitiesIndex; $i++) {
+                                                if (isset($quantities[$i])) {
+                                                    $cumulativeOkQty += $quantities[$i]->ok_quantity;
+                                                    $cumulativeScrappedQty += $quantities[$i]->scrapped_quantity;
+                                                }
+                                            }
+                                            
+                                            // Calculate remaining quantity based on cumulative quantities
+                                            $remainingQty = $record->qty - ($cumulativeOkQty + $cumulativeScrappedQty);
+                                            
+                                            // Add detailed logging
+                                            \Log::info('Work Order Quantity Calculation', [
+                                                'work_order_id' => $record->id,
+                                                'cycle_index' => $quantitiesIndex,
+                                                'total_qty' => $record->qty,
+                                                'current_ok_qty' => $okQty,
+                                                'current_scrapped_qty' => $scrappedQty,
+                                                'cumulative_ok_qty' => $cumulativeOkQty,
+                                                'cumulative_scrapped_qty' => $cumulativeScrappedQty,
+                                                'calculated_remaining_qty' => $remainingQty,
+                                                'timestamp' => $timestamp,
+                                                'status' => $status
+                                            ]);
+                                            
                                             if ($quantity->scrapped_quantity > 0) {
                                                 $scrappedReason = $quantity->reason->description;
                                             }
