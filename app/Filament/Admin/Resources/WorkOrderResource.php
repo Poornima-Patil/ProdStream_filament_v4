@@ -305,7 +305,7 @@ class WorkOrderResource extends Resource
                     ->label('Material Batch ID')
                     ->required(fn ($get, $record) => $get('status') === 'Start' && ! $record?->material_batch)
                     ->visible(fn ($get) => in_array($get('status'), ['Start', 'Hold', 'Completed']))
-                    //->disabled(fn ($record) => $record && $record->material_batch)
+                    ->disabled(fn ($record) => $record && $record->material_batch)
                     ->helperText(fn ($get, $record) => $get('status') === 'Start' && ! $record?->material_batch
                             ? 'Material Batch ID is required when starting the work order'
                             : null
