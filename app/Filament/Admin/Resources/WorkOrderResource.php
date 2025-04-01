@@ -774,7 +774,7 @@ class WorkOrderResource extends Resource
                                     $scrappedReason = '';
                                     $documents = '';
 
-                                    if ($status === 'Hold') {
+                                    if (in_array($status, ['Hold', 'Completed'])) {
                                         if (isset($quantities[$quantitiesIndex])) {
                                             $quantity = $quantities[$quantitiesIndex];
                                             $okQty = $quantity->ok_quantity;
