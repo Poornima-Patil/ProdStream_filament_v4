@@ -474,33 +474,66 @@ class WorkOrderResource extends Resource
 
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('unique_id')->label('Unique ID')->searchable(),
-                Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.description')->label('BOM')
-                    ->hidden(! $isAdminOrManager),
-                Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.partnumber')->label('Part Number')
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.revision')->label('Revision'),
-                Tables\Columns\TextColumn::make('machine.name')->label('Machine')
-                    ->formatStateUsing(fn ($record) => "Asset ID: {$record->machine->assetId} - Name: {$record->machine->name}"),
-
-                Tables\Columns\TextColumn::make('operator.user.first_name')->label('Operator')
-                    ->hidden(! $isAdminOrManager)
+                Tables\Columns\TextColumn::make('unique_id')
+                    ->label('Unique ID')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('qty'),
-
+                Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.description')
+                    ->label('BOM')
+                    ->hidden(! $isAdminOrManager),
+                Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.partnumber')
+                    ->label('Part Number')
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.revision')
+                    ->label('Revision'),
+                Tables\Columns\TextColumn::make('machine.name')
+                    ->label('Machine')
+                    ->formatStateUsing(fn ($record) => "Asset ID: {$record->machine->assetId} - Name: {$record->machine->name}")
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('operator.user.first_name')
+                    ->label('Operator')
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('qty')
+                    ->label('Qty')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('status')
-                    ->sortable()
-                    ->searchable(),
-
-                Tables\Columns\TextColumn::make('start_time'),
-                Tables\Columns\TextColumn::make('end_time'),
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'Assigned' => 'gray',
+                        'Start' => 'warning',
+                        'Hold' => 'danger',
+                        'Completed' => 'success',
+                        'Closed' => 'info',
+                        default => 'gray',
+                    })
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('start_time')
+                    ->dateTime()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('end_time')
+                    ->dateTime()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('ok_qtys')
                     ->label('OK Quantities')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('scrapped_qtys')
                     ->label('Scrapped Quantities')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('created_at')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('updated_at')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('deleted_at')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->modifyQueryUsing(function (Builder $query) {
                 $userId = Auth::id();
@@ -516,11 +549,6 @@ class WorkOrderResource extends Resource
 
                 return $query;
             })
-            ->defaultGroup('status')
-            ->groups([
-                Tables\Grouping\Group::make('status')
-                    ->collapsible(),
-            ])
             ->filters([
                 Tables\Filters\TrashedFilter::make(),
                 SelectFilter::make('status')
@@ -530,7 +558,8 @@ class WorkOrderResource extends Resource
                         'Hold' => 'Hold',
                         'Completed' => 'Completed',
                     ])
-                    ->attribute('status'),
+                    ->attribute('status')
+                    ->default('Assigned'),
                 SelectFilter::make('operator_id')
                     ->label('Operator')
                     ->relationship('operator.user', 'first_name', function ($query) {
@@ -541,10 +570,9 @@ class WorkOrderResource extends Resource
                     ->searchable()
                     ->preload()
                     ->multiple(),
-
                 SelectFilter::make('machine_id')
-                    ->label('Machine') // Correct label
-                    ->relationship('machine', 'assetId') // Ensure correct relationship & column
+                    ->label('Machine')
+                    ->relationship('machine', 'assetId')
                     ->searchable()
                     ->preload()
                     ->multiple(),
