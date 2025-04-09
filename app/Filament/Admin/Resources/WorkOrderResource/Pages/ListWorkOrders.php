@@ -236,7 +236,7 @@ public function getTabs(): array
         return [
             WorkOrderPieChart::class,
             
-                //WorkOrderEndTimeTrendChart::class,
+                WorkOrderEndTimeTrendChart::class,
         
             // Register the WorkOrderStats widget here
         ];
