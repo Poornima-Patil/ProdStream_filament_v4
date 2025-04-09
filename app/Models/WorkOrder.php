@@ -35,6 +35,11 @@ class WorkOrder extends Model
 
     public function bom()
     {
+        \Log::info('Accessing BOM for Work Order:', [
+            'work_order_id' => $this->id,
+            'work_order_unique_id' => $this->unique_id,
+            'bom_id' => $this->bom_id
+        ]);
         return $this->belongsTo(Bom::class, 'bom_id');
     }
 

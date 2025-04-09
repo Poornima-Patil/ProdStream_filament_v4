@@ -77,3 +77,9 @@ Route::get('/storage/{path}', function ($path) {
 if (app()->environment('local')) {
     URL::forceScheme('http');
 }
+
+
+Route::get('/test-chart', function () {
+    return view('test-chart');
+});
+

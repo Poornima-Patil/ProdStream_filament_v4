@@ -178,7 +178,7 @@ class BomResource extends Resource
                         ->hiddenLabel(),
                 ])->label('')
                     ->button(),
-            ], position: ActionsPosition::BeforeColumns)
+            ])
 
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

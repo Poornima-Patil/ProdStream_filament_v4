@@ -23,6 +23,8 @@ class PurchaseOrder extends Model
         'delivery_target_date',
     ];
 
+    protected $with = ['boms.workOrders.operator.user'];
+
     public function partNumber()
     {
         return $this->belongsTo(PartNumber::class, 'part_number_id');
@@ -30,7 +32,52 @@ class PurchaseOrder extends Model
 
     public function boms()
     {
+        \Log::info('Accessing BOMs for PO:', [
+            'po_id' => $this->id,
+            'po_unique_id' => $this->unique_id,
+            'boms_count' => $this->hasMany(Bom::class)->count(),
+            'boms' => $this->hasMany(Bom::class)->get()->map(function($bom) {
+                return [
+                    'id' => $bom->id,
+                    'unique_id' => $bom->unique_id,
+                    'purchase_order_id' => $bom->purchase_order_id
+                ];
+            })->toArray()
+        ]);
         return $this->hasMany(Bom::class);
+    }
+
+    public function workOrders()
+    {
+        \Log::info('Accessing workOrders relationship for PO:', [
+            'po_id' => $this->id,
+            'has_boms' => $this->boms->isNotEmpty(),
+            'boms_count' => $this->boms->count()
+        ]);
+
+        $workOrders = $this->hasManyThrough(
+            WorkOrder::class,
+            Bom::class,
+            'purchase_order_id', // Foreign key on BOMs table
+            'bom_id', // Foreign key on WorkOrders table
+            'id', // Local key on PurchaseOrders table
+            'id' // Local key on BOMs table
+        );
+
+        \Log::info('WorkOrders query results:', [
+            'po_id' => $this->id,
+            'work_orders_count' => $workOrders->count(),
+            'work_orders' => $workOrders->get()->map(function($wo) {
+                return [
+                    'id' => $wo->id,
+                    'unique_id' => $wo->unique_id,
+                    'status' => $wo->status,
+                    'bom_id' => $wo->bom_id
+                ];
+            })->toArray()
+        ]);
+
+        return $workOrders;
     }
 
     public function factory(): BelongsTo

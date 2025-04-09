@@ -108,6 +108,19 @@ class PurchaseorderResource extends Resource
 
                 Tables\Columns\TextColumn::make('price'),
 
+                Tables\Columns\TextColumn::make('progress')
+                    ->label('Progress')
+                    ->formatStateUsing(function ($state) {
+                        $progressPercent = $state ?? 0;
+
+                        // Return the progress bar as an HTML string
+                        return '
+                            <div class="h-4 rounded-full text-xs text-center leading-4" style="background-color: #10B981; width: ' . $progressPercent . '%;">
+                                ' . $progressPercent . '%
+                            </div>
+                        ';
+                    })
+                    ->html(), // Enable HTML rendering for this column
             ])
             ->filters([
                 Tables\Filters\TrashedFilter::make(),
@@ -117,7 +130,7 @@ class PurchaseorderResource extends Resource
                     ->label('Edit Sales Order Line'),
                 Tables\Actions\ViewAction::make()
                     ->hiddenLabel(),
-            ])
+            ])  
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),

@@ -406,8 +406,7 @@ class WorkOrderResource extends Resource
                                     $latestLog = $workOrder->createWorkOrderLog($workOrder->status);
                                 }
 
-                                // Add the work_order_log_id to the state
-                                return array_merge($state, ['work_order_log_id' => $latestLog->id]);
+                                // Add the work_order_log_id to the state                                return array_merge($state, ['work_order_log_id' => $latestLog->id]);
                             })
                             ->afterStateHydrated(function ($state, $record, $set) {
                                 if ($record) {
@@ -551,43 +550,7 @@ class WorkOrderResource extends Resource
             })
             ->filters([
                 Tables\Filters\TrashedFilter::make(),
-                SelectFilter::make('status')
-                    ->options([
-                        'Assigned' => 'Assigned',
-                        'Start' => 'Start',
-                        'Hold' => 'Hold',
-                        'Completed' => 'Completed',
-                    ])
-                    ->attribute('status')
-                    ->default('Assigned'),
-                SelectFilter::make('operator_id')
-                    ->label('Operator')
-                    ->relationship('operator.user', 'first_name', function ($query) {
-                        $query->whereHas('roles', function ($roleQuery) {
-                            $roleQuery->where('name', 'operator');
-                        });
-                    })
-                    ->searchable()
-                    ->preload()
-                    ->multiple(),
-                SelectFilter::make('machine_id')
-                    ->label('Machine')
-                    ->relationship('machine', 'assetId')
-                    ->searchable()
-                    ->preload()
-                    ->multiple(),
-                SelectFilter::make('part_number_id')
-                    ->label('Part Number')
-                    ->relationship('bom.purchaseorder.partnumber', 'partnumber')
-                    ->searchable()
-                    ->preload(),
-                Tables\Filters\Filter::make('unique_id')
-                    ->label('Unique ID')
-                    ->query(fn (Builder $query, $data) => $query->where('unique_id', 'like', '%'.(is_array($data) ? implode(',', $data) : $data).'%')
-                    )
-                    ->form([
-                        Forms\Components\TextInput::make('unique_id')->label('Unique ID'),
-                    ]),
+                
             ])
             ->actions([
                 ActionGroup::make([
@@ -668,257 +631,14 @@ class WorkOrderResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListWorkorders::route('/'),
-            'create' => Pages\CreateWorkorder::route('/create'),
-            'edit' => Pages\EditWorkorder::route('/{record}/edit'),
-            'view' => Pages\ViewWorkorder::route('/{record}/'),
+            'index' => Pages\ListWorkOrders::route('/'),
+            'create' => Pages\CreateWorkOrder::route('/create'),
+            'edit' => Pages\EditWorkOrder::route('/{record}/edit'),
+            'view' => Pages\ViewWorkOrder::route('/{record}'),
         ];
     }
 
-    public static function infoList(InfoList $infoList): InfoList
-    {
-        $user = Auth::user();
-        $isAdminOrManager = $user && in_array($user->role, ['manager', 'admin']);
-
-        return $infoList
-            ->schema([
-                // Section 1: BOM, Quantity, Machines, Operator
-                Section::make('General Information')
-                    ->collapsible()
-                    ->schema([
-                        TextEntry::make('bom.description')
-                            ->label('BOM')
-                            ->hidden(! $isAdminOrManager),
-                        TextEntry::make('qty')->label('Quantity'),
-
-                        TextEntry::make('machine.name')->label('Machine')
-                            ->formatStateUsing(function ($record) {
-                                // Ensure the machine relationship is loaded and exists
-                                if ($record && $record->machine) {
-                                    $machine = $record->machine; // Access the machine relationship
-
-                                    return "{$machine->assetId} - {$machine->name}"; // Display asset_id and name
-                                }
-
-                                return 'No Machine'; // Default value if no machine found
-                            }),
-                        TextEntry::make('operator.user.first_name')
-                            ->label('Operator')
-                            ->hidden(! $isAdminOrManager),
-                    ])->columns(2),
-
-                // Section 2: Remaining fields
-                Section::make('Details')
-                    ->collapsible()
-                    ->schema([
-                        TextEntry::make('unique_id')->label('Unique ID'),
-                        TextEntry::make('bom.purchaseorder.partnumber.partnumber')->label('Part Number'),
-                        TextEntry::make('bom.purchaseorder.partnumber.revision')->label('Revision'),
-                        TextEntry::make('status')->label('Status'),
-                        TextEntry::make('start_time')->label('Planned Start Time'),
-                        TextEntry::make('end_time')->label('Planned End Time'),
-                        TextEntry::make('ok_qtys')->label('OK Quantities'),
-                        TextEntry::make('scrapped_qtys')->label('Scrapped Quantities'),
-                        TextEntry::make('material_batch')->label('Material Batch ID'),
-                    ])->columns(2),
-
-                Section::make('Documents')
-                    ->collapsible()
-                    ->schema([
-                        TextEntry::make('requirement_pkg')
-                            ->state(function ($record) {
-                                // Access the related BOM
-                                $bom = $record->bom;
-                                if (! $bom) {
-                                    return 'No BOM associated'; // Fallback if no BOM is linked
-                                }
-
-                                // Fetch media from the BOM's 'requirement_pkg' collection
-                                $mediaItems = $bom->getMedia('requirement_pkg');
-                                if ($mediaItems->isEmpty()) {
-                                    return 'No files uploaded'; // Fallback if no files exist
-                                }
-
-                                return $mediaItems->map(function ($media) {
-                                    // Use target="_blank" to open in a new tab
-                                    return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>";
-                                })->implode('<br>'); // Concatenate links with line breaks
-                            })
-                            ->html(), // Enable HTML rendering
-
-                        TextEntry::make('process_flowchart')
-                            ->state(function ($record) {
-                                // Access the related BOM
-                                $bom = $record->bom;
-                                if (! $bom) {
-                                    return 'No BOM associated'; // Fallback if no BOM is linked
-                                }
-
-                                // Fetch media from the BOM's 'process_flowchart' collection
-                                $mediaItems = $bom->getMedia('process_flowchart');
-                                if ($mediaItems->isEmpty()) {
-                                    return 'No files uploaded'; // Fallback if no files exist
-                                }
-
-                                return $mediaItems->map(function ($media) {
-                                    // Use target="_blank" to open in a new tab
-                                    return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>";
-                                })->implode('<br>'); // Concatenate links with line breaks
-                            })
-                            ->html(),
-                    ])->columns(1),
-
-                Section::make('Work Order Logs')
-                    ->collapsible()
-                    ->schema([
-                        TextEntry::make('work_order_logs_table')
-                            ->label('Work Order Logs')
-                            ->state(function ($record) {
-                                // Load necessary relationships
-                                $record->load(['workOrderLogs.user', 'quantities']);
-                                $quantities = $record->quantities;
-                                $quantitiesIndex = 0;
-
-                                // Create the HTML table
-                                $html = '<table class="table-auto w-full text-left border border-gray-300">';
-                                $html .= '<thead class="bg-gray-200"><tr>';
-                                $html .= '<th class="border px-2 py-1">Status</th>';
-                                $html .= '<th class="border px-2 py-1">User</th>';
-                                $html .= '<th class="border px-2 py-1">Timestamp</th>';
-                                $html .= '<th class="border px-2 py-1">OK QTY</th>';
-                                $html .= '<th class="border px-2 py-1">Scrapped QTY</th>';
-                                $html .= '<th class="border px-2 py-1">Remaining QTY</th>';
-                                $html .= '<th class="border px-2 py-1">Scrapped Reason</th>';
-                                $html .= '<th class="border px-2 py-1">Documents</th>';
-                                $html .= '</tr></thead><tbody>';
-
-                                foreach ($record->workOrderLogs as $log) {
-                                    $status = $log->status;
-                                    $user = $log->user ? $log->user->first_name.' '.$log->user->last_name : 'N/A';
-                                    $timestamp = $log->created_at->format('Y-m-d H:i:s');
-                                    $okQty = '';
-                                    $scrappedQty = '';
-                                    $remainingQty = '';
-                                    $scrappedReason = '';
-                                    $documents = '';
-
-                                    if (in_array($status, ['Hold', 'Completed'])) {
-                                        if (isset($quantities[$quantitiesIndex])) {
-                                            $quantity = $quantities[$quantitiesIndex];
-                                            $okQty = $quantity->ok_quantity;
-                                            $scrappedQty = $quantity->scrapped_quantity;
-                                            
-                                            // Calculate cumulative quantities up to this cycle
-                                            $cumulativeOkQty = 0;
-                                            $cumulativeScrappedQty = 0;
-                                            
-                                            // Sum up quantities from previous cycles
-                                            for ($i = 0; $i <= $quantitiesIndex; $i++) {
-                                                if (isset($quantities[$i])) {
-                                                    $cumulativeOkQty += $quantities[$i]->ok_quantity;
-                                                    $cumulativeScrappedQty += $quantities[$i]->scrapped_quantity;
-                                                }
-                                            }
-                                            
-                                            // Calculate remaining quantity based on cumulative quantities
-                                            $remainingQty = $record->qty - ($cumulativeOkQty + $cumulativeScrappedQty);
-                                            
-                                            // Add detailed logging
-                                            \Log::info('Work Order Quantity Calculation', [
-                                                'work_order_id' => $record->id,
-                                                'cycle_index' => $quantitiesIndex,
-                                                'total_qty' => $record->qty,
-                                                'current_ok_qty' => $okQty,
-                                                'current_scrapped_qty' => $scrappedQty,
-                                                'cumulative_ok_qty' => $cumulativeOkQty,
-                                                'cumulative_scrapped_qty' => $cumulativeScrappedQty,
-                                                'calculated_remaining_qty' => $remainingQty,
-                                                'timestamp' => $timestamp,
-                                                'status' => $status
-                                            ]);
-                                            
-                                            if ($quantity->scrapped_quantity > 0) {
-                                                $scrappedReason = $quantity->reason->description;
-                                            }
-
-                                            // Get QR code and PDF links
-                                            $qrCodeMedia = $quantity->getMedia('qr_code')->first();
-
-                                            if ($qrCodeMedia) {
-                                                $documents .= "<a href='{$qrCodeMedia->getUrl()}' download='qr_code.png' class='text-blue-500 underline'>Download QR Code</a>";
-                                            }
-
-                                            $quantitiesIndex++;
-                                        }
-                                    }
-
-                                    $html .= '<tr>';
-                                    $html .= '<td class="border px-2 py-1">'.e($status).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($user).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($timestamp).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($okQty).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($scrappedQty).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($remainingQty).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($scrappedReason).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.$documents.'</td>';
-                                    $html .= '</tr>';
-                                }
-
-                                $html .= '</tbody></table>';
-
-                                return $html;
-                            })
-                            ->html(),
-                    ])
-                    ->columns(1),
-
-                Section::make('Work Order Info Messages')
-                    ->collapsible()
-                    ->schema([
-                        TextEntry::make('info_messages_table')
-                            ->label('Info Messages')
-                            ->state(function ($record) {
-                                // Ensure info messages are loaded with user details
-                                $record->load('infoMessages.user');
-
-                                $messages = $record->infoMessages->map(function ($message) {
-                                    return [
-                                        'user' => $message->user->getFilamentname() ?? 'N/A',
-                                        'message' => $message->message,
-                                        'priority' => ucfirst($message->priority), // Capitalize first letter
-                                        'sent_at' => $message->created_at->format('Y-m-d H:i:s'),
-                                    ];
-                                });
-
-                                // Create the HTML table
-                                $html = '<table class="table-auto w-full text-left border border-gray-300">';
-                                $html .= '<thead class="bg-gray-200"><tr>';
-                                $html .= '<th class="border px-2 py-1">User</th>';
-                                $html .= '<th class="border px-2 py-1">Message</th>';
-                                $html .= '<th class="border px-2 py-1">Priority</th>';
-                                $html .= '<th class="border px-2 py-1">Sent At</th>';
-                                $html .= '</tr></thead><tbody>';
-
-                                foreach ($messages as $message) {
-                                    $html .= '<tr>';
-                                    $html .= '<td class="border px-2 py-1">'.e($message['user']).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($message['message']).'</td>';
-                                    $html .= '<td class="border px-2 py-1 font-bold text-'.($message['priority'] === 'High' ? 'red-500' : ($message['priority'] === 'Medium' ? 'yellow-500' : 'green-500')).'">'.e($message['priority']).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($message['sent_at']).'</td>';
-                                    $html .= '</tr>';
-                                }
-
-                                $html .= '</tbody></table>';
-
-                                return $html;
-                            })
-                            ->html(), // Enable raw HTML rendering
-                    ])
-                    ->columns(1),
-
-            ]);
-
-    }
+ 
 
     public static function getEloquentQuery(): Builder
     {
@@ -952,4 +672,12 @@ class WorkOrderResource extends Resource
 
         return sprintf('%02d:%02d:%02d', $hours, $minutes, $remainingSeconds);
     }
+
+
+    public static function getWidgets(): array
+{
+    return [
+        \App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderProgress::class,
+    ];
+}
 }

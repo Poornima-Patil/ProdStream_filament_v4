@@ -67,8 +67,7 @@ class HoldReasonResource extends Resource
             'index' => Pages\ListHoldReasons::route('/'),
             'create' => Pages\CreateHoldReason::route('/create'),
             'edit' => Pages\EditHoldReason::route('/{record}/edit'),
-            'view' => Pages\ViewHoldReason::route('/{record}/'),
-
+            'view' => Pages\ViewHoldReasons::route('/{record}'),
         ];
     }
 }

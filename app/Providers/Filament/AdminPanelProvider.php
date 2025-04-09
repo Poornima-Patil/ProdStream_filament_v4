@@ -20,18 +20,24 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use function Illuminate\Support\vite;
+use Filament\Support\Facades\FilamentAsset;
+use Filament\Support\Assets\Js;
+use Illuminate\Support\Facades\Vite;
+use Leandrocfe\FilamentApexCharts\FilamentApexChartsPlugin;
 
 class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
         return $panel
+            ->default()
             ->id('admin')
             ->path('admin')
-            ->colors([
-                'primary' => Color::Amber,
-            ])
             ->login()
+            ->colors([
+               'primary' => '#106EBE'
+            ])
             ->discoverResources(in: app_path('Filament/Admin/Resources'), for: 'App\\Filament\\Admin\\Resources')
             ->discoverPages(in: app_path('Filament/Admin/Pages'), for: 'App\\Filament\\Admin\\Pages')
             ->pages([
@@ -39,9 +45,10 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\\Filament\\Admin\\Widgets')
             ->widgets([
-                // Widgets\AccountWidget::class,
-                // Widgets\FilamentInfoWidget::class,
+                Widgets\AccountWidget::class,
+                Widgets\FilamentInfoWidget::class,
             ])
+            ->viteTheme('resources/css/app.css')
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
@@ -55,8 +62,11 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
-            ])->tenant(Factory::class, ownershipRelationship: 'owner')
+            ])
+            ->tenant(Factory::class, ownershipRelationship: 'owner')
             ->tenantRegistration(RegisterFactory::class)
             ->tenantProfile(EditFactoryProfile::class);
+            
     }
+
 }

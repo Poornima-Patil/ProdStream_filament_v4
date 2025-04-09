@@ -1,3 +1,36 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+
+    /* Progress bar styles */
+    .progress-bar {
+        @apply bg-gray-200 rounded-full overflow-hidden;
+    }
+
+    .progress-bar-fill {
+        @apply h-full transition-all duration-300;
+    }
+
+    /* Color definitions */
+    .bg-green-500 {
+        @apply bg-[#22c55e];
+    }
+
+    .bg-yellow-500 {
+        @apply bg-[#eab308];
+    }
+
+    .text-white {
+        @apply text-[#ffffff];
+    }
+}
+
+/* Test class */
+.test-class {
+    background-color: red;
+    color: white;
+    padding: 1rem;
+    border: 1px solid black;
+}
