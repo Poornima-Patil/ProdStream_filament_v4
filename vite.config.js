@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
+import path from 'path';
 
 export default defineConfig({
     plugins: [
@@ -12,11 +13,22 @@ export default defineConfig({
         }),
     ],
     build: {
-        manifest: true,
+        outDir: 'public/build',
+        emptyOutDir: true,
+        manifest: 'manifest.json',
         rollupOptions: {
             output: {
                 manualChunks: undefined,
+                entryFileNames: 'assets/[name]-[hash].js',
+                chunkFileNames: 'assets/[name]-[hash].js',
+                assetFileNames: 'assets/[name]-[hash][extname]',
             },
         },
     },
+    resolve: {
+        alias: {
+            '@': path.resolve(__dirname, './resources'),
+        },
+    },
 });
+
