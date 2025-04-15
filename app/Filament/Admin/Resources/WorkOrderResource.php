@@ -481,7 +481,8 @@ class WorkOrderResource extends Resource
                 Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.description')
                     ->label('BOM')
                     ->hidden(! $isAdminOrManager)
-                    ->toggleable(),
+                    ->toggleable()
+                    ->wrap(),
                 Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.partnumber')
                     ->label('Part Number')
                     ->searchable()
