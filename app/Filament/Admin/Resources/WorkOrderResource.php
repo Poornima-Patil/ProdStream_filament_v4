@@ -476,28 +476,34 @@ class WorkOrderResource extends Resource
                 Tables\Columns\TextColumn::make('unique_id')
                     ->label('Unique ID')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                 ->toggleable(),
                 Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.description')
                     ->label('BOM')
-                    ->hidden(! $isAdminOrManager),
+                    ->hidden(! $isAdminOrManager)
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.partnumber')
                     ->label('Part Number')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.revision')
                     ->label('Revision'),
                 Tables\Columns\TextColumn::make('machine.name')
                     ->label('Machine')
-                    ->formatStateUsing(fn ($record) => "Asset ID: {$record->machine->assetId} - Name: {$record->machine->name}")
+                    ->formatStateUsing(fn ($record) => "{$record->machine->assetId}")
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('operator.user.first_name')
                     ->label('Operator')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('qty')
                     ->label('Qty')
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
@@ -508,21 +514,26 @@ class WorkOrderResource extends Resource
                         'Closed' => 'info',
                         default => 'gray',
                     })
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('start_time')
-                    ->dateTime()
-                    ->sortable(),
+                    ->date()
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('end_time')
-                    ->dateTime()
-                    ->sortable(),
+                    ->date()
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('ok_qtys')
-                    ->label('OK Quantities')
-                    ->sortable(),
+                    ->label('OK Qtys')
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('scrapped_qtys')
-                    ->label('Scrapped Quantities')
-                    ->sortable(),
+                    ->label('KO Qtys')
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
+                    ->date()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('updated_at')
