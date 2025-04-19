@@ -19,6 +19,8 @@ class SimpleWorkOrderGantt extends Widget
 
     public function getWorkOrders()
     {
+        ini_set('memory_limit', '256M'); // Increase memory limit for this method
+
         $perPage = 10; // Number of Work Orders to load per page
 
         return WorkOrder::query()

@@ -4,21 +4,33 @@
     @php
         use Illuminate\Support\Carbon;
 
-        // Ensure $workOrders is not empty before calculating dates
-        $startDate = collect($workOrders->items())->min('start_date') ?? now()->startOfWeek();
-        $endDate = collect($workOrders->items())->max('end_date') ?? now()->endOfWeek();
+        // Define a broader range if $workOrders is empty
+        $defaultStartDate = now()->subYear()->startOfWeek(); // Start of the past year
+        $defaultEndDate = now()->endOfWeek(); // End of the current week
 
+        // Calculate start and end dates based on $workOrders
+        $startDate = collect($workOrders->items())->min('start_date') 
+            ? Carbon::parse(collect($workOrders->items())->min('start_date'))->startOfWeek()
+            : $defaultStartDate;
+
+        $endDate = collect($workOrders->items())->max('end_date') 
+            ? Carbon::parse(collect($workOrders->items())->max('end_date'))->endOfWeek()
+            : $defaultEndDate;
+
+        $maxWeeks = 52; // Limit to 1 year of weeks
         $weeks = collect([]);
-        $currentDate = Carbon::parse($startDate)->startOfWeek();
-        $endWeek = Carbon::parse($endDate)->endOfWeek();
+        $currentDate = $startDate;
+        $endWeek = $endDate;
+        $weekCount = 0;
 
-        while ($currentDate <= $endWeek) {
+        while ($currentDate <= $endWeek && $weekCount < $maxWeeks) {
             $weeks->push([
                 'start' => $currentDate->format('Y-m-d'),
                 'end' => $currentDate->copy()->endOfWeek()->format('Y-m-d'),
                 'label' => $currentDate->format('M d') . ' - ' . $currentDate->copy()->endOfWeek()->format('M d'),
             ]);
             $currentDate->addWeek();
+            $weekCount++;
         }
 
         $workOrderColumnWidth = 350;
@@ -84,14 +96,16 @@
                                     <td colspan="{{ count($weeks) }}" class="relative p-0" style="height: 64px;">
                                         <div class="absolute inset-0">
                                             {{-- Planned Bar --}}
-                                            <div class="absolute h-4 bg-blue-500 rounded top-[20%] mx-2"
-                                                 style="width: calc({{ $plannedWidth }}% - 16px); left: {{ $plannedLeft }}%;">
-                                                <div class="flex items-center justify-center h-full">
-                                                    <span class="text-xs text-white font-medium px-2 truncate">
-                                                        Planned
-                                                    </span>
+                                            @if ($plannedWidth > 0)
+                                                <div class="absolute h-4 bg-blue-500 rounded top-[20%] mx-2"
+                                                     style="width: calc({{ $plannedWidth }}% - 16px); left: {{ $plannedLeft }}%;">
+                                                    <div class="flex items-center justify-center h-full">
+                                                        <span class="text-xs text-white font-medium px-2 truncate">
+                                                            Planned
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            @endif
 
                                             {{-- Actual Bar --}}
                                             @if ($actualWidth > 0)
