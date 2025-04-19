@@ -160,4 +160,20 @@ class WorkOrder extends Model
         // Create the quantity
         return $this->quantities()->create($data);
     }
+
+    public function scopeFiltered($query, $filters)
+{
+    if (!empty($filters['status'])) {
+        $query->where('status', $filters['status']);
+    }
+
+    // You can add more filters here based on your table setup
+    // if (!empty($filters['operator_id'])) {
+    //     $query->where('operator_id', $filters['operator_id']);
+    // }
+
+    return $query;
+}
+
+
 }
