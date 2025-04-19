@@ -15,6 +15,7 @@
         "laravel/framework": "^11.31",
         "laravel/tinker": "^2.9",
         "leandrocfe/filament-apex-charts": "^3.2",
+        "livewire/livewire": "^3.5",
         "simplesoftwareio/simple-qrcode": "^4.2",
         "spatie/laravel-medialibrary": "^11.12",
         "spatie/laravel-permission": "^6.10"
