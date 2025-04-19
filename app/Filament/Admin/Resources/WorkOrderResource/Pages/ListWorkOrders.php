@@ -27,6 +27,8 @@ use Filament\Forms\Components\DatePicker;
 use Carbon\Carbon;
 use App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderPieChart;
 use App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderEndTimeTrendChart;
+use App\Filament\Admin\Widgets\WorkOrderGantt;
+use App\Filament\Admin\Widgets\SimpleWorkOrderGantt;
 
 
 class ListWorkOrders extends ListRecords
@@ -73,6 +75,19 @@ class ListWorkOrders extends ListRecords
                 ]),
         ];
     }
+
+/*************  ✨ Windsurf Command ⭐  *************/
+/**
+ * Retrieves the query builder for the WorkOrders table.
+ *
+ * This method logs an info message indicating that the `getTableQuery` has been called.
+ * It then returns an eloquent query filtered by the factory ID of the authenticated user.
+ *
+ * @return Builder The query builder for the WorkOrders table.
+ */
+
+/*******  ef5a735e-e81c-4b32-be8c-930717cd88f5  *******/
+
 
     protected function getTableQuery(): Builder
 {
@@ -235,10 +250,14 @@ public function getTabs(): array
     {
         return [
             WorkOrderPieChart::class,
-            
-                WorkOrderEndTimeTrendChart::class,
-        
-            // Register the WorkOrderStats widget here
+            \App\Filament\Admin\Resources\WorkOrderResource\Widgets\SimpleWorkOrderGantt::class,
+
+
         ];
+    }
+
+    public function getTableRecordKey($record): string
+    {
+        return $record->unique_id;
     }
 }

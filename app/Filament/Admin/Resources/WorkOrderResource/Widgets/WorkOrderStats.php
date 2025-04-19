@@ -56,4 +56,13 @@ class WorkOrderStats extends BaseWidget
     {
         return ListWorkOrders::class;
     }
+
+    public function renderGanttChart()
+    {
+        $workOrders = $this->getPageTableQuery()->get();
+
+        return view('work-order-stats', [
+            'workOrders' => $workOrders,
+        ]);
+    }
 }

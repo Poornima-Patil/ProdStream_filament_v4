@@ -3,6 +3,7 @@
 namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\WorkOrderResource\Pages;
+use App\Filament\Admin\Widgets\SimpleWorkOrderGantt;
 use App\Models\InfoMessage;
 use App\Models\Machine;
 use App\Models\Operator;
@@ -30,11 +31,11 @@ use Filament\Tables\Enums\ActionsPosition;
 
 class WorkOrderResource extends Resource
 {
-    protected static ?string $model = Workorder::class;
+    protected static ?string $model = WorkOrder::class;
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    protected static ?string $navigationIcon = 'heroicon-o-clipboard';
+    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
     protected static ?string $navigationGroup = 'Process Operations';
 
@@ -687,9 +688,9 @@ class WorkOrderResource extends Resource
 
 
     public static function getWidgets(): array
-{
-    return [
-        \App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderProgress::class,
-    ];
-}
+    {
+        return [
+            \App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderProgress::class,
+        ];
+    }
 }
