@@ -69,8 +69,27 @@
                                 @php
                                     $woStart = Carbon::parse($workOrder['start_date']);
                                     $woEnd = Carbon::parse($workOrder['end_date']);
+                                    $totalQty = $workOrder['qty'];
+                                    $okQtys = $workOrder['ok_qtys'];
+                                    $scrappedQtys = $workOrder['scrapped_qtys'];
+
                                     $actualStart = $workOrder['actual_start_date'] ? Carbon::parse($workOrder['actual_start_date']) : null;
                                     $actualEnd = $workOrder['actual_end_date'] ? Carbon::parse($workOrder['actual_end_date']) : null;
+
+                                    // Calculate the total timeline in days
+                                    $timelineStart = Carbon::parse($weeks->first()['start']);
+                                    $timelineEnd = Carbon::parse($weeks->last()['end']);
+                                    $totalTimelineDays = $timelineStart->diffInDays($timelineEnd);
+
+                                    // Calculate the actual bar position and width
+                                    $actualStartOffset = $actualStart ? $timelineStart->diffInDays($actualStart) : 0;
+                                    $actualEndOffset = $actualEnd ? $timelineStart->diffInDays($actualEnd) : $totalTimelineDays;
+
+                                    $actualBarLeft = ($actualStartOffset / $totalTimelineDays) * 100;
+                                    $actualBarWidth = (($actualEndOffset - $actualStartOffset) / $totalTimelineDays) * 100;
+
+                                    $okPercentage = $totalQty > 0 ? ($okQtys / $totalQty) * 100 : 0;
+                                    $scrappedPercentage = $totalQty > 0 ? ($scrappedQtys / $totalQty) * 100 : 0;
 
                                     $totalWeeks = count($weeks);
 
@@ -79,17 +98,16 @@
                                     $plannedEndIndex = $weeks->search(fn($week) => $woEnd->between($week['start'], $week['end']));
                                     $plannedWidth = max(($plannedEndIndex - $plannedStartIndex + 1) * 100 / $totalWeeks, 1);
                                     $plannedLeft = $plannedStartIndex * 100 / $totalWeeks;
-
-                                    // Calculate actual bar position and width
-                                    $actualStartIndex = $actualStart ? $weeks->search(fn($week) => $actualStart->between($week['start'], $week['end'])) : null;
-                                    $actualEndIndex = $actualEnd ? $weeks->search(fn($week) => $actualEnd->between($week['start'], $week['end'])) : null;
-                                    $actualWidth = $actualStart && $actualEnd ? max(($actualEndIndex - $actualStartIndex + 1) * 100 / $totalWeeks, 1) : 0;
-                                    $actualLeft = $actualStartIndex ? $actualStartIndex * 100 / $totalWeeks : 0;
                                 @endphp
                                 <tr>
                                     <td class="sticky left-0 z-20 bg-white border-r" style="width: {{ $workOrderColumnWidth }}px">
                                         <div class="px-4 py-4">
-                                            <div class="text-xs font-medium text-gray-900 truncate max-w-[310px]">{{ $workOrder['unique_id'] }}</div>
+                                            <div class="text-xs font-medium text-gray-900 truncate max-w-[310px]">
+                                                <a href="{{ url('admin/' . auth()->user()->factory_id . '/work-orders/' . $workOrder['id']) }}" 
+                                                   class="text-blue-500 hover:underline">
+                                                    {{ $workOrder['unique_id'] }}
+                                                </a>
+                                            </div>
                                             <div class="text-xs text-gray-500">{{ $workOrder['status'] }}</div>
                                         </div>
                                     </td>
@@ -108,12 +126,27 @@
                                             @endif
 
                                             {{-- Actual Bar --}}
-                                            @if ($actualWidth > 0)
-                                                <div class="absolute h-4 bg-green-500 rounded top-[60%] mx-2"
-                                                     style="width: calc({{ $actualWidth }}% - 16px); left: {{ $actualLeft }}%;">
-                                                    <div class="flex items-center justify-center h-full">
-                                                        <span class="text-xs text-white font-medium px-2 truncate">
-                                                            Actual
+                                            @if ($workOrder['status'] === 'Start')
+                                                {{-- Flag for Actual Start Date --}}
+                                                <div class="absolute top-[60%] mx-2" style="left: {{ $actualBarLeft }}%;">
+                                                    <span class="flex items-center justify-center text-xs text-green-500 font-medium">
+                                                        <i class="fas fa-flag"></i> {{-- Font Awesome flag icon --}}
+                                                    </span>
+                                                </div>
+                                            @elseif ($workOrder['status'] !== 'Assigned')
+                                                {{-- Actual Bar --}}
+                                                <div class="absolute h-4 bg-gray-200 rounded top-[60%] mx-2"
+                                                     style="width: calc({{ $actualBarWidth }}% - 16px); left: {{ $actualBarLeft }}%; display: flex;">
+                                                    {{-- Green Section for OK Quantities --}}
+                                                    <div class="h-full bg-green-500 rounded-l" style="width: {{ $okPercentage }}%;">
+                                                        <span class="flex items-center justify-center text-xs text-white font-medium h-full">
+                                                            {{ round($okPercentage, 1) }}%
+                                                        </span>
+                                                    </div>
+                                                    {{-- Red Section for Scrapped Quantities --}}
+                                                    <div class="h-full bg-red-500" style="width: {{ $scrappedPercentage }}%;">
+                                                        <span class="flex items-center justify-center text-xs text-white font-medium h-full">
+                                                            {{ round($scrappedPercentage, 1) }}%
                                                         </span>
                                                     </div>
                                                 </div>

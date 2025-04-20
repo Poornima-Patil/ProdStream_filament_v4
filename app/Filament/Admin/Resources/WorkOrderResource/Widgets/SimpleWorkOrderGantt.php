@@ -34,21 +34,35 @@ class SimpleWorkOrderGantt extends Widget
             ->orderBy('start_time')
             ->paginate($perPage)
             ->through(function ($workOrder) {
+                // Fetch actual start time (earliest 'Start' status using created_at)
                 $actualStartTime = WorkOrderLog::where('work_order_id', $workOrder->id)
                     ->where('status', 'Start')
                     ->orderBy('created_at', 'asc')
                     ->value('created_at');
 
-                $actualEndTime = WorkOrderLog::where('work_order_id', $workOrder->id)
-                    ->whereIn('status', ['Completed', 'Closed'])
-                    ->orderBy('created_at', 'desc')
-                    ->value('created_at');
+                // Fetch actual end time based on status
+                if ($workOrder->status === 'Hold') {
+                    // If status is "Hold", get the last "Hold" log
+                    $actualEndTime = WorkOrderLog::where('work_order_id', $workOrder->id)
+                        ->where('status', 'Hold')
+                        ->orderBy('created_at', 'desc')
+                        ->value('created_at');
+                } else {
+                    // Otherwise, get the last "Completed" or "Closed" log
+                    $actualEndTime = WorkOrderLog::where('work_order_id', $workOrder->id)
+                        ->whereIn('status', ['Completed', 'Closed'])
+                        ->orderBy('created_at', 'desc')
+                        ->value('created_at');
+                }
 
                 return [
                     'id' => $workOrder->id,
                     'unique_id' => $workOrder->unique_id,
                     'start_date' => $workOrder->start_time->format('Y-m-d'),
                     'end_date' => $workOrder->end_time->format('Y-m-d'),
+                    'qty' => $workOrder->qty,
+                    'ok_qtys' => $workOrder->ok_qtys,
+                    'scrapped_qtys' => $workOrder->scrapped_qtys,
                     'actual_start_date' => $actualStartTime ? Carbon::parse($actualStartTime)->format('Y-m-d') : null,
                     'actual_end_date' => $actualEndTime ? Carbon::parse($actualEndTime)->format('Y-m-d') : null,
                     'status' => $workOrder->status,
