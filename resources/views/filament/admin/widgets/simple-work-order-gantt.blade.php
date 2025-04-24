@@ -17,6 +17,11 @@
             ? Carbon::parse(collect($workOrders->items())->max('end_date'))->endOfWeek()
             : $defaultEndDate;
 
+        // Ensure the timeline includes today
+        if (now()->greaterThan($endDate)) {
+            $endDate = now()->endOfWeek();
+        }
+
         $maxWeeks = 52; // Limit to 1 year of weeks
         $weeks = collect([]);
         $currentDate = $startDate;
@@ -98,6 +103,8 @@
                                     $plannedEndIndex = $weeks->search(fn($week) => $woEnd->between($week['start'], $week['end']));
                                     $plannedWidth = max(($plannedEndIndex - $plannedStartIndex + 1) * 100 / $totalWeeks, 1);
                                     $plannedLeft = $plannedStartIndex * 100 / $totalWeeks;
+
+                                    Log::info("Work Order ID: {$workOrder['unique_id']}, Timeline Start: {$timelineStart}, Actual Start: {$actualStart}, Total Timeline Days: {$totalTimelineDays}, Actual Start Offset: {$actualStartOffset}, Actual Bar Left: {$actualBarLeft}");
                                 @endphp
                                 <tr>
                                     <td class="sticky left-0 z-20 bg-white border-r" style="width: {{ $workOrderColumnWidth }}px">
@@ -129,8 +136,9 @@
                                             @if ($workOrder['status'] === 'Start')
                                                 {{-- Flag for Actual Start Date --}}
                                                 <div class="absolute top-[60%] mx-2" style="left: {{ $actualBarLeft }}%;">
-                                                    <span class="flex items-center justify-center text-xs text-green-500 font-medium">
-                                                        <i class="fas fa-flag"></i> {{-- Font Awesome flag icon --}}
+                                                    <span class="flex items-center justify-center text-xs  font-medium">
+                                                      
+                                                        <i class="fas fa-flag fa-xl"></i> {{-- Font Awesome flag icon --}}
                                                     </span>
                                                 </div>
                                             @elseif ($workOrder['status'] !== 'Assigned')
