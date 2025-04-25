@@ -3,6 +3,7 @@
 use App\Models\OkQuantity;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
+use App\Filament\Admin\Widgets\AdvancedWorkOrderGantt;
 
 Route::get('/', function () {
     return view('welcome');
@@ -78,8 +79,11 @@ if (app()->environment('local')) {
     URL::forceScheme('http');
 }
 
-
 Route::get('/test-chart', function () {
     return view('test-chart');
 });
+
+Route::get('/admin/{tenant}/advanced-work-order-gantt', function () {
+    return app(AdvancedWorkOrderGantt::class)->render();
+})->name('filament.admin.widgets.advanced-work-order-gantt');
 
