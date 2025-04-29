@@ -96,6 +96,13 @@ class WorkOrder extends Model
         $scrappedQtys = $latestQuantity ? $latestQuantity->scrapped_quantity : 0;
         $scrappedReasonId = $latestQuantity ? $latestQuantity->reason_id : null;
 
+        // Calculate FPY for 'Hold' status
+        $fpy = 0;
+        if ($newStatus === 'Hold') {
+            $total = $okQtys + $scrappedQtys;
+            $fpy = $total > 0 ? ($scrappedQtys / $total) * 100 : 0;
+        }
+
         $log = WorkOrderLog::create([
             'work_order_id' => $this->id,
             'status' => $newStatus,
@@ -106,6 +113,7 @@ class WorkOrder extends Model
             'remaining' => $this->qty - ($okQtys + $scrappedQtys),
             'scrapped_reason_id' => $scrappedReasonId,
             'hold_reason_id' => $this->hold_reason_id,
+            'fpy' => $fpy, // Add FPY value
         ]);
 
         return $log;

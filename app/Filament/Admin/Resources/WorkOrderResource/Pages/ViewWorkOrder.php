@@ -184,6 +184,8 @@ class ViewWorkOrder extends ViewRecord
                                 $html .= '<th class="border px-2 py-1">Remaining QTY</th>';
                                 $html .= '<th class="border px-2 py-1">Scrapped Reason</th>';
                                 $html .= '<th class="border px-2 py-1">Documents</th>';
+                                $html .= '<th class="border px-2 py-1">FPY (%)</th>'; // <-- Add FPY column
+
                                 $html .= '</tr></thead><tbody>';
 
                                 foreach ($record->workOrderLogs as $log) {
@@ -194,6 +196,7 @@ class ViewWorkOrder extends ViewRecord
                                     $scrappedQty = '';
                                     $remainingQty = '';
                                     $scrappedReason = '';
+                                    $fpy = $log->fpy !== null ? number_format($log->fpy, 2) : ''; // <-- Get FPY value
                                     $documents = '';
 
                                     if (in_array($status, ['Hold', 'Completed'])) {
@@ -255,6 +258,8 @@ class ViewWorkOrder extends ViewRecord
                                     $html .= '<td class="border px-2 py-1">'.e($remainingQty).'</td>';
                                     $html .= '<td class="border px-2 py-1">'.e($scrappedReason).'</td>';
                                     $html .= '<td class="border px-2 py-1">'.$documents.'</td>';
+                                    $html .= '<td class="border px-2 py-1">'.e($fpy).'</td>'; // <-- Show FPY value
+                                        
                                     $html .= '</tr>';
                                 }
 

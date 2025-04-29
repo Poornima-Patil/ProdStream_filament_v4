@@ -23,6 +23,7 @@ class WorkOrderLog extends Model
         'remaining',
         'scrapped_reason_id',
         'hold_reason_id',
+        'fpy',
     ];
 
     protected $casts = [
