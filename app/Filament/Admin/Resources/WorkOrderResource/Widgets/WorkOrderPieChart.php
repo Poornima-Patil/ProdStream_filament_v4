@@ -2,17 +2,16 @@
 
 namespace App\Filament\Admin\Resources\WorkOrderResource\Widgets;
 
-use Filament\Widgets\ChartWidget;
-use App\Models\WorkOrder;
-use Filament\Widgets\Concerns\InteractsWithPageTable;
 use Filament\Support\RawJs;
+use Filament\Widgets\ChartWidget;
+use Filament\Widgets\Concerns\InteractsWithPageTable;
 
 class WorkOrderPieChart extends ChartWidget
 {
     use InteractsWithPageTable;
 
-
     protected static ?string $heading = 'Work Order Status Distribution';
+
     protected static ?int $sort = 2;
 
     protected int|string|array $columnSpan = 'full';
@@ -21,6 +20,7 @@ class WorkOrderPieChart extends ChartWidget
     {
         $statuses = ['Assigned', 'Start', 'Hold', 'Completed', 'Closed'];
         $counts = [];
+        $statusColors = config('work_order_status');
 
         foreach ($statuses as $status) {
             $counts[] = $this->getPageTableQuery()
@@ -36,11 +36,11 @@ class WorkOrderPieChart extends ChartWidget
                     'label' => 'Work Orders',
                     'data' => $counts,
                     'backgroundColor' => [
-                        '#3B82F6', // Bright blue for Assigned
-                        '#F59E0B', // Vibrant yellow for Start
-                        '#F97316', // Warning orange for Hold
-                        '#10B981', // Success green for Completed
-                        '#6B7280', // Neutral gray for Closed
+                        $statusColors['assigned'],
+                        $statusColors['start'],
+                        $statusColors['hold'],
+                        $statusColors['completed'],
+                        $statusColors['closed'],
                     ],
                     'borderWidth' => 2,
                     'hoverOffset' => 10,
@@ -49,7 +49,6 @@ class WorkOrderPieChart extends ChartWidget
         ];
     }
 
-   
     protected function getOptions(): RawJs|array
     {
         $js = <<<'JS'
@@ -106,12 +105,9 @@ class WorkOrderPieChart extends ChartWidget
         }
     }
     JS;
-    
+
         return RawJs::make($js);
     }
-    
-    
-
 
     protected function getType(): string
     {
@@ -122,6 +118,4 @@ class WorkOrderPieChart extends ChartWidget
     {
         return \App\Filament\Admin\Resources\WorkOrderResource\Pages\ListWorkOrders::class;
     }
-
-   
 }

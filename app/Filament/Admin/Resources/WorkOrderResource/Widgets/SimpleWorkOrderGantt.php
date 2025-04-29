@@ -2,22 +2,21 @@
 
 namespace App\Filament\Admin\Resources\WorkOrderResource\Widgets;
 
-use App\Models\WorkOrder;
 use App\Models\WorkOrderLog;
+use Filament\Widgets\Concerns\InteractsWithPageTable;
 use Filament\Widgets\Widget;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Livewire\WithPagination;
-use Filament\Widgets\Concerns\InteractsWithPageTable;
 
 class SimpleWorkOrderGantt extends Widget
 {
-    use WithPagination, InteractsWithPageTable;
+    use InteractsWithPageTable, WithPagination;
 
     protected static string $view = 'filament.admin.widgets.simple-work-order-gantt';
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     public function getWorkOrders()
     {

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Filament\Admin\Resources\WorkOrderResource\Widgets;
 
 use App\Models\WorkOrder;
@@ -11,21 +12,21 @@ class WorkOrderQtyTrendChart extends ChartWidget
     public ?WorkOrder $workOrder = null;
 
     protected static ?string $heading = 'Work Order Qty Trend';
-    
 
     protected function getData(): array
     {
-        if (!$this->workOrder) {
+        if (! $this->workOrder) {
             Log::info('No WorkOrder passed to widget.');
+
             return ['datasets' => [], 'labels' => []];
         }
 
-        Log::info('WorkOrderQtyTrendChart: Record ID ' . $this->workOrder->id);
+        Log::info('WorkOrderQtyTrendChart: Record ID '.$this->workOrder->id);
 
         $logs = WorkOrderLog::where('work_order_id', $this->workOrder->id)
-        ->whereIn('status', ['Hold', 'Completed', 'Closed']) // 👈 Only these statuses
-        ->orderBy('changed_at')
-        ->get();
+            ->whereIn('status', ['Hold', 'Completed', 'Closed']) // 👈 Only these statuses
+            ->orderBy('changed_at')
+            ->get();
 
         Log::info('Logs:', $logs->toArray());
 

@@ -9,7 +9,7 @@
     $scrappedQty = $record->scrapped_qtys ?? 0;
     $totalQty = $record->qty ?? 1;
 
-    $progress = min(($okQty / $totalQty) * 100, 100);
+    $progress = min((($okQty + $scrappedQty) / $totalQty) * 100, 100);
     $pendingQty = max($totalQty - ($okQty + $scrappedQty), 0);
 
     $progressColor = $isOverdue ? '#ef4444' : '#10b981'; // red / green

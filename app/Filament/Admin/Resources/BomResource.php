@@ -14,14 +14,14 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
-use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
 
 class BomResource extends Resource
 {
@@ -119,7 +119,7 @@ class BomResource extends Resource
                 Forms\Components\Select::make('status')->options([
                     '1' => 'Active',
                     '0' => 'InActive',
-                    '2' => 'Complete'
+                    '2' => 'Complete',
                 ])->required()
                     ->reactive()
                     ->afterStateUpdated(function (callable $get, $record) {
@@ -142,73 +142,72 @@ class BomResource extends Resource
     }
 
     public static function table(Table $table): Table
-{
-    return $table
-        ->columns([
-            Tables\Columns\TextColumn::make('unique_id')
-                ->label('Unique ID')
-                ->searchable()
-                ->wrap()
-                ->toggleable(),
+    {
+        return $table
+            ->columns([
+                Tables\Columns\TextColumn::make('unique_id')
+                    ->label('Unique ID')
+                    ->searchable()
+                    ->wrap()
+                    ->toggleable(),
 
-            Tables\Columns\TextColumn::make('purchaseorder.partnumber.description')
-                ->label('Description')
-                ->searchable()
-                ->wrap()
-                ->toggleable(),
+                Tables\Columns\TextColumn::make('purchaseorder.partnumber.description')
+                    ->label('Description')
+                    ->searchable()
+                    ->wrap()
+                    ->toggleable(),
 
-            Tables\Columns\TextColumn::make('purchaseorder.partnumber.partnumber')
-                ->label('PartNumber')
-                ->searchable()
-                ->toggleable(),
+                Tables\Columns\TextColumn::make('purchaseorder.partnumber.partnumber')
+                    ->label('PartNumber')
+                    ->searchable()
+                    ->toggleable(),
 
-            Tables\Columns\TextColumn::make('purchaseorder.partnumber.revision')
-                ->label('Revision')
-                ->toggleable(),
+                Tables\Columns\TextColumn::make('purchaseorder.partnumber.revision')
+                    ->label('Revision')
+                    ->toggleable(),
 
-            Tables\Columns\TextColumn::make('machineGroup.group_name')
-                ->label('Machine Group')
-                ->toggleable(),
+                Tables\Columns\TextColumn::make('machineGroup.group_name')
+                    ->label('Machine Group')
+                    ->toggleable(),
 
-            Tables\Columns\TextColumn::make('operatorproficiency.proficiency')
-                ->label('Operator Proficiency')
-                ->toggleable(),
+                Tables\Columns\TextColumn::make('operatorproficiency.proficiency')
+                    ->label('Operator Proficiency')
+                    ->toggleable(),
 
-            Tables\Columns\TextColumn::make('lead_time')
-                ->label('Target Completion Time')
-                ->formatStateUsing(function ($state) {
-                    return \Carbon\Carbon::parse($state)->format('d M Y');
-                })
-                ->toggleable(),
+                Tables\Columns\TextColumn::make('lead_time')
+                    ->label('Target Completion Time')
+                    ->formatStateUsing(function ($state) {
+                        return \Carbon\Carbon::parse($state)->format('d M Y');
+                    })
+                    ->toggleable(),
 
-            Tables\Columns\TextColumn::make('status')
-                ->label('Status')
-                ->formatStateUsing(fn ($state) => match ($state) {
-                    1 => 'Active',
-                    0 => 'Inactive',
-                    2 => 'Complete',
-                    default => 'Unknown',
-                })
-                ->toggleable(),
-        ])
+                Tables\Columns\TextColumn::make('status')
+                    ->label('Status')
+                    ->formatStateUsing(fn ($state) => match ($state) {
+                        1 => 'Active',
+                        0 => 'Inactive',
+                        2 => 'Complete',
+                        default => 'Unknown',
+                    })
+                    ->toggleable(),
+            ])
 
-        ->filters([
+            ->filters([
             Tables\Filters\TrashedFilter::make(),
         ])
 
-        ->actions([
+            ->actions([
             ActionGroup::make([
-                EditAction::make()->label('Edit BOM'),
-                ViewAction::make()->hiddenLabel(),
+                    EditAction::make()->label('Edit BOM'),
+                    ViewAction::make()->hiddenLabel(),
             ]),
-        ], position: ActionsPosition::BeforeColumns) 
-        ->bulkActions([
+        ], position: ActionsPosition::BeforeColumns)
+            ->bulkActions([
             Tables\Actions\BulkActionGroup::make([
-                Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make(),
             ]),
         ]);
-}
-
+    }
 
     public static function getRelations(): array
     {

@@ -11,9 +11,10 @@ class AdvancedWorkOrderGantt extends Widget
 {
     protected static string $view = 'filament.admin.widgets.advanced-work-order-gantt';
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     public $timeRange = 'week'; // Default time range
+
     public $selectedDate = null; // Selected date for filtering
 
     public function getWorkOrders()
@@ -33,22 +34,22 @@ class AdvancedWorkOrderGantt extends Widget
                     'endOfWeek' => $selectedDate->endOfWeek()->toDateTimeString(),
                 ]);
                 $query->whereBetween('start_time', [$selectedDate->startOfWeek(), $selectedDate->endOfWeek()])
-                      ->whereBetween('end_time', [$selectedDate->startOfWeek(), $selectedDate->endOfWeek()]);
+                    ->whereBetween('end_time', [$selectedDate->startOfWeek(), $selectedDate->endOfWeek()]);
             } elseif ($this->timeRange === 'day') {
                 \Log::info('Filtering work orders for the day:', [
                     'selectedDate' => $selectedDate->toDateString(),
                 ]);
                 $query->whereDate('start_time', $selectedDate->toDateString())
-                      ->whereDate('end_time', $selectedDate->toDateString());
+                    ->whereDate('end_time', $selectedDate->toDateString());
             } elseif ($this->timeRange === 'month') {
                 \Log::info('Filtering work orders for the month:', [
                     'year' => $selectedDate->year,
                     'month' => $selectedDate->month,
                 ]);
                 $query->whereYear('start_time', $selectedDate->year)
-                      ->whereMonth('start_time', $selectedDate->month)
-                      ->whereYear('end_time', $selectedDate->year)
-                      ->whereMonth('end_time', $selectedDate->month);
+                    ->whereMonth('start_time', $selectedDate->month)
+                    ->whereYear('end_time', $selectedDate->year)
+                    ->whereMonth('end_time', $selectedDate->month);
             }
         }
 
@@ -77,4 +78,3 @@ class AdvancedWorkOrderGantt extends Widget
         ]);
     }
 }
-

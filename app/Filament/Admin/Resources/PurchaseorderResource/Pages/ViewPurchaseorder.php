@@ -4,13 +4,11 @@ namespace App\Filament\Admin\Resources\PurchaseorderResource\Pages;
 
 use App\Filament\Admin\Resources\PurchaseorderResource;
 use App\Models\PurchaseOrder;
-use Filament\Resources\Pages\ViewRecord;
-use Filament\Infolists\Infolist;
+use Filament\Infolists\Components\Progress;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Components\Card;
-use Filament\Infolists\Components\Progress;
-use Filament\Infolists\Components\TextInput;
+use Filament\Infolists\Infolist;
+use Filament\Resources\Pages\ViewRecord;
 
 class ViewPurchaseorder extends ViewRecord
 {
@@ -32,18 +30,18 @@ class ViewPurchaseorder extends ViewRecord
                             $completedQty = $record->boms
                                 ? $record->boms->flatMap->workOrders->sum('ok_qtys')
                                 : 0;
-                        
+
                             $scrappedQty = $record->boms
                                 ? $record->boms->flatMap->workOrders->sum('scrapped_qtys')
                                 : 0;
-                        
+
                             $requestedQty = $record->QTY ?? 0;
                             $progressPercent = $requestedQty > 0 ? round(($completedQty / $requestedQty) * 100) : 0;
-                        
+
                             // Determine progress bar color
                             $progressColor = $progressPercent >= 50 ? 'bg-emerald-500' : 'bg-amber-500';
                             $textColor = 'text-white';
-                        
+
                             return new \Illuminate\Support\HtmlString('
                                 <div class="overflow-x-auto rounded-lg shadow">
                                     <table class="w-full text-sm border border-gray-300 text-center">
@@ -61,26 +59,26 @@ class ViewPurchaseorder extends ViewRecord
                                         </thead>
                                         <tbody>
                                             <tr class="bg-white hover:bg-gray-50">
-                                                <td class="p-2 border border-gray-300">' . htmlspecialchars($record->unique_id) . '</td>
-                                                <td class="p-2 border border-gray-300">' . htmlspecialchars($record->customer->name ?? '-') . '</td>
-                                                <td class="p-2 border border-gray-300">' . htmlspecialchars($record->partNumber->partnumber ?? '-') . '</td>
-                                                <td class="p-2 border border-gray-300">' . htmlspecialchars($requestedQty) . '</td>
-                                                <td class="p-2 border border-gray-300">' . htmlspecialchars($completedQty) . '</td>
-                                                <td class="p-2 border border-gray-300">' . htmlspecialchars($scrappedQty) . '</td>
+                                                <td class="p-2 border border-gray-300">'.htmlspecialchars($record->unique_id).'</td>
+                                                <td class="p-2 border border-gray-300">'.htmlspecialchars($record->customer->name ?? '-').'</td>
+                                                <td class="p-2 border border-gray-300">'.htmlspecialchars($record->partNumber->partnumber ?? '-').'</td>
+                                                <td class="p-2 border border-gray-300">'.htmlspecialchars($requestedQty).'</td>
+                                                <td class="p-2 border border-gray-300">'.htmlspecialchars($completedQty).'</td>
+                                                <td class="p-2 border border-gray-300">'.htmlspecialchars($scrappedQty).'</td>
                                                 <td class="p-2 border border-gray-300">
                                                     <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-                                                        <div class="h-4 ' . $progressColor . ' ' . $textColor . ' rounded-full text-xs font-medium flex items-center justify-center transition-all duration-300" style="width:' . $progressPercent . '%; min-width: 2rem;">
-                                                            ' . $progressPercent . '%
+                                                        <div class="h-4 '.$progressColor.' '.$textColor.' rounded-full text-xs font-medium flex items-center justify-center transition-all duration-300" style="width:'.$progressPercent.'%; min-width: 2rem;">
+                                                            '.$progressPercent.'%
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td class="p-2 border border-gray-300">' . htmlspecialchars($record->status) . '</td>
+                                                <td class="p-2 border border-gray-300">'.htmlspecialchars($record->status).'</td>
                                             </tr>
                                         </tbody>
                                     </table>
                                 </div>
                             ');
-                        })
+                        }),
                 ]),
 
             Section::make('Bills of Materials')
@@ -88,7 +86,7 @@ class ViewPurchaseorder extends ViewRecord
                     TextEntry::make('boms_table')
                         ->label('')
                         ->getStateUsing(function ($record) {
-                            if (!$record->boms || $record->boms->isEmpty()) {
+                            if (! $record->boms || $record->boms->isEmpty()) {
                                 return '<div class="text-gray-500">No BOMs found.</div>';
                             }
 
@@ -114,13 +112,14 @@ class ViewPurchaseorder extends ViewRecord
 
                                 $table .= '
                                     <tr class="bg-white hover:bg-gray-50">
-                                        <td class="p-2 border border-gray-300">' . htmlspecialchars($bom->unique_id) . '</td>
-                                        <td class="p-2 border border-gray-300">' . htmlspecialchars($bom->description) . '</td>
-                                        <td class="p-2 border border-gray-300 ' . $statusClass . '">' . htmlspecialchars($bom->status) . '</td>
+                                        <td class="p-2 border border-gray-300">'.htmlspecialchars($bom->unique_id).'</td>
+                                        <td class="p-2 border border-gray-300">'.htmlspecialchars($bom->description).'</td>
+                                        <td class="p-2 border border-gray-300 '.$statusClass.'">'.htmlspecialchars($bom->status).'</td>
                                     </tr>';
                             }
 
                             $table .= '</tbody></table></div>';
+
                             return $table;
                         })->html(),
                 ]),
@@ -130,7 +129,7 @@ class ViewPurchaseorder extends ViewRecord
                     TextEntry::make('workOrders')
                         ->hiddenLabel()
                         ->getStateUsing(function ($record) {
-                            if (!$record->workOrders || $record->workOrders->isEmpty()) {
+                            if (! $record->workOrders || $record->workOrders->isEmpty()) {
                                 return '<div class="text-gray-500">No work orders found.</div>';
                             }
 
@@ -167,19 +166,20 @@ class ViewPurchaseorder extends ViewRecord
 
                                 $table .= '
                                     <tr class="bg-white hover:bg-gray-50">
-                                        <td class="p-2 border border-gray-300">' . htmlspecialchars($workOrder->unique_id) . '</td>
-                                        <td class="p-2 border border-gray-300">BOM-' . htmlspecialchars($workOrder->bom_id) . '</td>
-                                        <td class="p-2 border border-gray-300">' . htmlspecialchars($workOrder->qty) . '</td>
-                                        <td class="p-2 border border-gray-300">' . htmlspecialchars($workOrder->machine_id) . '</td>
-                                        <td class="p-2 border border-gray-300">' . htmlspecialchars($startTime) . '</td>
-                                        <td class="p-2 border border-gray-300">' . htmlspecialchars($endTime) . '</td>
-                                        <td class="p-2 border border-gray-300"><span class="px-2 py-1 text-xs font-semibold rounded-full ' . $statusClass . '">' . htmlspecialchars($workOrder->status) . '</span></td>
-                                        <td class="p-2 border border-gray-300 text-green-600">' . htmlspecialchars($workOrder->ok_qtys) . '</td>
-                                        <td class="p-2 border border-gray-300 text-red-600">' . htmlspecialchars($workOrder->scrapped_qtys) . '</td>
+                                        <td class="p-2 border border-gray-300">'.htmlspecialchars($workOrder->unique_id).'</td>
+                                        <td class="p-2 border border-gray-300">BOM-'.htmlspecialchars($workOrder->bom_id).'</td>
+                                        <td class="p-2 border border-gray-300">'.htmlspecialchars($workOrder->qty).'</td>
+                                        <td class="p-2 border border-gray-300">'.htmlspecialchars($workOrder->machine_id).'</td>
+                                        <td class="p-2 border border-gray-300">'.htmlspecialchars($startTime).'</td>
+                                        <td class="p-2 border border-gray-300">'.htmlspecialchars($endTime).'</td>
+                                        <td class="p-2 border border-gray-300"><span class="px-2 py-1 text-xs font-semibold rounded-full '.$statusClass.'">'.htmlspecialchars($workOrder->status).'</span></td>
+                                        <td class="p-2 border border-gray-300 text-green-600">'.htmlspecialchars($workOrder->ok_qtys).'</td>
+                                        <td class="p-2 border border-gray-300 text-red-600">'.htmlspecialchars($workOrder->scrapped_qtys).'</td>
                                     </tr>';
                             }
 
                             $table .= '</tbody></table></div></div>';
+
                             return $table;
                         })->html(),
                 ]),
@@ -191,7 +191,7 @@ class ViewPurchaseorder extends ViewRecord
         \Log::info('Initial Purchase Order Data:', [
             'po_id' => $data['id'],
             'has_boms' => isset($data['boms']),
-            'boms_count' => isset($data['boms']) ? count($data['boms']) : 0
+            'boms_count' => isset($data['boms']) ? count($data['boms']) : 0,
         ]);
 
         $purchaseOrder = PurchaseOrder::with([
@@ -200,7 +200,7 @@ class ViewPurchaseorder extends ViewRecord
             'boms.workOrders.quantities',
             'partNumber',
             'factory',
-            'customer'
+            'customer',
         ])->find($data['id']);
 
         $data['workOrders'] = $purchaseOrder->workOrders->toArray();
@@ -218,14 +218,14 @@ class ViewPurchaseorder extends ViewRecord
             'boms.workOrders.quantities',
             'partNumber',
             'factory',
-            'customer'
+            'customer',
         ])->find($this->record->id);
 
         \Log::info('Purchase Order loaded in afterMount:', [
             'po_id' => $purchaseOrder->id,
             'po_unique_id' => $purchaseOrder->unique_id,
             'work_orders_count' => $purchaseOrder->workOrders->count(),
-            'boms_count' => $purchaseOrder->boms->count()
+            'boms_count' => $purchaseOrder->boms->count(),
         ]);
     }
 }

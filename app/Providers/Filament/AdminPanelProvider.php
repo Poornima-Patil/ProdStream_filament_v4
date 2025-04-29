@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Admin\Pages\WorkOrderWidgets;
 use App\Filament\Pages\Tenancy\EditFactoryProfile;
 use App\Filament\Pages\Tenancy\RegisterFactory;
 use App\Models\Factory;
@@ -11,7 +12,6 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Support\Colors\Color;
 use Filament\Widgets;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -20,12 +20,6 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use function Illuminate\Support\vite;
-use Filament\Support\Facades\FilamentAsset;
-use Filament\Support\Assets\Js;
-use Illuminate\Support\Facades\Vite;
-use Leandrocfe\FilamentApexCharts\FilamentApexChartsPlugin;
-use App\Filament\Admin\Pages\WorkOrderWidgets;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -37,7 +31,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->colors([
-               'primary' => '#106EBE'
+                'primary' => '#106EBE',
             ])
             ->discoverResources(in: app_path('Filament/Admin/Resources'), for: 'App\\Filament\\Admin\\Resources')
             ->discoverPages(in: app_path('Filament/Admin/Pages'), for: 'App\\Filament\\Admin\\Pages')
@@ -45,7 +39,7 @@ class AdminPanelProvider extends PanelProvider
                 Pages\Dashboard::class,
                 WorkOrderWidgets::class, // Add the Work Order Widgets page here
             ])
-            //->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\\Filament\\Admin\\Widgets')
+            // ->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\\Filament\\Admin\\Widgets')
             ->widgets([
                 Widgets\AccountWidget::class,
                 Widgets\FilamentInfoWidget::class,
@@ -69,7 +63,6 @@ class AdminPanelProvider extends PanelProvider
             ->tenant(Factory::class, ownershipRelationship: 'owner')
             ->tenantRegistration(RegisterFactory::class)
             ->tenantProfile(EditFactoryProfile::class);
-            
-    }
 
+    }
 }

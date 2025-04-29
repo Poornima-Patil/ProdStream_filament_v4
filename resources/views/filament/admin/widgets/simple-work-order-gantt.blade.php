@@ -146,7 +146,12 @@
                                                 <div class="absolute h-4 bg-gray-200 rounded top-[60%] mx-2"
                                                      style="width: calc({{ $actualBarWidth }}% - 16px); left: {{ $actualBarLeft }}%; display: flex;">
                                                     {{-- Green Section for OK Quantities --}}
-                                                    <div class="h-full bg-green-500 rounded-l" style="width: {{ $okPercentage }}%;">
+                                                    @php
+                                                        $statusColors = config('work_order_status');
+                                                        $statusKey = strtolower($workOrder['status']);
+                                                        $okColor = $statusColors[$statusKey] ?? '#10B981';
+                                                    @endphp
+                                                    <div class="h-full rounded-l" style="background: {{ $okColor }}; width: {{ $okPercentage }}%;">
                                                         <span class="flex items-center justify-center text-xs text-white font-medium h-full">
                                                             {{ round($okPercentage, 1) }}%
                                                         </span>

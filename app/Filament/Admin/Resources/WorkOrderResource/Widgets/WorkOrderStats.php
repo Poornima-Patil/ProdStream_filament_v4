@@ -1,15 +1,17 @@
 <?php
+
 namespace App\Filament\Admin\Resources\WorkOrderResource\Widgets;
 
+use App\Filament\Admin\Resources\WorkOrderResource\Pages\ListWorkOrders;
 use App\Models\WorkOrder;
+use Filament\Widgets\Concerns\InteractsWithPageTable;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Card;
-use Filament\Widgets\Concerns\InteractsWithPageTable;
-use App\Filament\Admin\Resources\WorkOrderResource\Pages\ListWorkOrders;
 
 class WorkOrderStats extends BaseWidget
 {
     use InteractsWithPageTable;
+
     protected function getCards(): array
     {
         // Get the current factory ID, assuming it's set in the session or context
@@ -30,24 +32,24 @@ class WorkOrderStats extends BaseWidget
 
         // Return the stats cards
         return [
-               
-                Card::make('Total orders', $this->getPageTableQuery()->count())
+
+            Card::make('Total orders', $this->getPageTableQuery()->count())
                 ->description('Total work orders in the system'),
 
-                Card::make('Started WorkOrders', $this->getPageTableQuery()->where('status', 'Start')->count())
+            Card::make('Started WorkOrders', $this->getPageTableQuery()->where('status', 'Start')->count())
                 ->description('Started work orders in the system'),
 
-                Card::make('Hold WorkOrders', $this->getPageTableQuery()->where('status', 'Hold')->count())
+            Card::make('Hold WorkOrders', $this->getPageTableQuery()->where('status', 'Hold')->count())
                 ->description('Hold work orders in the system'),
 
             Card::make('Completed WorkOrders', $this->getPageTableQuery()->where('status', 'Completed')->count())
-            ->description('Completed Work Orders'),
+                ->description('Completed Work Orders'),
 
             Card::make('Closed WorkOrders', $this->getPageTableQuery()->where('status', 'Closed')->count())
-            ->description('Closeed Work Orders'),
+                ->description('Closeed Work Orders'),
 
             Card::make('Assigned WorkOrders', $this->getPageTableQuery()->where('status', 'Assigned')->count())
-            ->description('Work orders that are assigned'),
+                ->description('Work orders that are assigned'),
 
         ];
     }

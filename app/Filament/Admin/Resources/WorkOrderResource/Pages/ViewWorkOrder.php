@@ -3,28 +3,20 @@
 namespace App\Filament\Admin\Resources\WorkOrderResource\Pages;
 
 use App\Filament\Admin\Resources\WorkOrderResource;
-use Filament\Resources\Pages\ViewRecord;
-use Filament\Infolists\Infolist;
-use Illuminate\Support\Facades\Auth;
-use Filament\Infolists\Components\Section;
-use Filament\Infolists\Components\TextEntry;
-use App\Models\CustomerInformation;
-use App\Models\WorkOrder;
-use Filament\Forms;
-use Filament\Forms\Form;
-use Filament\Tables;
-use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderProgress;
 use App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderQtyTrendChart;
-
+use Filament\Infolists\Components\Section;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Infolist;
+use Filament\Resources\Pages\ViewRecord;
+use Filament\Tables\Table;
+use Illuminate\Support\Facades\Auth;
 
 class ViewWorkOrder extends ViewRecord
 {
     protected static string $resource = WorkOrderResource::class;
 
-    public  function infoList(InfoList $infoList): InfoList
+    public function infoList(InfoList $infoList): InfoList
     {
         $user = Auth::user();
         $isAdminOrManager = $user && in_array($user->role, ['manager', 'admin']);
@@ -33,19 +25,19 @@ class ViewWorkOrder extends ViewRecord
             ->schema([
                 // Section 1: BOM, Quantity, Machines, Operator
                 Section::make('General Information')
-                ->collapsible()
-                ->schema([
-                    TextEntry::make('general_information_table')
-                        ->hiddenLabel()
-                        ->getStateUsing(function ($record) {
-                            $bom = $record->bom->unique_id ?? 'N/A';
-                            $qty = $record->qty ?? 'N/A';
-                            $machine = $record->machine
-                                ? $record->machine->assetId . ' - ' . $record->machine->name
-                                : 'No Machine';
-                            $operator = $record->operator->user->first_name ?? 'N/A';
-            
-                            return '
+                    ->collapsible()
+                    ->schema([
+                        TextEntry::make('general_information_table')
+                            ->hiddenLabel()
+                            ->getStateUsing(function ($record) {
+                                $bom = $record->bom->unique_id ?? 'N/A';
+                                $qty = $record->qty ?? 'N/A';
+                                $machine = $record->machine
+                                    ? $record->machine->assetId.' - '.$record->machine->name
+                                    : 'No Machine';
+                                $operator = $record->operator->user->first_name ?? 'N/A';
+
+                                return '
                                 <div class="overflow-x-auto rounded-lg shadow-md">
                                     <table class="w-full text-sm border border-gray-300 text-center">
                                         <thead class="bg-primary-500 text-white">
@@ -58,37 +50,36 @@ class ViewWorkOrder extends ViewRecord
                                         </thead>
                                         <tbody>
                                             <tr class="bg-white hover:bg-gray-50">
-                                                <td class="p-2 border">' . htmlspecialchars($bom) . '</td>
-                                                <td class="p-2 border">' . htmlspecialchars($qty) . '</td>
-                                                <td class="p-2 border">' . htmlspecialchars($machine) . '</td>
-                                                <td class="p-2 border">' . htmlspecialchars($operator) . '</td>
+                                                <td class="p-2 border">'.htmlspecialchars($bom).'</td>
+                                                <td class="p-2 border">'.htmlspecialchars($qty).'</td>
+                                                <td class="p-2 border">'.htmlspecialchars($machine).'</td>
+                                                <td class="p-2 border">'.htmlspecialchars($operator).'</td>
                                             </tr>
                                         </tbody>
                                     </table>
                                 </div>';
-                        })
-                        ->html(),
+                            })
+                            ->html(),
                     ]),
-            
 
                 // Section 2: Remaining fields
                 Section::make('Details')
-                ->collapsible()
-                ->schema([
-                    TextEntry::make('details_table')
-                        ->hiddenLabel()
-                        ->getStateUsing(function ($record) {
-                            $uniqueId = $record->unique_id ?? 'N/A';
-                            $partNumber = $record->bom->purchaseorder->partnumber->partnumber ?? 'N/A';
-                            $revision = $record->bom->purchaseorder->partnumber->revision ?? 'N/A';
-                            $status = $record->status ?? 'N/A';
-                            $startTime = $record->start_time ? \Carbon\Carbon::parse($record->start_time)->format('Y-m-d H:i') : 'N/A';
-                            $endTime = $record->end_time ? \Carbon\Carbon::parse($record->end_time)->format('Y-m-d H:i') : 'N/A';
-                            $okQty = $record->ok_qtys ?? 'N/A';
-                            $scrapQty = $record->scrapped_qtys ?? 'N/A';
-                            $materialBatch = $record->material_batch ?? 'N/A';
-            
-                            return '
+                    ->collapsible()
+                    ->schema([
+                        TextEntry::make('details_table')
+                            ->hiddenLabel()
+                            ->getStateUsing(function ($record) {
+                                $uniqueId = $record->unique_id ?? 'N/A';
+                                $partNumber = $record->bom->purchaseorder->partnumber->partnumber ?? 'N/A';
+                                $revision = $record->bom->purchaseorder->partnumber->revision ?? 'N/A';
+                                $status = $record->status ?? 'N/A';
+                                $startTime = $record->start_time ? \Carbon\Carbon::parse($record->start_time)->format('Y-m-d H:i') : 'N/A';
+                                $endTime = $record->end_time ? \Carbon\Carbon::parse($record->end_time)->format('Y-m-d H:i') : 'N/A';
+                                $okQty = $record->ok_qtys ?? 'N/A';
+                                $scrapQty = $record->scrapped_qtys ?? 'N/A';
+                                $materialBatch = $record->material_batch ?? 'N/A';
+
+                                return '
                                 <div class="overflow-x-auto rounded-lg shadow-md">
                                     <table class="w-full text-sm border border-gray-300 text-center">
                                         <thead class="bg-primary-500 text-white">
@@ -106,24 +97,24 @@ class ViewWorkOrder extends ViewRecord
                                         </thead>
                                         <tbody>
                                             <tr class="bg-white hover:bg-gray-50">
-                                                <td class="p-2 border">' . htmlspecialchars($uniqueId) . '</td>
-                                                <td class="p-2 border">' . htmlspecialchars($partNumber) . '</td>
-                                                <td class="p-2 border">' . htmlspecialchars($revision) . '</td>
-                                                <td class="p-2 border">' . htmlspecialchars($status) . '</td>
-                                                <td class="p-2 border">' . htmlspecialchars($startTime) . '</td>
-                                                <td class="p-2 border">' . htmlspecialchars($endTime) . '</td>
-                                                <td class="p-2 border text-green-600">' . htmlspecialchars($okQty) . '</td>
-                                                <td class="p-2 border text-red-600">' . htmlspecialchars($scrapQty) . '</td>
-                                                <td class="p-2 border">' . htmlspecialchars($materialBatch) . '</td>
+                                                <td class="p-2 border">'.htmlspecialchars($uniqueId).'</td>
+                                                <td class="p-2 border">'.htmlspecialchars($partNumber).'</td>
+                                                <td class="p-2 border">'.htmlspecialchars($revision).'</td>
+                                                <td class="p-2 border">'.htmlspecialchars($status).'</td>
+                                                <td class="p-2 border">'.htmlspecialchars($startTime).'</td>
+                                                <td class="p-2 border">'.htmlspecialchars($endTime).'</td>
+                                                <td class="p-2 border text-green-600">'.htmlspecialchars($okQty).'</td>
+                                                <td class="p-2 border text-red-600">'.htmlspecialchars($scrapQty).'</td>
+                                                <td class="p-2 border">'.htmlspecialchars($materialBatch).'</td>
                                             </tr>
                                         </tbody>
                                     </table>
                                 </div>';
-                        })
-                        ->html(),
+                            })
+                            ->html(),
                     ]),
 
-                    Section::make('Documents')
+                Section::make('Documents')
                     ->collapsible()
                     ->schema([
                         TextEntry::make('documents_table')
@@ -132,24 +123,24 @@ class ViewWorkOrder extends ViewRecord
                                 // Requirement Package links
                                 $requirementLinks = 'No BOM associated';
                                 $flowchartLinks = 'No BOM associated';
-                
+
                                 if ($record->bom) {
                                     $requirementMedia = $record->bom->getMedia('requirement_pkg');
                                     $flowchartMedia = $record->bom->getMedia('process_flowchart');
-                
+
                                     $requirementLinks = $requirementMedia->isEmpty()
                                         ? 'No files uploaded'
                                         : $requirementMedia->map(function ($media) {
                                             return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>";
                                         })->implode('<br>');
-                
+
                                     $flowchartLinks = $flowchartMedia->isEmpty()
                                         ? 'No files uploaded'
                                         : $flowchartMedia->map(function ($media) {
                                             return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>";
                                         })->implode('<br>');
                                 }
-                
+
                                 return '
                                     <div class="overflow-x-auto rounded-lg shadow-md">
                                         <table class="w-full text-sm border border-gray-300 text-left">
@@ -161,15 +152,15 @@ class ViewWorkOrder extends ViewRecord
                                             </thead>
                                             <tbody>
                                                 <tr class="bg-white hover:bg-gray-50 align-top">
-                                                    <td class="p-2 border border-gray-300">' . $requirementLinks . '</td>
-                                                    <td class="p-2 border border-gray-300">' . $flowchartLinks . '</td>
+                                                    <td class="p-2 border border-gray-300">'.$requirementLinks.'</td>
+                                                    <td class="p-2 border border-gray-300">'.$flowchartLinks.'</td>
                                                 </tr>
                                             </tbody>
                                         </table>
                                     </div>';
                             })
                             ->html(),
-                        ]),
+                    ]),
 
                 Section::make('Work Order Logs')
                     ->collapsible()
@@ -210,11 +201,11 @@ class ViewWorkOrder extends ViewRecord
                                             $quantity = $quantities[$quantitiesIndex];
                                             $okQty = $quantity->ok_quantity;
                                             $scrappedQty = $quantity->scrapped_quantity;
-                                            
+
                                             // Calculate cumulative quantities up to this cycle
                                             $cumulativeOkQty = 0;
                                             $cumulativeScrappedQty = 0;
-                                            
+
                                             // Sum up quantities from previous cycles
                                             for ($i = 0; $i <= $quantitiesIndex; $i++) {
                                                 if (isset($quantities[$i])) {
@@ -222,10 +213,10 @@ class ViewWorkOrder extends ViewRecord
                                                     $cumulativeScrappedQty += $quantities[$i]->scrapped_quantity;
                                                 }
                                             }
-                                            
+
                                             // Calculate remaining quantity based on cumulative quantities
                                             $remainingQty = $record->qty - ($cumulativeOkQty + $cumulativeScrappedQty);
-                                            
+
                                             // Add detailed logging
                                             \Log::info('Work Order Quantity Calculation', [
                                                 'work_order_id' => $record->id,
@@ -237,9 +228,9 @@ class ViewWorkOrder extends ViewRecord
                                                 'cumulative_scrapped_qty' => $cumulativeScrappedQty,
                                                 'calculated_remaining_qty' => $remainingQty,
                                                 'timestamp' => $timestamp,
-                                                'status' => $status
+                                                'status' => $status,
                                             ]);
-                                            
+
                                             if ($quantity->scrapped_quantity > 0) {
                                                 $scrappedReason = $quantity->reason->description;
                                             }
@@ -322,13 +313,12 @@ class ViewWorkOrder extends ViewRecord
             ]);
 
     }
+
     public function getHeaderWidgets(): array
-{
-    return [
-        WorkOrderProgress::class,
-        WorkOrderQtyTrendChart::make(['workOrder' => $this->record]),
+    {
+        return [
+            WorkOrderProgress::class,
+            WorkOrderQtyTrendChart::make(['workOrder' => $this->record]),
         ];
+    }
 }
-
-
-} 

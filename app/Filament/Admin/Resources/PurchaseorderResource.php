@@ -115,8 +115,8 @@ class PurchaseorderResource extends Resource
 
                         // Return the progress bar as an HTML string
                         return '
-                            <div class="h-4 rounded-full text-xs text-center leading-4" style="background-color: #10B981; width: ' . $progressPercent . '%;">
-                                ' . $progressPercent . '%
+                            <div class="h-4 rounded-full text-xs text-center leading-4" style="background-color: #10B981; width: '.$progressPercent.'%;">
+                                '.$progressPercent.'%
                             </div>
                         ';
                     })
@@ -130,7 +130,7 @@ class PurchaseorderResource extends Resource
                     ->label('Edit Sales Order Line'),
                 Tables\Actions\ViewAction::make()
                     ->hiddenLabel(),
-            ])  
+            ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),

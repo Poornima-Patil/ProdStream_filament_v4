@@ -2,8 +2,8 @@
 
 namespace App\Filament\Admin\Pages;
 
-use Filament\Pages\Page;
 use App\Filament\Admin\Widgets\AdvancedWorkOrderGantt;
+use Filament\Pages\Page;
 
 class WorkOrderWidgets extends Page
 {

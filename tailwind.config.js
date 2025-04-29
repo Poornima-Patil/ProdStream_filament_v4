@@ -29,6 +29,13 @@ export default {
                     800: '#072c4c',
                     900: '#041626',
                 },
+                wo: {
+                    assigned: '#3B82F6',
+                    start: '#f5c50b',
+                    hold: '#F97316',
+                    completed: '#10B981',
+                    closed: '#6B7280',
+                }
             },
             fontFamily: {
                 sans: ['Inter var', 'Inter', ...defaultTheme.fontFamily.sans],

@@ -3,7 +3,6 @@
 namespace App\Filament\Admin\Resources;
 
 use App\Filament\Admin\Resources\WorkOrderResource\Pages;
-use App\Filament\Admin\Widgets\SimpleWorkOrderGantt;
 use App\Models\InfoMessage;
 use App\Models\Machine;
 use App\Models\Operator;
@@ -11,9 +10,6 @@ use App\Models\User;
 use App\Models\WorkOrder;
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Infolists\Components\Section;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -21,13 +17,11 @@ use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\EditAction;
 use Filament\Tables\Actions\ViewAction;
-use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
-use Filament\Tables\Enums\ActionsPosition;
-
 
 class WorkOrderResource extends Resource
 {
@@ -478,7 +472,7 @@ class WorkOrderResource extends Resource
                     ->label('Unique ID')
                     ->searchable()
                     ->sortable()
-                 ->toggleable(),
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.description')
                     ->label('BOM')
                     ->hidden(! $isAdminOrManager)
@@ -563,7 +557,7 @@ class WorkOrderResource extends Resource
             })
             ->filters([
                 Tables\Filters\TrashedFilter::make(),
-                
+
             ])
             ->actions([
                 ActionGroup::make([
@@ -575,18 +569,18 @@ class WorkOrderResource extends Resource
                     Action::make('Alert Manager')
                         ->visible(fn () => Auth::check() && Auth::user()->hasRole('Operator'))
                         ->form([
-                                    Forms\Components\Textarea::make('comments')
-                                        ->label('Comments')
-                                        ->required(),
-                                    Forms\Components\Select::make('priority')
-                                        ->label('Priority')
-                                        ->options([
-                                            'High' => 'High',
-                                            'Medium' => 'Medium',
-                                            'Low' => 'Low',
-                                        ])
-                                        ->required(),
+                            Forms\Components\Textarea::make('comments')
+                                ->label('Comments')
+                                ->required(),
+                            Forms\Components\Select::make('priority')
+                                ->label('Priority')
+                                ->options([
+                                    'High' => 'High',
+                                    'Medium' => 'Medium',
+                                    'Low' => 'Low',
                                 ])
+                                ->required(),
+                        ])
                         ->modalHeading('Send Alert to Manager') // Title of the modal
                         ->action(function (array $data, $record) {
                             self::sendAlert($data, $record);
@@ -613,8 +607,8 @@ class WorkOrderResource extends Resource
                             self::sendAlert($data, $record);
                         })
                         ->button(),
-                    ])
-                    ],position: ActionsPosition::BeforeColumns)
+                ]),
+            ], position: ActionsPosition::BeforeColumns)
             ->headerActions([])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -651,8 +645,6 @@ class WorkOrderResource extends Resource
         ];
     }
 
- 
-
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery()
@@ -685,7 +677,6 @@ class WorkOrderResource extends Resource
 
         return sprintf('%02d:%02d:%02d', $hours, $minutes, $remainingSeconds);
     }
-
 
     public static function getWidgets(): array
     {

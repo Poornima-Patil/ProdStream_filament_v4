@@ -40,8 +40,9 @@ class WorkOrder extends Model
         \Log::info('Accessing BOM for Work Order:', [
             'work_order_id' => $this->id,
             'work_order_unique_id' => $this->unique_id,
-            'bom_id' => $this->bom_id
+            'bom_id' => $this->bom_id,
         ]);
+
         return $this->belongsTo(Bom::class, 'bom_id');
     }
 
@@ -162,18 +163,16 @@ class WorkOrder extends Model
     }
 
     public function scopeFiltered($query, $filters)
-{
-    if (!empty($filters['status'])) {
-        $query->where('status', $filters['status']);
+    {
+        if (! empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        // You can add more filters here based on your table setup
+        // if (!empty($filters['operator_id'])) {
+        //     $query->where('operator_id', $filters['operator_id']);
+        // }
+
+        return $query;
     }
-
-    // You can add more filters here based on your table setup
-    // if (!empty($filters['operator_id'])) {
-    //     $query->where('operator_id', $filters['operator_id']);
-    // }
-
-    return $query;
-}
-
-
 }
