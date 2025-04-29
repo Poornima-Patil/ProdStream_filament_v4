@@ -93,18 +93,18 @@ class ListWorkOrders extends ListRecords
     {
         $tabs = [
             'all' => Tab::make('All Work Orders')
-                ->badge(fn () => $this->getFilteredTableQuery()->count())
+                ->badge(fn () => \App\Models\WorkOrder::where('factory_id', auth()->user()->factory_id)->count())
                 ->modifyQueryUsing(fn (Builder $query) => $query),
         ];
 
-        // Get unique statuses from the filtered table query inside the badge closure
+        // Get unique statuses for the current factory
         $statuses = \App\Models\WorkOrder::where('factory_id', auth()->user()->factory_id)
             ->pluck('status')
             ->unique();
 
         foreach ($statuses as $status) {
             $tabs[str($status)->slug()->toString()] = Tab::make($status)
-                ->badge(fn () => $this->getFilteredTableQuery()->clone()->where('status', $status)->count())
+                ->badge(fn () => \App\Models\WorkOrder::where('factory_id', auth()->user()->factory_id)->where('status', $status)->count())
                 ->modifyQueryUsing(fn (Builder $query) => $query->where('status', $status));
         }
 
