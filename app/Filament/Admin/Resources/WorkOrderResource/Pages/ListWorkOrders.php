@@ -123,7 +123,11 @@ class ListWorkOrders extends ListRecords
                     ->relationship('operator.user', 'first_name', function ($query) {
                         $query->whereHas('roles', function ($roleQuery) {
                             $roleQuery->where('name', 'operator');
-                        });
+                        })
+                        ->where('factory_id', auth()->user()->factory_id);
+                    })
+                    ->query(function ($query) {
+                        $query->where('factory_id', auth()->user()->factory_id);
                     })
                     ->searchable()
                     ->preload()
@@ -132,7 +136,12 @@ class ListWorkOrders extends ListRecords
                 // Machine Filter
                 SelectFilter::make('machine_id')
                     ->label('Machine')
-                    ->relationship('machine', 'assetId')
+                    ->relationship('machine', 'assetId', function ($query) {
+                        $query->where('factory_id', auth()->user()->factory_id);
+                    })
+                    ->query(function ($query) {
+                        $query->where('factory_id', auth()->user()->factory_id);
+                    })
                     ->searchable()
                     ->preload()
                     ->multiple(),
@@ -141,7 +150,8 @@ class ListWorkOrders extends ListRecords
                 SelectFilter::make('partnumber_revision')
                     ->label('Part Number Revision')
                     ->options(function () {
-                        return PartNumber::pluck(DB::raw("CONCAT(partnumber, ' - ', revision)"), 'id')
+                        return PartNumber::where('factory_id', auth()->user()->factory_id)
+                            ->pluck(DB::raw("CONCAT(partnumber, ' - ', revision)"), 'id')
                             ->mapWithKeys(function ($item, $key) {
                                 return [$key => $item];
                             })
@@ -171,8 +181,9 @@ class ListWorkOrders extends ListRecords
                 // Unique ID Filter
                 Filter::make('unique_id')
                     ->label('Unique ID')
-                    ->query(fn (Builder $query, $data) => $query->where('factory_id', auth()->user()->factory_id)
-                        ->where('unique_id', 'like', '%'.(is_array($data) ? implode(',', $data) : $data).'%')
+                    ->query(fn (Builder $query, $data) =>
+                        $query->where('factory_id', auth()->user()->factory_id)
+                            ->where('unique_id', 'like', '%'.(is_array($data) ? implode(',', $data) : $data).'%')
                     )
                     ->form([
                         TextInput::make('unique_id')->label('Unique ID'),
@@ -200,7 +211,6 @@ class ListWorkOrders extends ListRecords
                         if ($from && $to) {
                             $query->whereBetween('created_at', [$from, $to]);
                         }
-
                         return $query;
                     })
                     ->indicateUsing(function (array $data): ?string {
@@ -209,7 +219,6 @@ class ListWorkOrders extends ListRecords
                         }
                         $from = Carbon::parse($data['from'])->format('d-m-Y');
                         $to = Carbon::parse($data['to'])->format('d-m-Y');
-
                         return "Created between {$from} and {$to}";
                     }),
             ]);
