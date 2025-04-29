@@ -126,24 +126,28 @@ class WorkOrder extends Model
         });
 
         static::updated(function ($workOrder) {
+            // Only create a log if the status changed AND quantities are up-to-date
             if ($workOrder->isDirty('status')) {
-                $workOrder->createWorkOrderLog($workOrder->status);
+                // Only create a log if this is not a "Start" status, or if there are quantities
+                if (
+                    $workOrder->status !== 'Start' ||
+                    $workOrder->quantities()->exists()
+                ) {
+                    $workOrder->createWorkOrderLog($workOrder->status);
+                }
             }
         });
 
-        // Add observer for WorkOrderQuantity
+        // Remove or comment out this block to avoid duplicate log creation:
+        /*
         static::created(function ($workOrder) {
-            // Get the latest work order log
             $latestLog = $workOrder->workOrderLogs()->latest()->first();
-
             if (! $latestLog) {
-                // If no log exists, create one
                 $latestLog = $workOrder->createWorkOrderLog($workOrder->status);
             }
-
-            // Update any existing quantities with the work_order_log_id
             $workOrder->quantities()->update(['work_order_log_id' => $latestLog->id]);
         });
+        */
     }
 
     // Define the relationship with InfoMessage
