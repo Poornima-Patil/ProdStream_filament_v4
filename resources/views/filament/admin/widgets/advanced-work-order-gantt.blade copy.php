@@ -201,7 +201,7 @@ $tableWidth = $workOrderColumnWidth + (count($columns) * $colWidth);
                                     {{-- Actual Bar --}}
                                     @if ($workOrder->status === 'Start')
                                         <div class="absolute top-[60%] mx-2" style="left: {{ $actualBarLeft }}%;">
-                                            <span class="flex items-center justify-center text-xs font-medium">
+                                            <span class="flex items-center justify-center text-xs font-medium"  style="color: {{ config('work_order_status.start') }}">
                                                 <i class="fas fa-flag fa-xl"></i>
                                             </span>
                                         </div>

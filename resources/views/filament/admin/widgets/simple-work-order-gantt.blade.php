@@ -136,8 +136,8 @@
                                             @if ($workOrder['status'] === 'Start')
                                                 {{-- Flag for Actual Start Date --}}
                                                 <div class="absolute top-[60%] mx-2" style="left: {{ $actualBarLeft }}%;">
-                                                    <span class="flex items-center justify-center text-xs  font-medium">
-                                                      
+                                                    <span class="flex items-center justify-center text-xs  font-medium"  style="color: {{ config('work_order_status.start') }}">
+                
                                                         <i class="fas fa-flag fa-xl"></i> {{-- Font Awesome flag icon --}}
                                                     </span>
                                                 </div>
