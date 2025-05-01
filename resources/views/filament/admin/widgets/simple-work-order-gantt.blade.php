@@ -9,12 +9,12 @@
         $defaultEndDate = now()->endOfWeek(); // End of the current week
 
         // Calculate start and end dates based on $workOrders
-        $startDate = collect($workOrders->items())->min('start_date') 
-            ? Carbon::parse(collect($workOrders->items())->min('start_date'))->startOfWeek()
+        $startDate = collect($workOrders)->min('start_date') 
+            ? Carbon::parse(collect($workOrders)->min('start_date'))->startOfWeek()
             : $defaultStartDate;
 
-        $endDate = collect($workOrders->items())->max('end_date') 
-            ? Carbon::parse(collect($workOrders->items())->max('end_date'))->endOfWeek()
+        $endDate = collect($workOrders)->max('end_date') 
+            ? Carbon::parse(collect($workOrders)->max('end_date'))->endOfWeek()
             : $defaultEndDate;
 
         // Ensure the timeline includes today
@@ -171,9 +171,7 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="mt-4">
-                    {{ $workOrders->links() }}
-                </div>
+    
             </div>
         </div>
     </div>
