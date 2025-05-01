@@ -120,14 +120,15 @@ class ListWorkOrders extends ListRecords
                 // Operator Filter
                 SelectFilter::make('operator_id')
                     ->label('Operator')
-                    ->relationship('operator.user', 'first_name', function ($query) {
-                        $query->whereHas('roles', function ($roleQuery) {
-                            $roleQuery->where('name', 'operator');
-                        })
-                        ->where('factory_id', auth()->user()->factory_id);
-                    })
-                    ->query(function ($query) {
-                        $query->where('factory_id', auth()->user()->factory_id);
+                    ->options(function () {
+                        // Get all operators for this factory, eager load user
+                        return \App\Models\Operator::with('user')
+                            ->where('factory_id', auth()->user()->factory_id)
+                            ->get()
+                            ->mapWithKeys(function ($operator) {
+                                return [$operator->id => $operator->user?->first_name . ' ' . $operator->user?->last_name];
+                            })
+                            ->toArray();
                     })
                     ->searchable()
                     ->preload()
@@ -137,9 +138,6 @@ class ListWorkOrders extends ListRecords
                 SelectFilter::make('machine_id')
                     ->label('Machine')
                     ->relationship('machine', 'assetId', function ($query) {
-                        $query->where('factory_id', auth()->user()->factory_id);
-                    })
-                    ->query(function ($query) {
                         $query->where('factory_id', auth()->user()->factory_id);
                     })
                     ->searchable()
