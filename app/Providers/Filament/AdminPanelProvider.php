@@ -60,6 +60,7 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
+            ->viteTheme('resources/css/filament/admin/theme.css')
             ->tenant(Factory::class, ownershipRelationship: 'owner')
             ->tenantRegistration(RegisterFactory::class)
             ->tenantProfile(EditFactoryProfile::class);
