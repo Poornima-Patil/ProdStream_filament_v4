@@ -226,8 +226,13 @@ class ListWorkOrders extends ListRecords
     {
         return [
             WorkOrderPieChart::class,
-            \App\Filament\Admin\Resources\WorkOrderResource\Widgets\SimpleWorkOrderGantt::class,
+        ];
+    }
 
+    protected function getFooterWidgets(): array
+    {
+        return [
+            \App\Filament\Admin\Resources\WorkOrderResource\Widgets\SimpleWorkOrderGantt::class,
         ];
     }
 
