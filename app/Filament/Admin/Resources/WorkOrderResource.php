@@ -294,6 +294,13 @@ class WorkOrderResource extends Resource
                                 $record->save();
                             }
                         }
+                        if ($status === 'Start' && $record) {
+                            $existingLog = $record->workOrderLogs()->where('status', 'Start')->first();
+                            if (!$existingLog) {
+                                $record->createWorkOrderLog('Start');
+                            }
+                        }
+                        
                     }),
 
                 Forms\Components\TextInput::make('material_batch')

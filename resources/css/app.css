@@ -36,22 +36,3 @@
     padding: 1rem;
     border: 1px solid black;
 }
-
-/* Reduce table row height for all Filament tables */
-.filament-tables-table tr td,
-.filament-tables-table tr th {
-    padding-top: 0.25rem !important;
-    /* py-1 */
-    padding-bottom: 0.25rem !important;
-    /* py-1 */
-}
-
-/* Even more specific selector */
-.filament-tables-table tbody tr td,
-.filament-tables-table tbody tr th {
-    padding-top: 0.125rem !important;
-    /* py-0.5 */
-    padding-bottom: 0.125rem !important;
-    line-height: 1 !important;
-    min-height: 0 !important;
-}
