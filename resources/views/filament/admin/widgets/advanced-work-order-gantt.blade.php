@@ -426,6 +426,9 @@
                                                     $barGap = 4;
                                                     $barTop = 18;
                                                     $spanDays = max(1, $bar['spanDays']);
+                                                    $actualStatusKey = $actualEndLog ? strtolower($actualEndLog->status) : strtolower($wo->status);
+
+                                                    $actualColor = $statusColors[$actualStatusKey] ?? '#10B981';
                                                     $firstStartLog = $wo->workOrderLogs->where('status', 'Start')->sortBy('changed_at')->first();
                                                     $firstStartDate = $firstStartLog ? \Carbon\Carbon::parse($firstStartLog->changed_at)->toDateString() : null;
                                                     $isFirstStartDay = $firstStartDate && $firstStartDate === $day->toDateString();
@@ -442,9 +445,10 @@
                                                     </a>
                                                 @elseif($bar['type'] === 'actual')
                                                     <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo->id) }}"
-                                                       class="absolute bg-green-500 rounded flex items-center shadow hover:bg-green-700 transition group"
-                                                       style="top: {{ $barTop + $stackIdx * 2 * ($barHeight + $barGap) + $barHeight + $barGap }}px; left: 0; height: {{ $barHeight }}px; width: calc({{ $spanDays }} * 100% + ({{ $spanDays-1 }} * 2px)); min-width: 8px; z-index: 20; text-decoration: none;"
+                                                       class="absolute  rounded flex items-center shadow hover:bg-green-700 transition group"
+                                                       style="top: {{ $barTop + $stackIdx * 2 * ($barHeight + $barGap) + $barHeight + $barGap }}px; left: 0; height: {{ $barHeight }}px; width: calc({{ $spanDays }} * 100% + ({{ $spanDays-1 }} * 2px)); min-width: 8px; z-index: 20; text-decoration: none; background: {{ $actualColor }};"
                                                        title="{{ $wo->unique_id }}">
+
                                                         <span class="text-xs text-white font-semibold px-2 truncate w-full" style="line-height: {{ $barHeight }}px;">
                                                             @if($isFirstStartDay)
                                                                 <svg class="inline mr-1" width="16" height="16" viewBox="0 0 20 20" fill="#065f46" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle;">
