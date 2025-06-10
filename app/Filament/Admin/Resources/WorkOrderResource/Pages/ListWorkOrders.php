@@ -93,7 +93,7 @@ class ListWorkOrders extends ListRecords
     {
         $tabs = [
             'all' => Tab::make('All Work Orders')
-                ->badge(fn () => \App\Models\WorkOrder::where('factory_id', auth()->user()->factory_id)->count())
+               // ->badge(fn () => \App\Models\WorkOrder::where('factory_id', auth()->user()->factory_id)->count())
                 ->modifyQueryUsing(fn (Builder $query) => $query),
         ];
 
@@ -102,10 +102,10 @@ class ListWorkOrders extends ListRecords
             ->pluck('status')
             ->unique();
 
-        foreach ($statuses as $status) {
+    foreach ($statuses as $status) {
             $tabs[str($status)->slug()->toString()] = Tab::make($status)
-                ->badge(fn () => \App\Models\WorkOrder::where('factory_id', auth()->user()->factory_id)->where('status', $status)->count())
-                ->modifyQueryUsing(fn (Builder $query) => $query->where('status', $status));
+            //    ->badge(fn () => \App\Models\WorkOrder::where('factory_id', auth()->user()->factory_id)->where('status', $status)->count())
+              ->modifyQueryUsing(fn (Builder $query) => $query->where('status', $status));
         }
 
         return $tabs;
