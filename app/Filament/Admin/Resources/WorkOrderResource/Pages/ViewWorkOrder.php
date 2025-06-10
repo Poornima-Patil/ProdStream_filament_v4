@@ -110,9 +110,9 @@ class ViewWorkOrder extends ViewRecord
                                                 <td class="p-2 border">'.htmlspecialchars($partNumber).'</td>
                                                 <td class="p-2 border">'.htmlspecialchars($revision).'</td>
                                                 <td class="p-2 border">'.htmlspecialchars($status).'</td>
-                                                <td class="p-2 border">'.htmlspecialchars($startTime).'</td>
                     <td class="p-2 border">'.htmlspecialchars($startTime).'</td>
-                    '.$endTimeCell.'                                                <td class="p-2 border text-green-600">'.htmlspecialchars($okQty).'</td>
+                            '.$endTimeCell.'                                                
+                    <td class="p-2 border text-green-600">'.htmlspecialchars($okQty).'</td>
                                                 <td class="p-2 border text-red-600">'.htmlspecialchars($scrapQty).'</td>
                                                 <td class="p-2 border">'.htmlspecialchars($materialBatch).'</td>
                                             </tr>
