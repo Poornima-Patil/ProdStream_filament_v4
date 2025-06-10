@@ -234,10 +234,10 @@
                                             $expandCollapseButtonHeight = 32;
                                             $stackCount = count($cellBars);
 
-                                            $collapsedHeight = max(
-                                                $cellPadding + $maxVisibleBars * 2 * ($barHeight + $barGap) + $expandCollapseButtonHeight,
-                                                64 + $expandCollapseButtonHeight
-                                            );
+$collapsedHeight = $cellPadding + (count($visibleBars) * $barHeight) + ((count($visibleBars) > 0 ? (count($visibleBars) - 1) : 0) * $barGap) + 5;
+if(count($hiddenBars) > 0) {
+    $collapsedHeight += $expandCollapseButtonHeight;
+}
                                             $expandedHeight = max(
                                                 $cellPadding + $stackCount * 2 * ($barHeight + $barGap) + $expandCollapseButtonHeight,
                                                 64 + $expandCollapseButtonHeight
@@ -478,10 +478,10 @@
                                                 $visibleBars = array_slice($cellBars, 0, $maxVisibleBars);
                                                 $hiddenBars = array_slice($cellBars, $maxVisibleBars);
                                                 $stackCount = count($cellBars);
-                                                $collapsedHeight = max(
-                                                    $cellPadding + $maxVisibleBars * 2 * ($barHeight + $barGap) + $expandCollapseButtonHeight,
-                                                    36 + $expandCollapseButtonHeight
-                                                );
+$collapsedHeight = $cellPadding + (count($visibleBars) * $barHeight) + ((count($visibleBars) > 0 ? (count($visibleBars) - 1) : 0) * $barGap) + 5;
+if(count($hiddenBars) > 0) {
+    $collapsedHeight += $expandCollapseButtonHeight;
+}
                                                 $expandedHeight = max(
                                                     $cellPadding + $stackCount * 2 * ($barHeight + $barGap) + $expandCollapseButtonHeight,
                                                     36 + $expandCollapseButtonHeight
