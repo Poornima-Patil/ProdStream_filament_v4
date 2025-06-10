@@ -234,7 +234,7 @@
                                             $expandCollapseButtonHeight = 32;
                                             $stackCount = count($cellBars);
 
-$collapsedHeight = $cellPadding + (count($visibleBars) * $barHeight) + ((count($visibleBars) > 0 ? (count($visibleBars) - 1) : 0) * $barGap) + 5;
+$collapsedHeight = $cellPadding + (count($visibleBars) * $barHeight) + ((count($visibleBars) > 0 ? (count($visibleBars) - 1) : 0) * $barGap);
 if(count($hiddenBars) > 0) {
     $collapsedHeight += $expandCollapseButtonHeight;
 }
@@ -478,7 +478,7 @@ if(count($hiddenBars) > 0) {
                                                 $visibleBars = array_slice($cellBars, 0, $maxVisibleBars);
                                                 $hiddenBars = array_slice($cellBars, $maxVisibleBars);
                                                 $stackCount = count($cellBars);
-$collapsedHeight = $cellPadding + (count($visibleBars) * $barHeight) + ((count($visibleBars) > 0 ? (count($visibleBars) - 1) : 0) * $barGap) + 5;
+$collapsedHeight = $cellPadding + (count($visibleBars) * $barHeight) + ((count($visibleBars) > 0 ? (count($visibleBars) - 1) : 0) * $barGap);
 if(count($hiddenBars) > 0) {
     $collapsedHeight += $expandCollapseButtonHeight;
 }
