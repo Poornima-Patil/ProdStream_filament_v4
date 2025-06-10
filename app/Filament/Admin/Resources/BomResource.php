@@ -22,6 +22,8 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use App\Enums\BomStatus;
+
 
 class BomResource extends Resource
 {
@@ -127,17 +129,19 @@ Forms\Components\DatePicker::make('lead_time')
         }
     })
     ->reactive(),
-                Forms\Components\Select::make('status')->options([
-                    '1' => 'Active',
-                    '0' => 'InActive',
-                    '2' => 'Complete',
-                ])->required()
-                    ->reactive()
-                    ->afterStateUpdated(function (callable $get, $record) {
-                        if ($get('status') === '2') {
-                            self::close_WO($record);
-                        }
-                    }),
+                Forms\Components\Select::make('status')
+    ->options(
+        collect(BomStatus::cases())
+            ->mapWithKeys(fn($case) => [$case->value => $case->label()])
+            ->toArray()
+    )
+    ->required()
+    ->reactive()
+    ->afterStateUpdated(function (callable $get, $record) {
+        if ($get('status') === BomStatus::Complete->value) {
+            self::close_WO($record);
+        }
+    }),
             ]);
     }
 

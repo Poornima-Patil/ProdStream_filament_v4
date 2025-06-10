@@ -9,6 +9,8 @@ use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
+use App\Enums\BomStatus;
+
 
 class ViewPurchaseorder extends ViewRecord
 {
@@ -50,6 +52,8 @@ class ViewPurchaseorder extends ViewRecord
                                                 <th class="p-2 border border-gray-300">SO Number</th>
                                                 <th class="p-2 border border-gray-300">Customer</th>
                                                 <th class="p-2 border border-gray-300">Part Number</th>
+                                                <th class="p-2 border border-gray-300">Target Completion Date</th>
+
                                                 <th class="p-2 border border-gray-300">Requested Quantity</th>
                                                 <th class="p-2 border border-gray-300">Completed Quantity</th>
                                                 <th class="p-2 border border-gray-300">Scrapped Quantity</th>
@@ -62,7 +66,9 @@ class ViewPurchaseorder extends ViewRecord
                                                 <td class="p-2 border border-gray-300">'.htmlspecialchars($record->unique_id).'</td>
                                                 <td class="p-2 border border-gray-300">'.htmlspecialchars($record->customer->name ?? '-').'</td>
                                                 <td class="p-2 border border-gray-300">'.htmlspecialchars($record->partNumber->partnumber ?? '-').'</td>
-                                                <td class="p-2 border border-gray-300">'.htmlspecialchars($requestedQty).'</td>
+<td class="p-2 border border-gray-300">
+    '.htmlspecialchars($record->delivery_target_date ? \Carbon\Carbon::parse($record->delivery_target_date)->format('Y-m-d') : '-').'
+</td>                                                <td class="p-2 border border-gray-300">'.htmlspecialchars($requestedQty).'</td>
                                                 <td class="p-2 border border-gray-300">'.htmlspecialchars($completedQty).'</td>
                                                 <td class="p-2 border border-gray-300">'.htmlspecialchars($scrappedQty).'</td>
                                                 <td class="p-2 border border-gray-300">
@@ -110,11 +116,13 @@ class ViewPurchaseorder extends ViewRecord
                                     default => 'text-gray-600',
                                 };
 
+                                $statusLabel = BomStatus::tryFrom($bom->status)?->label() ?? $bom->status;
+
                                 $table .= '
                                     <tr class="bg-white hover:bg-gray-50">
                                         <td class="p-2 border border-gray-300">'.htmlspecialchars($bom->unique_id).'</td>
-                                        <td class="p-2 border border-gray-300">'.htmlspecialchars($bom->description).'</td>
-                                        <td class="p-2 border border-gray-300 '.$statusClass.'">'.htmlspecialchars($bom->status).'</td>
+                                        <td class="p-2 border border-gray-300">'.htmlspecialchars($record->partnumber->description).'</td>
+                                        <td class="p-2 border border-gray-300 '.$statusClass.'">'.htmlspecialchars($statusLabel).'</td>
                                     </tr>';
                             }
 
