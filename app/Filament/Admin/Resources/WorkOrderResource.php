@@ -261,7 +261,7 @@ class WorkOrderResource extends Resource
         }
         return null;
     })
-    ->reactive()    ,
+    ->reactive(),
                 Forms\Components\Select::make('status')
                     ->label('Status')
                     ->required()

@@ -114,8 +114,19 @@ class BomResource extends Resource
                             ->pluck('proficiency', 'id');
                     }),
 
-                Forms\Components\DatePicker::make('lead_time')
-                    ->label('Target Completion Time'),
+Forms\Components\DatePicker::make('lead_time')
+    ->label('Target Completion Time')
+    ->helperText(function (callable $get) {
+        $purchaseOrderId = $get('purchase_order_id');
+        if (!$purchaseOrderId) {
+            return 'Select a Sales Order line to view PO Delivery Date.';
+        }
+        $po = \App\Models\PurchaseOrder::find($purchaseOrderId);
+        if ($po && $po->delivery_target_date) {
+            return 'PO Delivery Date: ' . \Carbon\Carbon::parse($po->delivery_target_date)->format('d M Y');
+        }
+    })
+    ->reactive(),
                 Forms\Components\Select::make('status')->options([
                     '1' => 'Active',
                     '0' => 'InActive',
@@ -175,11 +186,39 @@ class BomResource extends Resource
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('lead_time')
-                    ->label('Target Completion Time')
-                    ->formatStateUsing(function ($state) {
-                        return \Carbon\Carbon::parse($state)->format('d M Y');
-                    })
-                    ->toggleable(),
+    ->label('Target Completion Time')
+    ->formatStateUsing(function ($state) {
+        return $state ? \Carbon\Carbon::parse($state)->format('d M Y') : '-';
+    })  ->extraAttributes(function ($record) {
+        // Check if BOM and PurchaseOrder exist and have the relevant dates
+        if (
+            $record &&
+            $record->lead_time &&
+            $record->purchaseOrder &&
+            $record->purchaseOrder->delivery_target_date
+        ) {
+            $leadTime = \Carbon\Carbon::parse($record->lead_time);
+            $deliveryTarget = \Carbon\Carbon::parse($record->purchaseOrder->delivery_target_date)->endOfDay();
+            if ($leadTime->greaterThan($deliveryTarget)) {
+                return [
+                    'style' => 'background-color: #FCA5A5; cursor: pointer;',
+                ];
+            }
+        }
+        return [];
+    })
+    ->tooltip(function ($record) {
+        if (
+            $record &&
+            $record->purchaseOrder &&
+            $record->purchaseOrder->delivery_target_date
+        ) {
+            return 'Sales Order Line Target Completion Date: ' .
+                \Carbon\Carbon::parse($record->purchaseOrder->delivery_target_date)->format('d M Y');
+        }
+        return null;
+    }),
+
 
                 Tables\Columns\TextColumn::make('status')
                     ->label('Status')
@@ -251,8 +290,35 @@ class BomResource extends Resource
                     ->schema([
                         TextEntry::make('operatorproficiency.proficiency')
                             ->label('Proficiency'),
-                        TextEntry::make('lead_time')->label('Target Completion time'),
-                        IconEntry::make('status')->label('Status'),
+TextEntry::make('lead_time')
+    ->label('Target Completion time')
+    ->formatStateUsing(fn ($state) => $state ? \Carbon\Carbon::parse($state)->format('d M Y') : '-')
+    ->extraAttributes(function ($record) {
+        if (
+            $record->lead_time &&
+            $record->purchaseOrder &&
+            $record->purchaseOrder->delivery_target_date
+        ) {
+            $leadTime = \Carbon\Carbon::parse($record->lead_time);
+            $deliveryTarget = \Carbon\Carbon::parse($record->purchaseOrder->delivery_target_date)->endOfDay();
+            if ($leadTime->greaterThan($deliveryTarget)) {
+                return [
+                    'style' => 'background-color: #FCA5A5; cursor: pointer;',
+                ];
+            }
+        }
+        return [];
+    })
+    ->tooltip(function ($record) {
+        if (
+            $record->purchaseOrder &&
+            $record->purchaseOrder->delivery_target_date
+        ) {
+            return 'Sales Order Line Target Completion Date: ' .
+                \Carbon\Carbon::parse($record->purchaseOrder->delivery_target_date)->format('d M Y');
+        }
+        return null;
+    }),                        IconEntry::make('status')->label('Status'),
 
                     ])->columns(),
                 Section::make('Documents')
