@@ -79,6 +79,8 @@ class ViewWorkOrder extends ViewRecord
                                  if ($record->bom && $record->bom->lead_time && $endTimeRaw) {
         $plannedEnd = \Carbon\Carbon::parse($endTimeRaw);
         $bomLead = \Carbon\Carbon::parse($record->bom->lead_time)->endOfDay();
+        $endTimeCell = '<td class="p-2 border">'.htmlspecialchars($endTime).'</td>';
+
         if ($plannedEnd->greaterThan($bomLead)) {
             $bomLeadFormatted = \Carbon\Carbon::parse($record->bom->lead_time)->format('d M Y');
             $endTimeCell = '<td class="p-2 border" style="background-color:#fee2e2;cursor:pointer;" title="BOM Target Completion Time: '.$bomLeadFormatted.'">'.htmlspecialchars($endTime).'</td>';

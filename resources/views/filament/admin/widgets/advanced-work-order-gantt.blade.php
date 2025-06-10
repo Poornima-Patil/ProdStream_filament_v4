@@ -255,7 +255,7 @@ if(count($hiddenBars) > 0) {
                                             <div class="text-xs font-semibold {{ $day->isToday() ? 'text-blue-600' : 'text-gray-700' }} px-1 pt-1">
                                                 {{ $day->format('j') }}
                                             </div>
-                                            <div id="{{ $cellId }}" class="relative h-full" style="min-height: 64px;">
+                                            <div id="{{ $cellId }}" class="relative h-full" style="min-height: 0px;">
                                                 @foreach($visibleBars as $bar)
                                                     @php
                                                         $wo = $bar['wo'];
