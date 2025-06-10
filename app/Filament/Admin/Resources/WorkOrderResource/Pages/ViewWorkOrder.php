@@ -73,8 +73,17 @@ class ViewWorkOrder extends ViewRecord
                                 $partNumber = $record->bom->purchaseorder->partnumber->partnumber ?? 'N/A';
                                 $revision = $record->bom->purchaseorder->partnumber->revision ?? 'N/A';
                                 $status = $record->status ?? 'N/A';
+                               $endTimeRaw = $record->end_time;
                                 $startTime = $record->start_time ? \Carbon\Carbon::parse($record->start_time)->format('Y-m-d H:i') : 'N/A';
                                 $endTime = $record->end_time ? \Carbon\Carbon::parse($record->end_time)->format('Y-m-d H:i') : 'N/A';
+                                 if ($record->bom && $record->bom->lead_time && $endTimeRaw) {
+        $plannedEnd = \Carbon\Carbon::parse($endTimeRaw);
+        $bomLead = \Carbon\Carbon::parse($record->bom->lead_time)->endOfDay();
+        if ($plannedEnd->greaterThan($bomLead)) {
+            $bomLeadFormatted = \Carbon\Carbon::parse($record->bom->lead_time)->format('d M Y');
+            $endTimeCell = '<td class="p-2 border" style="background-color:#fee2e2;cursor:pointer;" title="BOM Target Completion Time: '.$bomLeadFormatted.'">'.htmlspecialchars($endTime).'</td>';
+        }
+    }
                                 $okQty = $record->ok_qtys ?? 'N/A';
                                 $scrapQty = $record->scrapped_qtys ?? 'N/A';
                                 $materialBatch = $record->material_batch ?? 'N/A';
@@ -102,8 +111,8 @@ class ViewWorkOrder extends ViewRecord
                                                 <td class="p-2 border">'.htmlspecialchars($revision).'</td>
                                                 <td class="p-2 border">'.htmlspecialchars($status).'</td>
                                                 <td class="p-2 border">'.htmlspecialchars($startTime).'</td>
-                                                <td class="p-2 border">'.htmlspecialchars($endTime).'</td>
-                                                <td class="p-2 border text-green-600">'.htmlspecialchars($okQty).'</td>
+                    <td class="p-2 border">'.htmlspecialchars($startTime).'</td>
+                    '.$endTimeCell.'                                                <td class="p-2 border text-green-600">'.htmlspecialchars($okQty).'</td>
                                                 <td class="p-2 border text-red-600">'.htmlspecialchars($scrapQty).'</td>
                                                 <td class="p-2 border">'.htmlspecialchars($materialBatch).'</td>
                                             </tr>

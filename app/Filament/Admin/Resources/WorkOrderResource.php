@@ -250,7 +250,18 @@ class WorkOrderResource extends Resource
                 Forms\Components\DateTimePicker::make('end_time')
                     ->label('Planned End Time')
                     ->disabled(! $isAdminOrManager)
-                    ->required(),
+                    ->required()    ->helperText(function (callable $get) {
+        $bomId = $get('bom_id');
+        if (!$bomId) {
+            return null;
+        }
+        $bom = \App\Models\Bom::find($bomId);
+        if ($bom && $bom->lead_time) {
+            return 'BOM Target Completion Time: ' . \Carbon\Carbon::parse($bom->lead_time)->format('d M Y');
+        }
+        return null;
+    })
+    ->reactive()    ,
                 Forms\Components\Select::make('status')
                     ->label('Status')
                     ->required()
@@ -526,7 +537,34 @@ class WorkOrderResource extends Resource
                 Tables\Columns\TextColumn::make('end_time')
                     ->date()
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable() ->formatStateUsing(function ($state, $record) {
+        // Format the date as usual
+        return \Carbon\Carbon::parse($state)->format('d M Y H:i');
+    })
+    ->extraAttributes(function ($record) {
+        // Check if BOM exists and has a lead_time
+        if ($record->bom && $record->bom->lead_time && $record->end_time) {
+            $plannedEnd = \Carbon\Carbon::parse($record->end_time);
+            $bomLead = \Carbon\Carbon::parse($record->bom->lead_time)->endOfDay();
+            if ($plannedEnd->greaterThan($bomLead)) {
+                // Add a background color (e.g., red-100) if planned end exceeds BOM lead_time
+                return [
+                    'style' => 'background-color: #FCA5A5; cursor: pointer;', // Tailwind red-100
+                ];
+            }
+        }
+        return [];
+    })
+    ->tooltip(function ($record) {
+        if ($record->bom && $record->bom->lead_time && $record->end_time) {
+            $plannedEnd = \Carbon\Carbon::parse($record->end_time);
+            $bomLead = \Carbon\Carbon::parse($record->bom->lead_time)->endOfDay();
+            if ($plannedEnd->greaterThan($bomLead)) {
+                return 'BOM Target Completion Time: ' . \Carbon\Carbon::parse($record->bom->lead_time)->format('d M Y');
+            }
+        }
+        return null;
+    }),
                 Tables\Columns\TextColumn::make('ok_qtys')
                     ->label('OK Qtys')
                     ->sortable()
