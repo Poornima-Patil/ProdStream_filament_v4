@@ -24,7 +24,7 @@ class WorkOrderQtyTrendChart extends ChartWidget
         Log::info('WorkOrderQtyTrendChart: Record ID '.$this->workOrder->id);
 
         $logs = WorkOrderLog::where('work_order_id', $this->workOrder->id)
-            ->whereIn('status', ['Hold', 'Completed', 'Closed']) // 👈 Only these statuses
+            ->whereIn('status', ['Hold', 'Completed', 'Closed'])
             ->orderBy('changed_at')
             ->get();
 
@@ -54,5 +54,37 @@ class WorkOrderQtyTrendChart extends ChartWidget
     protected function getType(): string
     {
         return 'bar';
+    }
+
+    protected function getOptions(): array
+    {
+        return [
+            'plugins' => [
+                'legend' => [
+                    'labels' => [
+                        // Use CSS variables so Chart.js picks up the correct color in dark mode
+                        'color' => 'rgb(var(--tw-prose-body))',
+                    ],
+                ],
+            ],
+            'scales' => [
+                'x' => [
+                    'ticks' => [
+                        'color' => 'rgb(var(--tw-prose-body))',
+                    ],
+                    'grid' => [
+                        'color' => 'rgba(100,116,139,0.2)', // slate-500/20
+                    ],
+                ],
+                'y' => [
+                    'ticks' => [
+                        'color' => 'rgb(var(--tw-prose-body))',
+                    ],
+                    'grid' => [
+                        'color' => 'rgba(100,116,139,0.2)',
+                    ],
+                ],
+            ],
+        ];
     }
 }

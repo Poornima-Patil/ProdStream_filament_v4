@@ -21,13 +21,13 @@ Chefilepath: resources/views/filament/admin/widgets/simple-work-order-gantt.blad
 
 <div class="">
     <div class="min-w-[1100px] w-full mx-auto">
-        <h1 class="text-2xl font-bold mb-4">Work Order Calendar (Weekly)</h1>
-        <div class="w-full bg-white rounded shadow border p-4">
+        <h1 class="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100">Work Order Calendar (Weekly)</h1>
+        <div class="w-full bg-white dark:bg-gray-900 rounded shadow border border-gray-200 dark:border-gray-700 p-4">
             <div class="w-full">
-                <div class="grid grid-cols-8 bg-yellow-50 border-b border-gray-200 mb-2 w-full table-fixed">
-                    <div class="text-xs font-semibold py-2 px-2">Week</div>
+                <div class="grid grid-cols-8 bg-indigo-200 dark:bg-indigo-900 border-b border-gray-200 dark:border-gray-700 mb-2 w-full table-fixed">
+                    <div class="text-xs font-semibold py-2 px-2 text-gray-900 dark:text-gray-100 bg-indigo-300 dark:bg-indigo-800">Week</div>
                     @foreach($dayNames as $day)
-                        <div class="text-xs font-semibold py-2 px-2">{{ $day }}</div>
+                        <div class="text-xs font-semibold py-2 px-2 text-gray-900 dark:text-gray-100 bg-indigo-200 dark:bg-indigo-900">{{ $day }}</div>
                     @endforeach
                 </div>
                 @foreach($weeks as $weekIdx => $week)
@@ -70,7 +70,7 @@ Chefilepath: resources/views/filament/admin/widgets/simple-work-order-gantt.blad
                         $expandedHeight = 20 + ($maxBarsInRow * 24) + 36;
                     @endphp
                     <div class="grid grid-cols-8 min-h-[80px] border-b last:border-b-0 relative w-full table-fixed">
-                        <div class="flex items-center justify-center bg-blue-50 border-r text-xs font-semibold">
+                        <div class="flex items-center justify-center bg-indigo-300 dark:bg-indigo-800 border-r border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-900 dark:text-gray-100">
                             {{ $week[0]->format('W') }}
                         </div>
                         @foreach($week as $dayIdx => $day)
@@ -82,13 +82,13 @@ Chefilepath: resources/views/filament/admin/widgets/simple-work-order-gantt.blad
                                 $cellTotalBars = count($cellBars);
                             @endphp
                             <div
-                                class="relative min-h-[80px] border-r border-b border-gray-200 last:border-r-0 bg-white group transition-all duration-200 px-2 w-full"
+                                class="relative min-h-[80px] border-r border-b border-gray-200 dark:border-gray-700 last:border-r-0 bg-white dark:bg-gray-900 group transition-all duration-200 px-2 w-full"
                                 id="{{ $cellId }}_container"
                                 data-row="{{ $rowId }}"
                                 data-expanded="false"
                                 style="height: {{ $collapsedHeight }}px;"
                             >
-                                <div class="absolute top-1 left-1 text-xs font-semibold {{ $day->isToday() ? 'text-blue-600' : 'text-gray-700' }}">
+                                <div class="absolute top-1 left-1 text-xs font-semibold {{ $day->isToday() ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-200' }}">
                                     {{ $day->format('j') }}
                                 </div>
                                 <div id="{{ $cellId }}_bars" class="pb-8">
@@ -100,7 +100,7 @@ Chefilepath: resources/views/filament/admin/widgets/simple-work-order-gantt.blad
                                             $isHidden = $barIdx >= $maxVisibleBars;
                                         @endphp
                                         <a href="#"
-                                           class="absolute left-4 right-4 h-5 rounded flex items-center shadow hover:bg-blue-700 transition group"
+                                           class="absolute left-4 right-4 h-5 rounded flex items-center shadow hover:bg-blue-700 dark:hover:bg-blue-800 transition group"
                                            style="background: #3b82f6; top: {{ $barTop }}px; z-index: 10; text-decoration: none; {{ $isHidden ? 'display:none;' : '' }}"
                                            data-bar="{{ $cellId }}_bar_{{ $barIdx }}"
                                            title="{{ $wo['unique_id'] }}">
@@ -113,7 +113,7 @@ Chefilepath: resources/views/filament/admin/widgets/simple-work-order-gantt.blad
                                 @if(count($hiddenBars) > 0)
                                     <button 
                                         id="{{ $cellId }}_expand"
-                                        class="right-2 bottom-2 bg-gray-200 text-xs px-2 py-1 rounded flex items-center cursor-pointer z-50 border border-gray-300 mb-2"
+                                        class="right-2 bottom-2 bg-blue-500 dark:bg-blue-700 text-xs px-2 py-1 rounded flex items-center cursor-pointer z-50 border border-blue-600 dark:border-blue-800 mb-2 text-white"
                                         style="position: absolute; left: 8px; right: 8px; bottom: 4px; margin-bottom: 0;"
                                         onclick="
                                             this.closest('[data-row]').setAttribute('data-expanded', 'true');
@@ -128,14 +128,14 @@ Chefilepath: resources/views/filament/admin/widgets/simple-work-order-gantt.blad
                                         "
                                         type="button"
                                     >
-                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <svg class="w-3 h-3 mr-1 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                                         </svg>
                                         +{{ count($hiddenBars) }} more
                                     </button>
                                     <button
                                         id="{{ $cellId }}_collapse"
-                                        class="right-2 bottom-2 bg-gray-200 text-xs px-2 py-1 rounded flex items-center cursor-pointer z-50 border border-gray-300 mb-2"
+                                        class="right-2 bottom-2 bg-blue-500 dark:bg-blue-700 text-xs px-2 py-1 rounded flex items-center cursor-pointer z-50 border border-blue-600 dark:border-blue-800 mb-2 text-white"
                                         style="display:none; position: absolute; left: 8px; right: 8px; bottom: 4px; margin-bottom: 0;"
                                         onclick="
                                             this.closest('[data-row]').setAttribute('data-expanded', 'false');
@@ -158,7 +158,7 @@ Chefilepath: resources/views/filament/admin/widgets/simple-work-order-gantt.blad
                                         "
                                         type="button"
                                     >
-                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <svg class="w-3 h-3 mr-1 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/>
                                         </svg>
                                         Collapse

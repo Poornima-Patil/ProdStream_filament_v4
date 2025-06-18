@@ -16,7 +16,7 @@ class ViewWorkOrder extends ViewRecord
 {
     protected static string $resource = WorkOrderResource::class;
 
-    public function infoList(InfoList $infoList): InfoList
+    public function infoList(Infolist $infoList): Infolist
     {
         $user = Auth::user();
         $isAdminOrManager = $user && in_array($user->role, ['manager', 'admin']);
@@ -39,21 +39,21 @@ class ViewWorkOrder extends ViewRecord
 
                                 return '
                                 <div class="overflow-x-auto rounded-lg shadow-md">
-                                    <table class="w-full text-sm border border-gray-300 text-center">
-                                        <thead class="bg-primary-500 text-white">
+                                    <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900">
+                                        <thead class="bg-primary-500 dark:bg-primary-700 text-white">
                                             <tr>
-                                                <th class="p-2 border">BOM</th>
-                                                <th class="p-2 border">Quantity</th>
-                                                <th class="p-2 border">Machine</th>
-                                                <th class="p-2 border">Operator</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">BOM</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Quantity</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Machine</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Operator</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr class="bg-white hover:bg-gray-50">
-                                                <td class="p-2 border">'.htmlspecialchars($bom).'</td>
-                                                <td class="p-2 border">'.htmlspecialchars($qty).'</td>
-                                                <td class="p-2 border">'.htmlspecialchars($machine).'</td>
-                                                <td class="p-2 border">'.htmlspecialchars($operator).'</td>
+                                            <tr class="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($bom).'</td>
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($qty).'</td>
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($machine).'</td>
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($operator).'</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -73,50 +73,48 @@ class ViewWorkOrder extends ViewRecord
                                 $partNumber = $record->bom->purchaseorder->partnumber->partnumber ?? 'N/A';
                                 $revision = $record->bom->purchaseorder->partnumber->revision ?? 'N/A';
                                 $status = $record->status ?? 'N/A';
-                               $endTimeRaw = $record->end_time;
+                                $endTimeRaw = $record->end_time;
                                 $startTime = $record->start_time ? \Carbon\Carbon::parse($record->start_time)->format('Y-m-d H:i') : 'N/A';
                                 $endTime = $record->end_time ? \Carbon\Carbon::parse($record->end_time)->format('Y-m-d H:i') : 'N/A';
-                                 if ($record->bom && $record->bom->lead_time && $endTimeRaw) {
-        $plannedEnd = \Carbon\Carbon::parse($endTimeRaw);
-        $bomLead = \Carbon\Carbon::parse($record->bom->lead_time)->endOfDay();
-        $endTimeCell = '<td class="p-2 border">'.htmlspecialchars($endTime).'</td>';
-
-        if ($plannedEnd->greaterThan($bomLead)) {
-            $bomLeadFormatted = \Carbon\Carbon::parse($record->bom->lead_time)->format('d M Y');
-            $endTimeCell = '<td class="p-2 border" style="background-color:#fee2e2;cursor:pointer;" title="BOM Target Completion Time: '.$bomLeadFormatted.'">'.htmlspecialchars($endTime).'</td>';
-        }
-    }
+                                $endTimeCell = '<td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($endTime).'</td>';
+                                if ($record->bom && $record->bom->lead_time && $endTimeRaw) {
+                                    $plannedEnd = \Carbon\Carbon::parse($endTimeRaw);
+                                    $bomLead = \Carbon\Carbon::parse($record->bom->lead_time)->endOfDay();
+                                    if ($plannedEnd->greaterThan($bomLead)) {
+                                        $bomLeadFormatted = \Carbon\Carbon::parse($record->bom->lead_time)->format('d M Y');
+$endTimeCell = '<td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100 bg-red-100 dark:bg-red-900 dark:text-red-200" style="cursor:pointer;" title="BOM Target Completion Time: '.$bomLeadFormatted.'">'.htmlspecialchars($endTime).'</td>';                                    }
+                                }
                                 $okQty = $record->ok_qtys ?? 'N/A';
                                 $scrapQty = $record->scrapped_qtys ?? 'N/A';
                                 $materialBatch = $record->material_batch ?? 'N/A';
 
                                 return '
                                 <div class="overflow-x-auto rounded-lg shadow-md">
-                                    <table class="w-full text-sm border border-gray-300 text-center">
-                                        <thead class="bg-primary-500 text-white">
+                                    <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900">
+                                        <thead class="bg-primary-500 dark:bg-primary-700 text-white">
                                             <tr>
-                                                <th class="p-2 border">Unique ID</th>
-                                                <th class="p-2 border">Part Number</th>
-                                                <th class="p-2 border">Revision</th>
-                                                <th class="p-2 border">Status</th>
-                                                <th class="p-2 border">Planned Start Time</th>
-                                                <th class="p-2 border">Planned End Time</th>
-                                                <th class="p-2 border">OK Quantities</th>
-                                                <th class="p-2 border">Scrapped Quantities</th>
-                                                <th class="p-2 border">Material Batch ID</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Unique ID</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Part Number</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Revision</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Status</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Planned Start Time</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Planned End Time</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">OK Quantities</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Scrapped Quantities</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Material Batch ID</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <tr class="bg-white hover:bg-gray-50">
-                                                <td class="p-2 border">'.htmlspecialchars($uniqueId).'</td>
-                                                <td class="p-2 border">'.htmlspecialchars($partNumber).'</td>
-                                                <td class="p-2 border">'.htmlspecialchars($revision).'</td>
-                                                <td class="p-2 border">'.htmlspecialchars($status).'</td>
-                    <td class="p-2 border">'.htmlspecialchars($startTime).'</td>
-                            '.$endTimeCell.'                                                
-                    <td class="p-2 border text-green-600">'.htmlspecialchars($okQty).'</td>
-                                                <td class="p-2 border text-red-600">'.htmlspecialchars($scrapQty).'</td>
-                                                <td class="p-2 border">'.htmlspecialchars($materialBatch).'</td>
+                                            <tr class="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($uniqueId).'</td>
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($partNumber).'</td>
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($revision).'</td>
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($status).'</td>
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($startTime).'</td>
+                                                '.$endTimeCell.'
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-green-600 dark:text-green-400">'.htmlspecialchars($okQty).'</td>
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-red-600 dark:text-red-400">'.htmlspecialchars($scrapQty).'</td>
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($materialBatch).'</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -142,29 +140,29 @@ class ViewWorkOrder extends ViewRecord
                                     $requirementLinks = $requirementMedia->isEmpty()
                                         ? 'No files uploaded'
                                         : $requirementMedia->map(function ($media) {
-                                            return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>";
+                                            return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 dark:text-blue-400 underline'>{$media->file_name}</a>";
                                         })->implode('<br>');
 
                                     $flowchartLinks = $flowchartMedia->isEmpty()
                                         ? 'No files uploaded'
                                         : $flowchartMedia->map(function ($media) {
-                                            return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>";
+                                            return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 dark:text-blue-400 underline'>{$media->file_name}</a>";
                                         })->implode('<br>');
                                 }
 
                                 return '
                                     <div class="overflow-x-auto rounded-lg shadow-md">
-                                        <table class="w-full text-sm border border-gray-300 text-left">
-                                            <thead class="bg-primary-500 text-white">
+                                        <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-left bg-white dark:bg-gray-900">
+                                            <thead class="bg-primary-500 dark:bg-primary-700 text-white">
                                                 <tr>
-                                                    <th class="p-2 border border-gray-300">Requirement Package</th>
-                                                    <th class="p-2 border border-gray-300">Process Flowchart</th>
+                                                    <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Requirement Package</th>
+                                                    <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Process Flowchart</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <tr class="bg-white hover:bg-gray-50 align-top">
-                                                    <td class="p-2 border border-gray-300">'.$requirementLinks.'</td>
-                                                    <td class="p-2 border border-gray-300">'.$flowchartLinks.'</td>
+                                                <tr class="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 align-top">
+                                                    <td class="p-2 border border-gray-300 dark:border-gray-700">'.$requirementLinks.'</td>
+                                                    <td class="p-2 border border-gray-300 dark:border-gray-700">'.$flowchartLinks.'</td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -185,18 +183,17 @@ class ViewWorkOrder extends ViewRecord
                                 $quantitiesIndex = 0;
 
                                 // Create the HTML table
-                                $html = '<table class="table-auto w-full text-left border border-gray-300">';
-                                $html .= '<thead class="bg-primary-500 text-white"><tr>';
-                                $html .= '<th class="border px-2 py-1">Status</th>';
-                                $html .= '<th class="border px-2 py-1">User</th>';
-                                $html .= '<th class="border px-2 py-1">Timestamp</th>';
-                                $html .= '<th class="border px-2 py-1">OK QTY</th>';
-                                $html .= '<th class="border px-2 py-1">Scrapped QTY</th>';
-                                $html .= '<th class="border px-2 py-1">Remaining QTY</th>';
-                                $html .= '<th class="border px-2 py-1">Scrapped Reason</th>';
-                                $html .= '<th class="border px-2 py-1">Documents</th>';
-                                $html .= '<th class="border px-2 py-1">FPY (%)</th>'; // <-- Add FPY column
-
+                                $html = '<table class="table-auto w-full text-left border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900">';
+                                $html .= '<thead class="bg-primary-500 dark:bg-primary-700 text-white"><tr>';
+                                $html .= '<th class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">Status</th>';
+                                $html .= '<th class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">User</th>';
+                                $html .= '<th class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">Timestamp</th>';
+                                $html .= '<th class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">OK QTY</th>';
+                                $html .= '<th class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">Scrapped QTY</th>';
+                                $html .= '<th class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">Remaining QTY</th>';
+                                $html .= '<th class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">Scrapped Reason</th>';
+                                $html .= '<th class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">Documents</th>';
+                                $html .= '<th class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">FPY (%)</th>';
                                 $html .= '</tr></thead><tbody>';
 
                                 foreach ($record->workOrderLogs as $log) {
@@ -207,7 +204,7 @@ class ViewWorkOrder extends ViewRecord
                                     $scrappedQty = '';
                                     $remainingQty = '';
                                     $scrappedReason = '';
-                                    $fpy = $log->fpy !== null ? number_format($log->fpy, 2) : ''; // <-- Get FPY value
+                                    $fpy = $log->fpy !== null ? number_format($log->fpy, 2) : '';
                                     $documents = '';
 
                                     if (in_array($status, ['Hold', 'Completed'])) {
@@ -253,24 +250,23 @@ class ViewWorkOrder extends ViewRecord
                                             $qrCodeMedia = $quantity->getMedia('qr_code')->first();
 
                                             if ($qrCodeMedia) {
-                                                $documents .= "<a href='{$qrCodeMedia->getUrl()}' download='qr_code.png' class='text-blue-500 underline'>Download QR Code</a>";
+                                                $documents .= "<a href='{$qrCodeMedia->getUrl()}' download='qr_code.png' class='text-blue-500 dark:text-blue-400 underline'>Download QR Code</a>";
                                             }
 
                                             $quantitiesIndex++;
                                         }
                                     }
 
-                                    $html .= '<tr>';
-                                    $html .= '<td class="border px-2 py-1">'.e($status).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($user).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($timestamp).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($okQty).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($scrappedQty).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($remainingQty).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($scrappedReason).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.$documents.'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($fpy).'</td>'; // <-- Show FPY value
-                                        
+                                    $html .= '<tr class="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">';
+                                    $html .= '<td class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">'.e($status).'</td>';
+                                    $html .= '<td class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">'.e($user).'</td>';
+                                    $html .= '<td class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">'.e($timestamp).'</td>';
+                                    $html .= '<td class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-green-600 dark:text-green-400">'.e($okQty).'</td>';
+                                    $html .= '<td class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-red-600 dark:text-red-400">'.e($scrappedQty).'</td>';
+                                    $html .= '<td class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">'.e($remainingQty).'</td>';
+                                    $html .= '<td class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">'.e($scrappedReason).'</td>';
+                                    $html .= '<td class="border border-gray-300 dark:border-gray-700 px-2 py-1">'.$documents.'</td>';
+                                    $html .= '<td class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">'.e($fpy).'</td>';
                                     $html .= '</tr>';
                                 }
 
@@ -295,26 +291,31 @@ class ViewWorkOrder extends ViewRecord
                                     return [
                                         'user' => $message->user->getFilamentname() ?? 'N/A',
                                         'message' => $message->message,
-                                        'priority' => ucfirst($message->priority), // Capitalize first letter
+                                        'priority' => ucfirst($message->priority),
                                         'sent_at' => $message->created_at->format('Y-m-d H:i:s'),
                                     ];
                                 });
 
                                 // Create the HTML table
-                                $html = '<table class="table-auto w-full text-left border border-gray-300">';
-                                $html .= '<thead class="bg-primary-500 text-white"><tr>';
-                                $html .= '<th class="border px-2 py-1">User</th>';
-                                $html .= '<th class="border px-2 py-1">Message</th>';
-                                $html .= '<th class="border px-2 py-1">Priority</th>';
-                                $html .= '<th class="border px-2 py-1">Sent At</th>';
+                                $html = '<table class="table-auto w-full text-left border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900">';
+                                $html .= '<thead class="bg-primary-500 dark:bg-primary-700 text-white"><tr>';
+                                $html .= '<th class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">User</th>';
+                                $html .= '<th class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">Message</th>';
+                                $html .= '<th class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">Priority</th>';
+                                $html .= '<th class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">Sent At</th>';
                                 $html .= '</tr></thead><tbody>';
 
                                 foreach ($messages as $message) {
-                                    $html .= '<tr>';
-                                    $html .= '<td class="border px-2 py-1">'.e($message['user']).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($message['message']).'</td>';
-                                    $html .= '<td class="border px-2 py-1 font-bold text-'.($message['priority'] === 'High' ? 'red-500' : ($message['priority'] === 'Medium' ? 'yellow-500' : 'green-500')).'">'.e($message['priority']).'</td>';
-                                    $html .= '<td class="border px-2 py-1">'.e($message['sent_at']).'</td>';
+                                    $priorityClass = $message['priority'] === 'High'
+                                        ? 'text-red-500 dark:text-red-400'
+                                        : ($message['priority'] === 'Medium'
+                                            ? 'text-yellow-500 dark:text-yellow-400'
+                                            : 'text-green-600 dark:text-green-400');
+                                    $html .= '<tr class="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">';
+                                    $html .= '<td class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">'.e($message['user']).'</td>';
+                                    $html .= '<td class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">'.e($message['message']).'</td>';
+                                    $html .= '<td class="border border-gray-300 dark:border-gray-700 px-2 py-1 font-bold '.$priorityClass.'">'.e($message['priority']).'</td>';
+                                    $html .= '<td class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">'.e($message['sent_at']).'</td>';
                                     $html .= '</tr>';
                                 }
 
@@ -322,12 +323,11 @@ class ViewWorkOrder extends ViewRecord
 
                                 return $html;
                             })
-                            ->html(), // Enable raw HTML rendering
+                            ->html(),
                     ])
                     ->columns(1),
 
             ]);
-
     }
 
     public function getHeaderWidgets(): array

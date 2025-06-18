@@ -5,6 +5,7 @@ namespace App\Filament\Admin\Resources\WorkOrderResource\Widgets;
 use Filament\Support\RawJs;
 use Filament\Widgets\ChartWidget;
 use Filament\Widgets\Concerns\InteractsWithPageTable;
+use Filament\Facades\Filament;
 
 class WorkOrderPieChart extends ChartWidget
 {
@@ -21,6 +22,23 @@ class WorkOrderPieChart extends ChartWidget
         $statuses = ['Assigned', 'Start', 'Hold', 'Completed', 'Closed'];
         $counts = [];
         $statusColors = config('work_order_status');
+        $isDark = Filament::getTheme() === 'dark';
+
+        $colors = $isDark && isset($statusColors['dark'])
+            ? [
+                $statusColors['dark']['assigned'],
+                $statusColors['dark']['start'],
+                $statusColors['dark']['hold'],
+                $statusColors['dark']['completed'],
+                $statusColors['dark']['closed'],
+            ]
+            : [
+                $statusColors['assigned'],
+                $statusColors['start'],
+                $statusColors['hold'],
+                $statusColors['completed'],
+                $statusColors['closed'],
+            ];
 
         foreach ($statuses as $status) {
             $counts[] = $this->getPageTableQuery()
@@ -35,13 +53,7 @@ class WorkOrderPieChart extends ChartWidget
                 [
                     'label' => 'Work Orders',
                     'data' => $counts,
-                    'backgroundColor' => [
-                        $statusColors['assigned'],
-                        $statusColors['start'],
-                        $statusColors['hold'],
-                        $statusColors['completed'],
-                        $statusColors['closed'],
-                    ],
+                    'backgroundColor' => $colors,
                     'borderWidth' => 2,
                     'hoverOffset' => 10,
                 ],
@@ -89,14 +101,18 @@ class WorkOrderPieChart extends ChartWidget
                 const chart = this;
                 const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
                 const ctx = chart.ctx;
-                
+
                 // Calculate center using chartArea for more accurate positioning
                 const centerX = (chart.chartArea.left + chart.chartArea.right) / 2;
                 const centerY = (chart.chartArea.top + chart.chartArea.bottom) / 2;
-                
+
                 ctx.save();
                 ctx.font = 'bold 24px sans-serif';
-                ctx.fillStyle = '#111';
+
+                // Detect dark mode using Tailwind/Filament class on <html>
+                const isDark = document.documentElement.classList.contains('dark');
+                ctx.fillStyle = isDark ? '#fff' : '#111';
+
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(total.toString(), centerX, centerY);
