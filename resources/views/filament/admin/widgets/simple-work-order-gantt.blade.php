@@ -1,5 +1,5 @@
 {{-- 
-filepath: /Users/poornimapatil/Herd/ProdStream_v1.1/resources/views/filament/admin/widgets/simple-work-order-gantt.blade.php
+Chefilepath: resources/views/filament/admin/widgets/simple-work-order-gantt.blade.php
 --}}
 @php
     use Illuminate\Support\Carbon;
@@ -19,344 +19,156 @@ filepath: /Users/poornimapatil/Herd/ProdStream_v1.1/resources/views/filament/adm
     $dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 @endphp
 
-<div>
-    <h1 class="text-2xl font-bold mb-4">Work Order Calendar (Weekly)</h1>
-    <div class="w-full">
-        <table class="w-full bg-white rounded shadow border">
-            <thead>
-                <tr>
-                    <th class="w-20 min-w-[80px] text-xs text-gray-500 bg-blue-50 border p-2">Week</th>
+<div class="">
+    <div class="min-w-[1100px] w-full mx-auto">
+        <h1 class="text-2xl font-bold mb-4">Work Order Calendar (Weekly)</h1>
+        <div class="w-full bg-white rounded shadow border p-4">
+            <div class="w-full">
+                <div class="grid grid-cols-8 bg-yellow-50 border-b border-gray-200 mb-2 w-full table-fixed">
+                    <div class="text-xs font-semibold py-2 px-2">Week</div>
                     @foreach($dayNames as $day)
-                        <th class="text-xs text-gray-700 bg-yellow-50 border p-2">{{ $day }}</th>
+                        <div class="text-xs font-semibold py-2 px-2">{{ $day }}</div>
                     @endforeach
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($weeks as $week)
+                </div>
+                @foreach($weeks as $weekIdx => $week)
                     @php
-                        $weekStart = $week[0];
-                        $weekEnd = end($week);
+                        $rowId = "row_{$weekIdx}";
+                        // Prepare cellBarsArr for this week
+                        $cellBarsArr = [];
+                        $maxBarsInRow = 0;
                         $woStackOrder = [];
                         $woIndex = 0;
                         foreach ($workOrders as $wo) {
-                            $plannedStart = Carbon::parse($wo['start_date'])->startOfDay();
-                            $plannedEnd = Carbon::parse($wo['end_date'])->endOfDay();
-                            $logs = $wo['workOrderLogs'] ?? [];
-                            $actualStartLog = collect($logs)->where('status', 'Start')->sortBy('changed_at')->first();
-                            $actualEndLog = collect($logs)->whereIn('status', ['Closed', 'Completed', 'Hold'])->sortByDesc('changed_at')->first();
-                            $actualStart = $actualStartLog ? Carbon::parse($actualStartLog['changed_at'])->startOfDay() : null;
-                            $actualEnd = $actualEndLog ? Carbon::parse($actualEndLog['changed_at'])->endOfDay() : null;
-
+                            $plannedStart = \Carbon\Carbon::parse($wo['start_date'])->startOfDay();
+                            $plannedEnd = \Carbon\Carbon::parse($wo['end_date'])->endOfDay();
                             if (
-                                ($plannedEnd >= $weekStart && $plannedStart <= $weekEnd) ||
-                                ($actualStart && $actualEnd && $actualEnd >= $weekStart && $actualStart <= $weekEnd) ||
-                                ($actualStart && !$actualEnd && $actualStart >= $weekStart && $actualStart <= $weekEnd)
+                                ($plannedEnd >= $week[0] && $plannedStart <= end($week))
                             ) {
                                 $woStackOrder[$wo['id']] = $woIndex++;
                             }
                         }
-                    @endphp
-                    <tr class="relative">
-                        <td class="text-xs text-gray-600 align-top border bg-blue-50 font-semibold">
-                            {{ $week[0]->format('W') }}
-                        </td>
-                        @foreach($week as $dayIndex => $day)
-                            @php
-                                $cellBars = [];
-                                foreach ($workOrders as $wo) {
-                                    $stackIdx = $woStackOrder[$wo['id']] ?? null;
-                                    if ($stackIdx === null) continue;
-
-                                    // --- PLANNED BAR ---
-                                    $plannedStart = Carbon::parse($wo['start_date'])->startOfDay();
-                                    $plannedEnd = Carbon::parse($wo['end_date'])->endOfDay();
-
-                                    $barStart = $plannedStart->greaterThan($weekStart) ? $plannedStart : $weekStart;
-                                    $barEnd = $plannedEnd->lessThan($weekEnd) ? $plannedEnd : $weekEnd;
-
-                                    if ($barEnd >= $weekStart && $barStart <= $weekEnd) {
-                                        $plannedStartIdx = collect($week)->search(fn($d) => $d->equalTo($barStart));
-                                        if ($plannedStartIdx === false) $plannedStartIdx = 0;
-
-                                        $plannedEndIdx = collect($week)
-                                            ->filter(fn($d) => $d->lte($barEnd))
-                                            ->keys()
-                                            ->last();
-                                        if ($plannedEndIdx === null) $plannedEndIdx = $plannedStartIdx;
-
-                                        $plannedSpanDays = max(1, $plannedEndIdx - $plannedStartIdx + 1);
-
-                                        if ($dayIndex === $plannedStartIdx) {
-                                            $cellBars[] = [
-                                                'type' => 'planned',
-                                                'wo' => $wo,
-                                                'spanDays' => $plannedSpanDays,
-                                                'stackIdx' => $stackIdx,
-                                            ];
-                                        }
-                                    }
-
-                                    // --- ACTUAL BAR ---
-                                    $logs = $wo['workOrderLogs'] ?? [];
-                                    $actualStartLog = collect($logs)->where('status', 'Start')->sortBy('changed_at')->first();
-                                    $actualEndLog = collect($logs)->whereIn('status', ['Closed', 'Completed', 'Hold'])->sortByDesc('changed_at')->first();
-                                    $actualStart = $actualStartLog ? Carbon::parse($actualStartLog['changed_at'])->startOfDay() : null;
-                                    $actualEnd = $actualEndLog ? Carbon::parse($actualEndLog['changed_at'])->endOfDay() : null;
-
-                                    if ($actualStart && $actualEnd) {
-                                        $actualBarStart = $actualStart->greaterThan($weekStart) ? $actualStart : $weekStart;
-                                        $actualBarEnd = $actualEnd->lessThan($weekEnd) ? $actualEnd : $weekEnd;
-
-                                        if ($actualBarEnd >= $weekStart && $actualBarStart <= $weekEnd) {
-                                            $actualStartIdx = collect($week)->search(fn($d) => $d->equalTo($actualBarStart));
-                                            if ($actualStartIdx === false) $actualStartIdx = 0;
-
-                                            $actualEndIdx = collect($week)
-                                                ->filter(fn($d) => $d->lte($actualBarEnd))
-                                                ->keys()
-                                                ->last();
-                                            if ($actualEndIdx === null) $actualEndIdx = $actualStartIdx;
-
-                                            $actualSpanDays = max(1, $actualEndIdx - $actualStartIdx + 1);
-
-                                            if ($dayIndex === $actualStartIdx) {
-                                                $cellBars[] = [
-                                                    'type' => 'actual',
-                                                    'wo' => $wo,
-                                                    'spanDays' => $actualSpanDays,
-                                                    'stackIdx' => $stackIdx,
-                                                ];
-                                            }
-                                        }
-                                    }
-                                    // --- FLAG (only if there is a start log and NO end log) ---
-                                    if ($actualStart && !$actualEnd) {
-                                        $flagDayIdx = collect($week)->search(fn($d) => $d->toDateString() === $actualStart->toDateString());
-                                        if ($flagDayIdx !== false && $dayIndex === $flagDayIdx) {
-                                            $cellBars[] = [
-                                                'type' => 'flag',
-                                                'wo' => $wo,
-                                                'stackIdx' => $stackIdx,
-                                            ];
-                                        }
-                                    }
+                        foreach($week as $dayIdx => $day) {
+                            $cellBars = [];
+                            foreach ($workOrders as $wo) {
+                                $stackIdx = $woStackOrder[$wo['id']] ?? null;
+                                if ($stackIdx === null) continue;
+                                $plannedStart = \Carbon\Carbon::parse($wo['start_date'])->startOfDay();
+                                $plannedEnd = \Carbon\Carbon::parse($wo['end_date'])->endOfDay();
+                                if ($plannedStart <= $day && $plannedEnd >= $day) {
+                                    $cellBars[] = [
+                                        'type' => 'planned',
+                                        'wo' => $wo,
+                                        'stackIdx' => $stackIdx,
+                                    ];
                                 }
-
-                                // Collapse/Expand logic
-                                usort($cellBars, function($a, $b) {
-                                    if ($a['type'] === $b['type']) return 0;
-                                    if ($a['type'] === 'flag') return 1; // flag last
-                                    if ($b['type'] === 'flag') return -1;
-                                    return 0;
-                                });
-
-                                $maxVisibleBars = 2;
+                            }
+                            $cellBarsArr[$dayIdx] = $cellBars;
+                            $maxBarsInRow = max($maxBarsInRow, count($cellBars));
+                        }
+                        $maxVisibleBars = 2;
+                        $collapsedHeight = 20 + ($maxVisibleBars * 24) + (count($cellBarsArr) > $maxVisibleBars ? 36 : 0);
+                        $expandedHeight = 20 + ($maxBarsInRow * 24) + 36;
+                    @endphp
+                    <div class="grid grid-cols-8 min-h-[80px] border-b last:border-b-0 relative w-full table-fixed">
+                        <div class="flex items-center justify-center bg-blue-50 border-r text-xs font-semibold">
+                            {{ $week[0]->format('W') }}
+                        </div>
+                        @foreach($week as $dayIdx => $day)
+                            @php
+                                $cellId = "cell_{$weekIdx}_{$dayIdx}";
+                                $cellBars = $cellBarsArr[$dayIdx];
                                 $visibleBars = array_slice($cellBars, 0, $maxVisibleBars);
                                 $hiddenBars = array_slice($cellBars, $maxVisibleBars);
-
-                                $barHeight = 20;
-                                $barGap = 4;
-                                $cellPadding = 24;
-                                $expandCollapseButtonHeight = 32;
-                                $stackCount = count($cellBars);
-
-                                $collapsedHeight = max(
-                                    $cellPadding + $maxVisibleBars * 2 * ($barHeight + $barGap) + $expandCollapseButtonHeight,
-                                    64 + $expandCollapseButtonHeight
-                                );
-                                $expandedHeight = max(
-                                    $cellPadding + $stackCount * 2 * ($barHeight + $barGap) + $expandCollapseButtonHeight,
-                                    64 + $expandCollapseButtonHeight
-                                );
-                                $cellId = 'cell_' . $weekStart->format('Ymd') . '_' . $day->format('Ymd') . '_' . $dayIndex;
-
-                                // For planned-actual attachment logic
-                                $allBars = array_merge($visibleBars, $hiddenBars);
+                                $cellTotalBars = count($cellBars);
                             @endphp
-
-                            <td class="align-top border relative p-0"
-                                style="min-width: 160px; height: {{ $collapsedHeight }}px;"
-                                id="{{ $cellId }}_td"
+                            <div
+                                class="relative min-h-[80px] border-r border-b border-gray-200 last:border-r-0 bg-white group transition-all duration-200 px-2 w-full"
+                                id="{{ $cellId }}_container"
+                                data-row="{{ $rowId }}"
+                                data-expanded="false"
+                                style="height: {{ $collapsedHeight }}px;"
                             >
-                                <div class="text-xs font-semibold {{ $day->isToday() ? 'text-blue-600' : 'text-gray-700' }} px-1 pt-1">
+                                <div class="absolute top-1 left-1 text-xs font-semibold {{ $day->isToday() ? 'text-blue-600' : 'text-gray-700' }}">
                                     {{ $day->format('j') }}
                                 </div>
-
-                                <div id="{{ $cellId }}" class="relative h-full" style="min-height: 64px;">
-                                    @foreach($visibleBars as $bar)
+                                <div id="{{ $cellId }}_bars" class="pb-8">
+                                    @foreach($cellBars as $barIdx => $bar)
                                         @php
                                             $wo = $bar['wo'];
                                             $stackIdx = $bar['stackIdx'];
-                                            $factoryId = auth()->user()?->factory_id ?? 'default-factory';
-                                            $statusColors = config('work_order_status');
-                                            $barTop = 18 + $stackIdx * 2 * ($barHeight + $barGap);
-                                            $spanDays = isset($bar['spanDays']) ? max(1, $bar['spanDays']) : 1;
-                                            $totalQty = $wo['qty'] ?? 0;
-                                            $okQtys = $wo['ok_qtys'] ?? 0;
-                                            $percent = $totalQty > 0 ? round(($okQtys / $totalQty) * 100) : 0;
-                                            $logs = $wo['workOrderLogs'] ?? [];
-                                            $actualEndLog = collect($logs)->whereIn('status', ['Closed', 'Completed', 'Hold'])->sortByDesc('changed_at')->first();
-                                            $actualStatusKey = $actualEndLog ? strtolower($actualEndLog['status']) : strtolower($wo['status']);
-                                            $actualColor = $statusColors[$actualStatusKey] ?? '#10B981';
-
-                                            $isPlanned = $bar['type'] === 'planned';
-                                            $isActual = $bar['type'] === 'actual';
-
-                                            // Find planned bar for this WO in this cell (from all bars)
-                                            $plannedBarForWO = collect($allBars)->first(fn($b) => $b['type'] === 'planned' && $b['wo']['id'] === $wo['id']);
-                                            $plannedBarTop = $plannedBarForWO ? (18 + $plannedBarForWO['stackIdx'] * 2 * ($barHeight + $barGap)) : null;
-                                            $actualBarTop = ($isActual && $plannedBarForWO && $plannedBarForWO['stackIdx'] === $stackIdx)
-                                                ? ($plannedBarTop + $barHeight)
-                                                : ($barTop + $barHeight + $barGap);
+                                            $barTop = 20 + $stackIdx * 24;
+                                            $isHidden = $barIdx >= $maxVisibleBars;
                                         @endphp
-
-                                        @if($bar['type'] === 'planned')
-                                            <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo['id']) }}"
-                                               class="absolute bg-blue-500 rounded flex items-center shadow hover:bg-blue-700 transition group"
-                                               style="top: {{ $barTop }}px; left: 0; height: {{ $barHeight }}px; width: calc({{ $spanDays }} * 100% + ({{ $spanDays-1 }} * 2px)); min-width: 8px; z-index: 10; text-decoration: none;"
-                                               title="{{ $wo['unique_id'] }}">
-                                                <span class="text-xs text-white font-semibold px-2 truncate w-full" style="line-height: {{ $barHeight }}px;">
-                                                    {{ $wo['unique_id'] }}
-                                                </span>
-                                            </a>
-                                        @elseif($bar['type'] === 'actual')
-                                            <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo['id']) }}"
-                                               class="absolute rounded flex items-center shadow hover:opacity-90 transition group"
-                                               style="background: {{ $actualColor }}; top: {{ $actualBarTop }}px; left: 0; height: {{ $barHeight }}px; width: calc({{ $spanDays }} * 100% + ({{ $spanDays-1 }} * 2px)); min-width: 8px; z-index: 20; text-decoration: none;"
-                                               title="{{ $wo['unique_id'] }}">
-                                                <span class="text-xs text-white font-semibold px-2 truncate w-full" style="line-height: {{ $barHeight }}px;">
-                                                    @if($percent > 0)
-                                                        {{ $percent }}%
-                                                    @endif
-                                                </span>
-                                            </a>
-                                        @elseif($bar['type'] === 'flag')
-                                            <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo['id']) }}">
-                                                <span class="absolute"
-                                                      style="top: {{ $barTop + $barHeight + 2 }}px; left: 0; z-index: 40;">
-                                                    <svg class="inline mr-1" width="20" height="20" viewBox="0 0 20 20" fill="#065f46" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle;">
-                                                        <path d="M5 3v14M5 3l10 4-10 4" stroke="#065f46" stroke-width="2" fill="none"/>
-                                                        <circle cx="5" cy="3" r="2" fill="#065f46"/>
-                                                    </svg>
-                                                </span>
-                                            </a>
-                                        @endif
+                                        <a href="#"
+                                           class="absolute left-4 right-4 h-5 rounded flex items-center shadow hover:bg-blue-700 transition group"
+                                           style="background: #3b82f6; top: {{ $barTop }}px; z-index: 10; text-decoration: none; {{ $isHidden ? 'display:none;' : '' }}"
+                                           data-bar="{{ $cellId }}_bar_{{ $barIdx }}"
+                                           title="{{ $wo['unique_id'] }}">
+                                            <span class="text-[10px] text-white font-semibold px-2 truncate w-full" style="line-height: 20px;">
+                                                {{ $wo['unique_id'] }}
+                                            </span>
+                                        </a>
                                     @endforeach
-
-                                    @if(count($hiddenBars) > 0)
-                                        <button 
-                                            onclick="
-                                                document.getElementById('{{ $cellId }}_more').style.display='block';
-                                                this.style.display='none';
-                                                document.getElementById('{{ $cellId }}_td').style.height = '{{ $expandedHeight }}px';
-                                            "
-                                            class="absolute right-1 bottom-5 bg-gray-200 text-xs px-2 py-1 rounded flex items-center cursor-pointer z-50"
-                                            style="border:1px solid #ccc;">
-                                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-                                            </svg>
-                                            +{{ count($hiddenBars) }} more
-                                        </button>
-                                        <div id="{{ $cellId }}_more" class="absolute inset-0" style="display:none;">
-                                            @foreach($hiddenBars as $bar)
-                                                @php
-                                                    $wo = $bar['wo'];
-                                                    $stackIdx = $bar['stackIdx'];
-                                                    $factoryId = auth()->user()?->factory_id ?? 'default-factory';
-                                                    $statusColors = config('work_order_status');
-                                                    $barTop = 18 + $stackIdx * 2 * ($barHeight + $barGap);
-                                                    $spanDays = isset($bar['spanDays']) ? max(1, $bar['spanDays']) : 1;
-                                                    $totalQty = $wo['qty'] ?? 0;
-                                                    $okQtys = $wo['ok_qtys'] ?? 0;
-                                                    $percent = $totalQty > 0 ? round(($okQtys / $totalQty) * 100) : 0;
-                                                    $logs = $wo['workOrderLogs'] ?? [];
-                                                    $actualEndLog = collect($logs)->whereIn('status', ['Closed', 'Completed', 'Hold'])->sortByDesc('changed_at')->first();
-                                                    $actualStatusKey = $actualEndLog ? strtolower($actualEndLog['status']) : strtolower($wo['status']);
-                                                    $actualColor = $statusColors[$actualStatusKey] ?? '#10B981';
-
-                                                    $isPlanned = $bar['type'] === 'planned';
-                                                    $isActual = $bar['type'] === 'actual';
-
-                                                    // Find planned bar for this WO in this cell (from all bars)
-                                                    $plannedBarForWO = collect($allBars)->first(fn($b) => $b['type'] === 'planned' && $b['wo']['id'] === $wo['id']);
-                                                    $plannedBarTop = $plannedBarForWO ? (18 + $plannedBarForWO['stackIdx'] * 2 * ($barHeight + $barGap)) : null;
-                                                    $actualBarTop = ($isActual && $plannedBarForWO && $plannedBarForWO['stackIdx'] === $stackIdx)
-                                                        ? ($plannedBarTop + $barHeight)
-                                                        : ($barTop + $barHeight + $barGap);
-                                                @endphp
-
-                                                @if($bar['type'] === 'planned')
-                                                    <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo['id']) }}"
-                                                       class="absolute bg-blue-500 rounded flex items-center shadow hover:bg-blue-700 transition group"
-                                                       style="top: {{ $barTop }}px; left: 0; height: {{ $barHeight }}px; width: calc({{ $spanDays }} * 100% + ({{ $spanDays-1 }} * 2px)); min-width: 8px; z-index: 10; text-decoration: none;"
-                                                       title="{{ $wo['unique_id'] }}">
-                                                        <span class="text-xs text-white font-semibold px-2 truncate w-full" style="line-height: {{ $barHeight }}px;">
-                                                            {{ $wo['unique_id'] }}
-                                                        </span>
-                                                    </a>
-                                                @elseif($bar['type'] === 'actual')
-                                                    <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo['id']) }}"
-                                                       class="absolute rounded flex items-center shadow hover:opacity-90 transition group"
-                                                       style="background: {{ $actualColor }}; top: {{ $actualBarTop }}px; left: 0; height: {{ $barHeight }}px; width: calc({{ $spanDays }} * 100% + ({{ $spanDays-1 }} * 2px)); min-width: 8px; z-index: 20; text-decoration: none;"
-                                                       title="{{ $wo['unique_id'] }}">
-                                                        <span class="text-xs text-white font-semibold px-2 truncate w-full" style="line-height: {{ $barHeight }}px;">
-                                                            @if($percent > 0)
-                                                                {{ $percent }}%
-                                                            @endif
-                                                        </span>
-                                                    </a>
-                                                @elseif($bar['type'] === 'flag')
-                                                    <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo['id']) }}">
-                                                        <span class="absolute"
-                                                              style="top: {{ $barTop + $barHeight + 2 }}px; left: 0; z-index: 40;">
-                                                            <svg class="inline mr-1" width="20" height="20" viewBox="0 0 20 20" fill="#065f46" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle;">
-                                                                <path d="M5 3v14M5 3l10 4-10 4" stroke="#065f46" stroke-width="2" fill="none"/>
-                                                                <circle cx="5" cy="3" r="2" fill="#065f46"/>
-                                                            </svg>
-                                                        </span>
-                                                    </a>
-                                                @endif
-                                            @endforeach
-                                            <button
-                                                onclick="
-                                                    document.getElementById('{{ $cellId }}_more').style.display='none';
-                                                    document.querySelector('#{{ $cellId }} > button').style.display='block';
-                                                    document.getElementById('{{ $cellId }}_td').style.height = '{{ $collapsedHeight }}px';
-                                                "
-                                                class="absolute right-1 bottom-5 bg-gray-200 text-xs px-2 py-1 rounded flex items-center cursor-pointer z-50"
-                                                style="border:1px solid #ccc;">
-                                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/>
-                                                </svg>
-                                                Collapse
-                                            </button>
-                                        </div>
-                                    @endif
                                 </div>
-                            </td>
-                        @endforeach
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
+                                @if(count($hiddenBars) > 0)
+                                    <button 
+                                        id="{{ $cellId }}_expand"
+                                        class="right-2 bottom-2 bg-gray-200 text-xs px-2 py-1 rounded flex items-center cursor-pointer z-50 border border-gray-300 mb-2"
+                                        style="position: absolute; left: 8px; right: 8px; bottom: 4px; margin-bottom: 0;"
+                                        onclick="
+                                            this.closest('[data-row]').setAttribute('data-expanded', 'true');
+                                            document.querySelectorAll('[data-row={{ $rowId }}]').forEach(function(cell){
+                                                cell.style.height = '{{ $expandedHeight }}px';
+                                            });
+                                            @for($i = $maxVisibleBars; $i < $cellTotalBars; $i++)
+                                                document.querySelector('[data-bar={{ $cellId }}_bar_{{ $i }}]').style.display = 'flex';
+                                            @endfor
+                                            this.style.display='none';
+                                            document.getElementById('{{ $cellId }}_collapse').style.display='flex';
+                                        "
+                                        type="button"
+                                    >
+                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                        </svg>
+                                        +{{ count($hiddenBars) }} more
+                                    </button>
+                                    <button
+                                        id="{{ $cellId }}_collapse"
+                                        class="right-2 bottom-2 bg-gray-200 text-xs px-2 py-1 rounded flex items-center cursor-pointer z-50 border border-gray-300 mb-2"
+                                        style="display:none; position: absolute; left: 8px; right: 8px; bottom: 4px; margin-bottom: 0;"
+                                        onclick="
+                                            this.closest('[data-row]').setAttribute('data-expanded', 'false');
+                                            @for($i = $maxVisibleBars; $i < $cellTotalBars; $i++)
+                                                document.querySelector('[data-bar={{ $cellId }}_bar_{{ $i }}]').style.display = 'none';
+                                            @endfor
+                                            this.style.display='none';
+                                            document.getElementById('{{ $cellId }}_expand').style.display='flex';
 
-        {{-- Debug: Dump logs for each WO --}}
-        <div class="bg-gray-100 p-4 mt-8 rounded text-xs">
-            <strong>DEBUG: Work Order Logs</strong>
-            <ul class="list-disc pl-6">
-                @foreach($workOrders as $wo)
-                    <li>
-                        <span class="font-bold">{{ $wo['unique_id'] ?? $wo['id'] }}</span>
-                        <ul>
-                            @foreach(($wo['workOrderLogs'] ?? []) as $log)
-                                <li>
-                                    [{{ $log['status'] }}: {{ $log['changed_at'] }}]
-                                </li>
-                            @endforeach
-                        </ul>
-                    </li>
+                                            // Only collapse row if ALL cells are collapsed
+                                            let allCollapsed = true;
+                                            document.querySelectorAll('[data-row={{ $rowId }}][data-expanded]').forEach(function(cell){
+                                                if(cell.getAttribute('data-expanded') === 'true') allCollapsed = false;
+                                            });
+                                            if(allCollapsed) {
+                                                document.querySelectorAll('[data-row={{ $rowId }}]').forEach(function(cell){
+                                                    cell.style.height = '{{ $collapsedHeight }}px';
+                                                });
+                                            }
+                                        "
+                                        type="button"
+                                    >
+                                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 15l7-7 7 7"/>
+                                        </svg>
+                                        Collapse
+                                    </button>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
                 @endforeach
-            </ul>
+            </div>
         </div>
     </div>
 </div>
