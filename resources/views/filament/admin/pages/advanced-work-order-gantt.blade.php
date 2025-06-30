@@ -82,15 +82,23 @@
                             <h3 class="text-xl font-semibold text-gray-800 dark:text-gray-100">Work Order Calendar View</h3>
                             <p class="text-sm text-gray-500 dark:text-gray-300">Outlook-like {{ ucfirst($timeRange) }} view</p>
                         </div>
-                        <div class="grid grid-cols-8 bg-yellow-50 dark:bg-yellow-900 border-b border-gray-200 dark:border-gray-700">
-                            <div></div>
+
+                        {{-- Calendar Header --}}
+                        <div class="grid grid-cols-8">
+                            <div class="bg-indigo-600 dark:bg-indigo-900 text-white text-xs font-semibold py-2 px-2 text-center rounded-tl-lg border border-gray-200 dark:border-gray-700">
+                                Week
+                            </div>
                             @foreach($dayNames as $day)
-                                <div class="text-xs font-semibold py-2 px-2 text-gray-700 dark:text-gray-200">{{ $day }}</div>
+                                <div class="bg-indigo-100 dark:bg-indigo-800 text-indigo-900 dark:text-white text-xs font-semibold py-2 px-2 border border-gray-200 dark:border-gray-700 text-center">
+                                    {{ $day }}
+                                </div>
                             @endforeach
                         </div>
+
                         @foreach($weeks as $weekIdx => $week)
                             @php
                                 $rowId = "row_{$weekIdx}";
+                                $weekNumber = $week[0]->format('W');
                                 $maxBarsInRow = 0;
                                 $cellBarsArr = [];
                                 foreach($week as $dayIdx => $day) {
@@ -130,7 +138,11 @@
                                 $collapsedHeight = 20 + ($maxVisibleBars * 24) + (count($cellBarsArr) > $maxVisibleBars ? 36 : 0);
                                 $expandedHeight = 20 + ($maxBarsInRow * 24) + 36;
                             @endphp
-                            <div class="grid grid-cols-8 min-h-[80px] border-b last:border-b-0 relative" id="{{ $rowId }}">
+                            <div class="grid grid-cols-8 min-h-[80px] border-b border-gray-200 dark:border-gray-700 relative" id="{{ $rowId }}">
+                                {{-- Week number cell --}}
+                                <div class="flex items-center justify-center bg-indigo-200 dark:bg-indigo-800 text-indigo-900 dark:text-white text-xs font-bold border-r border-gray-200 dark:border-gray-700">
+                                    {{ $weekNumber }}
+                                </div>
                                 @foreach($week as $dayIdx => $day)
                                     @php
                                         $cellId = "cell_{$weekIdx}_{$dayIdx}";
@@ -492,4 +504,3 @@
         });
     </script>
 </x-filament::page>
-
