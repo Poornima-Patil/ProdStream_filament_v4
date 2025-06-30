@@ -99,7 +99,8 @@ Chefilepath: resources/views/filament/admin/widgets/simple-work-order-gantt.blad
                                             $barTop = 20 + $stackIdx * 24;
                                             $isHidden = $barIdx >= $maxVisibleBars;
                                         @endphp
-                                        <a href="#"
+                                       <a href="{{ url('admin/' . (auth()->user()?->factory_id ?? 3) . '/work-orders/' . $wo['id']) }}"
+
                                            class="absolute left-4 right-4 h-5 rounded flex items-center shadow hover:bg-blue-700 dark:hover:bg-blue-800 transition group"
                                            style="background: #3b82f6; top: {{ $barTop }}px; z-index: 10; text-decoration: none; {{ $isHidden ? 'display:none;' : '' }}"
                                            data-bar="{{ $cellId }}_bar_{{ $barIdx }}"

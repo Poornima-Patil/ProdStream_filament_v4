@@ -83,6 +83,7 @@ Route::get('/test-chart', function () {
     return view('test-chart');
 });
 
-Route::get('/admin/{tenant}/advanced-work-order-gantt', function () {
+/*Route::get('/admin/{tenant}/advanced-work-order-gantt', function () {
     return app(AdvancedWorkOrderGantt::class)->render();
 })->name('filament.admin.widgets.advanced-work-order-gantt');
+*/
