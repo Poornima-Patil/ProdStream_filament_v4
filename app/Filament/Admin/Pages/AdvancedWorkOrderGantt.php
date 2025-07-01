@@ -5,6 +5,8 @@ namespace App\Filament\Admin\Pages;
 use Filament\Pages\Page;
 use App\Models\WorkOrder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
+
 
 class AdvancedWorkOrderGantt extends Page
 {
@@ -22,9 +24,10 @@ class AdvancedWorkOrderGantt extends Page
 
     public function getWorkOrders()
     {
-        $query = WorkOrder::whereNotNull('start_time')
-            ->whereNotNull('end_time')
-            ->orderBy('start_time');
+        $query = WorkOrder::where('factory_id', Auth::user()?->factory_id)
+    ->whereNotNull('start_time')
+    ->whereNotNull('end_time')
+    ->orderBy('start_time');
 
         if ($this->selectedDate) {
             $selectedDate = Carbon::parse($this->selectedDate);

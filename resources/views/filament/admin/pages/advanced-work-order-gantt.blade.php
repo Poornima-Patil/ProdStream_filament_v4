@@ -1,3 +1,6 @@
+@php
+    use Illuminate\Support\Facades\Auth;
+@endphp
 <x-filament::page>
     <div class="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col">
         <div class="flex-1 flex flex-col items-center justify-start py-8">
@@ -172,7 +175,7 @@
                                                     $barColor = $bar['type'] === 'planned' ? '#3b82f6' : '#10B981';
                                                     $barBgClass = $bar['type'] === 'planned' ? 'bg-blue-500 dark:bg-blue-700' : 'bg-green-500 dark:bg-green-700';
                                                 @endphp
-                                                <a href="{{ url('admin/' . (auth()->user()?->factory_id ?? 3) . '/work-orders/' . $wo->id) }}"
+                                                <a href="{{ url('admin/' . (Auth::user()?->factory_id ?? 3) . '/work-orders/' . $wo->id) }}"
                                                     class="absolute left-1 right-1 h-5 rounded flex items-center shadow hover:bg-blue-700 dark:hover:bg-blue-800 transition group {{ $barBgClass }}"
                                                     style="top: {{ $barTop }}px; z-index: 10; text-decoration: none; {{ $isHidden ? 'display:none;' : '' }}"
                                                     data-bar="{{ $cellId }}_bar_{{ $barIdx }}"
@@ -349,7 +352,7 @@
                                                             @php
                                                                 $wo = $bar['wo'];
                                                                 $stackIdx = $bar['stackIdx'];
-                                                                $factoryId = auth()->user()?->factory_id ?? 'default-factory';
+                                                                $factoryId = Auth::user()?->factory_id ?? 'default-factory';
                                                                 $statusColors = config('work_order_status');
                                                                 $barTop = 8 + $stackIdx * 2 * ($barHeight + $barGap);
                                                                 $spanHours = isset($bar['spanHours']) ? max(1, $bar['spanHours']) : 1;
@@ -402,7 +405,7 @@
                                                                     @php
                                                                         $wo = $bar['wo'];
                                                                         $stackIdx = $bar['stackIdx'];
-                                                                        $factoryId = auth()->user()?->factory_id ?? 'default-factory';
+                                                                        $factoryId = Auth::user()?->factory_id ?? 'default-factory';
                                                                         $statusColors = config('work_order_status');
                                                                         $barTop = 8 + $stackIdx * 2 * ($barHeight + $barGap);
                                                                         $spanHours = isset($bar['spanHours']) ? max(1, $bar['spanHours']) : 1;
