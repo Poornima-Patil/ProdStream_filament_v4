@@ -13,7 +13,7 @@
         <pre class="text-xs bg-gray-100 p-4 rounded overflow-x-auto">{{ json_encode($pivotData, JSON_PRETTY_PRINT) }}</pre>
     </div> --}}
     <pre id="pivot-data-json" class="hidden">{{ json_encode($pivotData->values()->all(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) }}</pre>
-    <div class="mt-6 border rounded p-4 bg-white" wire:ignore>
+    <div class="mt-6 border rounded p-4 bg-white overflow-auto" wire:ignore>
         <div id="pivot-table"></div>
     </div>
     <!-- jQuery -->
