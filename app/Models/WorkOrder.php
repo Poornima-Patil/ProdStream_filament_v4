@@ -63,12 +63,12 @@ class WorkOrder extends Model
 
     public function scrappedQuantities()
     {
-        return $this->hasMany(WorkOrderQuantity::class)->where('type', 'scrapped');
+        return $this->hasMany(WorkOrderQuantity::class);
     }
 
     public function okQuantities()
     {
-        return $this->hasMany(WorkOrderQuantity::class)->where('type', 'ok');
+        return $this->hasMany(WorkOrderQuantity::class);
     }
 
     public function quantities()

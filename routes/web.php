@@ -4,6 +4,8 @@ use App\Filament\Admin\Widgets\AdvancedWorkOrderGantt;
 use App\Models\OkQuantity;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
+use App\Exports\WorkOrderExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 Route::get('/', function () {
     return view('welcome');
@@ -87,3 +89,16 @@ Route::get('/test-chart', function () {
     return app(AdvancedWorkOrderGantt::class)->render();
 })->name('filament.admin.widgets.advanced-work-order-gantt');
 */
+
+Route::get('/export/work-orders', function (\Illuminate\Http\Request $request) {
+    $start = $request->input('start') ?? now()->subMonth()->toDateString();
+    $end = $request->input('end') ?? now()->toDateString();
+
+    return Excel::download(new WorkOrderExport($start, $end), 'work-orders.xlsx');
+})->name('export.workorders');
+
+
+Route::get('/debug-workorders', function () {
+    $export = new \App\Exports\WorkOrderSheet('2025-06-01', '2025-06-30');
+    dd($export->collection());
+});
