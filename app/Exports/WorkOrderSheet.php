@@ -16,7 +16,7 @@ class WorkOrderSheet implements FromCollection, WithHeadings
     {
 
         $factoryId = Auth::user()->factory_id;
-
+    \Log::info('Factory ID: ', ['factory_id' => $factoryId]);
         $data = WorkOrder::with([
             'bom.purchaseOrder.partNumber',
             'machine',

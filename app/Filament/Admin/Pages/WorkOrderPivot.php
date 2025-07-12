@@ -9,6 +9,7 @@ use Illuminate\Support\Collection;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Concerns\InteractsWithForms;
+use Illuminate\Support\Facades\Auth;
 
 
 class WorkOrderPivot extends Page implements HasForms
@@ -75,11 +76,15 @@ class WorkOrderPivot extends Page implements HasForms
 
     public function loadData(): void
     {
+
+        $factoryId = Auth::user()->factory_id;
+
         $this->pivotData = WorkOrder::with([
             'bom.purchaseOrder.partNumber',
             'machine',
             'operator.user'
         ])
+            ->where('factory_id', $factoryId) // ✅ filter by the user's factory
             ->whereBetween('created_at', [$this->startDate, $this->endDate])
             ->get()
             ->map(function ($wo) {
