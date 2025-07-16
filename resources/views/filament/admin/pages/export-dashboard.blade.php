@@ -1,5 +1,5 @@
 <x-filament::page>
-    <form wire:submit.prevent="download" class="space-y-4">
+    <form wire:submit.prevent="downloadCsv" class="space-y-4">
         {{-- Renders the form --}}
         {{ $this->form }}
 
