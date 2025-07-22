@@ -51,7 +51,7 @@ class WorkOrderResource extends Resource
                             ->get()
                             ->mapWithKeys(function ($partNumber) {
                                 return [
-                                    $partNumber->id => $partNumber->partnumber.' - '.$partNumber->revision,
+                                    $partNumber->id => $partNumber->partnumber . ' - ' . $partNumber->revision,
                                 ];
                             });
                     })
@@ -110,14 +110,35 @@ class WorkOrderResource extends Resource
                         return \App\Models\Machine::where('machine_group_id', $bom->machine_group_id)
                             ->active()
                             ->get()
-                            ->mapWithKeys(fn ($machine) => [
+                            ->mapWithKeys(fn($machine) => [
                                 (int) $machine->id => "Asset ID: {$machine->assetId} - Name: {$machine->name}",
                             ])
                             ->toArray();
                     })
                     ->reactive()
                     ->required()
-                    ->disabled(! $isAdminOrManager),
+                    ->disabled(! $isAdminOrManager)
+                    ->rules([
+                        function (callable $get) {
+                            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                $startTime = $get('start_time');
+                                $endTime = $get('end_time');
+
+                                if ($value && $startTime && $endTime) {
+                                    $errorMessage = self::getSchedulingValidationError($get, $value, $startTime, $endTime);
+                                    if ($errorMessage) {
+                                        $fail($errorMessage);
+                                    }
+                                }
+                            };
+                        }
+                    ])
+                    ->afterStateUpdated(function (callable $get, callable $set, $state) {
+                        // Only validate if all required fields are filled and this is not the initial load
+                        if ($state && $get('start_time') && $get('end_time')) {
+                            self::validateMachineScheduling($get, $set);
+                        }
+                    }),
 
                 Forms\Components\TextInput::make('qty')
                     ->label('Quantity')
@@ -192,7 +213,7 @@ class WorkOrderResource extends Resource
                             ->with('user') // Get the associated user (operator)
                             ->get()
                             ->mapWithKeys(function ($operator) {
-                                return [$operator->id => $operator->user->first_name.' '.$operator->user->last_name];
+                                return [$operator->id => $operator->user->first_name . ' ' . $operator->user->last_name];
                             });
                     })
                     ->searchable()
@@ -246,22 +267,217 @@ class WorkOrderResource extends Resource
                 Forms\Components\DateTimePicker::make('start_time')
                     ->disabled(! $isAdminOrManager)
                     ->label('Planned Start Time')
-                    ->required(),
+                    ->seconds(false) // Cleaner UI without seconds
+                    ->native(false) // Better custom picker
+                    ->displayFormat('d M Y, H:i') // "21 Jul 2025, 14:30"
+                    ->timezone('Asia/Kolkata')
+                    ->live(onBlur: true)
+                    ->required()
+                    ->rules([
+                        function (callable $get) {
+                            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                $machineId = $get('machine_id');
+                                $endTime = $get('end_time');
+
+                                if ($machineId && $value && $endTime) {
+                                    $errorMessage = self::getSchedulingValidationError($get, $machineId, $value, $endTime);
+                                    if ($errorMessage) {
+                                        $fail($errorMessage);
+                                    }
+                                }
+                            };
+                        }
+                    ])
+                    ->afterStateUpdated(function (callable $get, callable $set, $state) {
+                        // Only validate if all required fields are filled
+                        if ($state && $get('machine_id') && $get('end_time')) {
+                            self::validateMachineScheduling($get, $set);
+                        }
+                    }),
                 Forms\Components\DateTimePicker::make('end_time')
                     ->label('Planned End Time')
                     ->disabled(! $isAdminOrManager)
-                    ->required()    ->helperText(function (callable $get) {
-        $bomId = $get('bom_id');
-        if (!$bomId) {
-            return null;
-        }
-        $bom = \App\Models\Bom::find($bomId);
-        if ($bom && $bom->lead_time) {
-            return 'BOM Target Completion Time: ' . \Carbon\Carbon::parse($bom->lead_time)->format('d M Y');
-        }
-        return null;
-    })
-    ->reactive(),
+                    ->seconds(false) // Cleaner UI without seconds
+                    ->native(false) // Better custom picker
+                    ->displayFormat('d M Y, H:i') // "21 Jul 2025, 14:30"
+                    ->timezone('Asia/Kolkata')
+                    ->live(onBlur: true)
+                    ->required()
+                    ->rules([
+                        function (callable $get) {
+                            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                $machineId = $get('machine_id');
+                                $startTime = $get('start_time');
+
+                                if ($machineId && $startTime && $value) {
+                                    $errorMessage = self::getSchedulingValidationError($get, $machineId, $startTime, $value);
+                                    if ($errorMessage) {
+                                        $fail($errorMessage);
+                                    }
+                                }
+                            };
+                        }
+                    ])
+                    ->afterStateUpdated(function (callable $get, callable $set, $state) {
+                        // Only validate if all required fields are filled
+                        if ($state && $get('machine_id') && $get('start_time')) {
+                            self::validateMachineScheduling($get, $set);
+                        }
+                    })
+                    ->helperText(function (callable $get) {
+                        $bomId = $get('bom_id');
+                        if (!$bomId) {
+                            return null;
+                        }
+                        $bom = \App\Models\Bom::find($bomId);
+                        if ($bom && $bom->lead_time) {
+                            return 'BOM Target Completion Time: ' . \Carbon\Carbon::parse($bom->lead_time)->format('d M Y');
+                        }
+                        return null;
+                    })
+                    ->reactive(),
+
+                // Machine Status Information Section
+                Forms\Components\Section::make('Machine Scheduling Information')
+                    ->schema([
+                        Forms\Components\Placeholder::make('machine_status')
+                            ->label('Current Machine Status')
+                            ->content(function (callable $get) {
+                                $machineId = $get('machine_id');
+                                $startTime = $get('start_time');
+                                $endTime = $get('end_time');
+                                $factoryId = Auth::user()->factory_id ?? null;
+
+                                if (!$machineId || !$factoryId) {
+                                    return 'Select a machine to see status';
+                                }
+
+                                try {
+                                    // Get machine details
+                                    $machine = \App\Models\Machine::find($machineId);
+                                    $machineName = $machine ? "({$machine->assetId} - {$machine->name})" : "";
+
+                                    // Check if machine is currently occupied
+                                    if (WorkOrder::isMachineCurrentlyOccupied($machineId, $factoryId)) {
+                                        $currentWO = WorkOrder::getCurrentRunningWorkOrder($machineId, $factoryId);
+                                        return "🔴 OCCUPIED {$machineName} - Running WO #{$currentWO->unique_id} (Est. completion: " .
+                                            \Carbon\Carbon::parse($currentWO->end_time)->format('M d, H:i') . ")";
+                                    }
+
+                                    // If start and end times are provided, check for conflicts
+                                    if ($startTime && $endTime) {
+                                        $validation = WorkOrder::validateScheduling([
+                                            'machine_id' => $machineId,
+                                            'factory_id' => $factoryId,
+                                            'start_time' => $startTime,
+                                            'end_time' => $endTime,
+                                            'id' => $get('id') // For edit mode
+                                        ]);
+
+                                        if (!$validation['is_valid']) {
+                                            $conflictCount = count($validation['conflicts']);
+                                            return "⚠️ CONFLICTS DETECTED {$machineName} - {$conflictCount} scheduling conflict(s) found";
+                                        }
+                                    }
+
+                                    return "🟢 AVAILABLE {$machineName} - Machine is ready for scheduling";
+                                } catch (\Exception $e) {
+                                    return 'Unable to check machine status';
+                                }
+                            })
+                            ->live(),
+
+                        Forms\Components\Placeholder::make('upcoming_schedule')
+                            ->label('Relevant Schedule')
+                            ->content(function (callable $get) {
+                                $machineId = $get('machine_id');
+                                $startTime = $get('start_time');
+                                $endTime = $get('end_time');
+                                $factoryId = Auth::user()->factory_id ?? null;
+
+                                if (!$machineId || !$factoryId) {
+                                    return 'Select a machine to see relevant schedule';
+                                }
+
+                                try {
+                                    $schedule = [];
+
+                                    // If user has entered scheduling times, show only relevant work orders
+                                    if ($startTime && $endTime) {
+                                        $newStart = \Carbon\Carbon::parse($startTime);
+                                        $newEnd = \Carbon\Carbon::parse($endTime);
+
+                                        // Get ALL work orders for this machine to check for conflicts and same-date items
+                                        $allWOs = WorkOrder::where('machine_id', $machineId)
+                                            ->where('factory_id', $factoryId)
+                                            ->where('status', 'Assigned')
+                                            ->orderBy('start_time')
+                                            ->get();
+
+                                        foreach ($allWOs as $wo) {
+                                            $woStart = \Carbon\Carbon::parse($wo->start_time);
+                                            $woEnd = \Carbon\Carbon::parse($wo->end_time);
+
+                                            $includeInList = false;
+                                            $icon = "📅";
+                                            $status = "";
+
+                                            // Check if this WO conflicts (overlaps) with the new scheduling
+                                            if ($newStart < $woEnd && $newEnd > $woStart) {
+                                                $icon = "⚠️";
+                                                $status = " (CONFLICT)";
+                                                $includeInList = true;
+                                            }
+                                            // Check if it's on the same date but doesn't conflict
+                                            else if ($woStart->isSameDay($newStart)) {
+                                                $icon = "📍";
+                                                $status = " (Same Day)";
+                                                $includeInList = true;
+                                            }
+
+                                            // Only add to schedule if it meets our criteria
+                                            if ($includeInList) {
+                                                $schedule[] = "{$icon} WO #{$wo->unique_id}: " .
+                                                    $woStart->format('M d, H:i') .
+                                                    " - " . $woEnd->format('H:i') . $status;
+                                            }
+                                        }
+                                    } else {
+                                        // If no scheduling times entered, show next few upcoming work orders
+                                        $upcomingWOs = WorkOrder::where('machine_id', $machineId)
+                                            ->where('factory_id', $factoryId)
+                                            ->where('status', 'Assigned')
+                                            ->where('start_time', '>', now())
+                                            ->orderBy('start_time')
+                                            ->limit(3)
+                                            ->get();
+
+                                        foreach ($upcomingWOs as $wo) {
+                                            $schedule[] = "📅 WO #{$wo->unique_id}: " .
+                                                \Carbon\Carbon::parse($wo->start_time)->format('M d, H:i') .
+                                                " - " . \Carbon\Carbon::parse($wo->end_time)->format('H:i');
+                                        }
+                                    }
+
+                                    if (empty($schedule)) {
+                                        return $startTime && $endTime ?
+                                            'No conflicting or same-day work orders found' :
+                                            'No upcoming scheduled work orders';
+                                    }
+
+                                    return implode("\n", $schedule);
+                                } catch (\Exception $e) {
+                                    return 'Unable to load schedule information';
+                                }
+                            })
+                            ->live(),
+                    ])
+                    ->visible(function (callable $get) {
+                        return $get('machine_id') && Auth::user()->factory_id ?? false;
+                    })
+                    ->collapsible()
+                    ->collapsed(),
+
                 Forms\Components\Select::make('status')
                     ->label('Status')
                     ->required()
@@ -311,15 +527,15 @@ class WorkOrderResource extends Resource
                                 $record->createWorkOrderLog('Start');
                             }
                         }
-                        
                     }),
 
                 Forms\Components\TextInput::make('material_batch')
                     ->label('Material Batch ID')
-                    ->required(fn ($get, $record) => $get('status') === 'Start' && ! $record?->material_batch)
-                    ->visible(fn ($get) => in_array($get('status'), ['Start', 'Hold', 'Completed']))
-                    ->disabled(fn ($record) => $record && $record->material_batch)
-                    ->helperText(fn ($get, $record) => $get('status') === 'Start' && ! $record?->material_batch
+                    ->required(fn($get, $record) => $get('status') === 'Start' && ! $record?->material_batch)
+                    ->visible(fn($get) => in_array($get('status'), ['Start', 'Hold', 'Completed']))
+                    ->disabled(fn($record) => $record && $record->material_batch)
+                    ->helperText(
+                        fn($get, $record) => $get('status') === 'Start' && ! $record?->material_batch
                             ? 'Material Batch ID is required when starting the work order'
                             : null
                     ),
@@ -329,9 +545,9 @@ class WorkOrderResource extends Resource
                     ->relationship('holdReason', 'description', function ($query) {
                         return $query->where('factory_id', auth()->user()->factory_id);
                     })
-                    ->visible(fn ($get) => in_array($get('status'), ['Hold']))
+                    ->visible(fn($get) => in_array($get('status'), ['Hold']))
                     ->reactive()
-                    ->required(fn ($get) => in_array($get('status'), ['Hold']))
+                    ->required(fn($get) => in_array($get('status'), ['Hold']))
                     ->columnSpanFull(),
 
                 Forms\Components\Section::make('Quantities')
@@ -345,29 +561,30 @@ class WorkOrderResource extends Resource
                                             ->numeric()
                                             ->required()
                                             ->default(0)
-                                            ->disabled(fn ($record) => $record && $record->exists),
+                                            ->disabled(fn($record) => $record && $record->exists),
                                         Forms\Components\TextInput::make('scrapped_quantity')
                                             ->label('Scrapped Quantity')
                                             ->numeric()
                                             ->required()
                                             ->default(0)
-                                            ->disabled(fn ($record) => $record && $record->exists),
+                                            ->disabled(fn($record) => $record && $record->exists),
                                         Forms\Components\Select::make('reason_id')
                                             ->label('Scrapped Reason')
                                             ->relationship(
                                                 'reason',
                                                 'description',
-                                                fn ($query) => $query->where('factory_id', Auth::user()->factory_id) // Filter reasons by factory
-                                            )->visible(fn ($get) => $get('scrapped_quantity') > 0)
-                                            ->required(fn ($get) => $get('scrapped_quantity') > 0)
-                                            ->disabled(fn ($record) => $record && $record->exists),
+                                                fn($query) => $query->where('factory_id', Auth::user()->factory_id) // Filter reasons by factory
+                                            )->visible(fn($get) => $get('scrapped_quantity') > 0)
+                                            ->required(fn($get) => $get('scrapped_quantity') > 0)
+                                            ->disabled(fn($record) => $record && $record->exists),
                                     ]),
                             ])
                             ->columns(1)
                             ->defaultItems(1)
                             ->reorderable()
                             ->collapsible()
-                            ->itemLabel(fn (array $state): ?string => $state['ok_quantity'] > 0 || $state['scrapped_quantity'] > 0
+                            ->itemLabel(
+                                fn(array $state): ?string => $state['ok_quantity'] > 0 || $state['scrapped_quantity'] > 0
                                     ? "OK: {$state['ok_quantity']}, Scrapped: {$state['scrapped_quantity']}"
                                     : null
                             )
@@ -402,7 +619,7 @@ class WorkOrderResource extends Resource
                             })
                             ->createItemButtonLabel('Add Quantities')
                             ->defaultItems(1)
-                            ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed']))
+                            ->visible(fn($get) => in_array($get('status'), ['Hold', 'Completed']))
                             ->beforeStateDehydrated(function ($state, $record, $get) {
                                 if ($record && $record->exists) {
                                     return;
@@ -439,17 +656,17 @@ class WorkOrderResource extends Resource
                                     ->label('Total OK Quantities')
                                     ->default(0)
                                     ->readonly()
-                                    ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
+                                    ->visible(fn($get) => in_array($get('status'), ['Hold', 'Completed'])),
 
                                 Forms\Components\TextInput::make('scrapped_qtys')
                                     ->label('Total Scrapped Quantities')
                                     ->default(0)
                                     ->readonly()
-                                    ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
+                                    ->visible(fn($get) => in_array($get('status'), ['Hold', 'Completed'])),
                             ]),
                     ])
                     ->columnSpanFull()
-                    ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
+                    ->visible(fn($get) => in_array($get('status'), ['Hold', 'Completed'])),
             ]);
     }
 
@@ -505,7 +722,7 @@ class WorkOrderResource extends Resource
                     ->label('Revision'),
                 Tables\Columns\TextColumn::make('machine.name')
                     ->label('Machine')
-                    ->formatStateUsing(fn ($record) => "{$record->machine->assetId}")
+                    ->formatStateUsing(fn($record) => "{$record->machine->assetId}")
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
@@ -520,7 +737,7 @@ class WorkOrderResource extends Resource
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'Assigned' => 'gray',
                         'Start' => 'warning',
                         'Hold' => 'danger',
@@ -537,34 +754,34 @@ class WorkOrderResource extends Resource
                 Tables\Columns\TextColumn::make('end_time')
                     ->date()
                     ->sortable()
-                    ->toggleable() ->formatStateUsing(function ($state, $record) {
-        // Format the date as usual
-        return \Carbon\Carbon::parse($state)->format('d M Y H:i');
-    })
-    ->extraAttributes(function ($record) {
-        // Check if BOM exists and has a lead_time
-        if ($record->bom && $record->bom->lead_time && $record->end_time) {
-            $plannedEnd = \Carbon\Carbon::parse($record->end_time);
-            $bomLead = \Carbon\Carbon::parse($record->bom->lead_time)->endOfDay();
-            if ($plannedEnd->greaterThan($bomLead)) {
-                // Add a background color (e.g., red-100) if planned end exceeds BOM lead_time
-                return [
-                    'style' => 'background-color: #FCA5A5; cursor: pointer;', // Tailwind red-100
-                ];
-            }
-        }
-        return [];
-    })
-    ->tooltip(function ($record) {
-        if ($record->bom && $record->bom->lead_time && $record->end_time) {
-            $plannedEnd = \Carbon\Carbon::parse($record->end_time);
-            $bomLead = \Carbon\Carbon::parse($record->bom->lead_time)->endOfDay();
-            if ($plannedEnd->greaterThan($bomLead)) {
-                return 'BOM Target Completion Time: ' . \Carbon\Carbon::parse($record->bom->lead_time)->format('d M Y');
-            }
-        }
-        return null;
-    }),
+                    ->toggleable()->formatStateUsing(function ($state, $record) {
+                        // Format the date as usual
+                        return \Carbon\Carbon::parse($state)->format('d M Y H:i');
+                    })
+                    ->extraAttributes(function ($record) {
+                        // Check if BOM exists and has a lead_time
+                        if ($record->bom && $record->bom->lead_time && $record->end_time) {
+                            $plannedEnd = \Carbon\Carbon::parse($record->end_time);
+                            $bomLead = \Carbon\Carbon::parse($record->bom->lead_time)->endOfDay();
+                            if ($plannedEnd->greaterThan($bomLead)) {
+                                // Add a background color (e.g., red-100) if planned end exceeds BOM lead_time
+                                return [
+                                    'style' => 'background-color: #FCA5A5; cursor: pointer;', // Tailwind red-100
+                                ];
+                            }
+                        }
+                        return [];
+                    })
+                    ->tooltip(function ($record) {
+                        if ($record->bom && $record->bom->lead_time && $record->end_time) {
+                            $plannedEnd = \Carbon\Carbon::parse($record->end_time);
+                            $bomLead = \Carbon\Carbon::parse($record->bom->lead_time)->endOfDay();
+                            if ($plannedEnd->greaterThan($bomLead)) {
+                                return 'BOM Target Completion Time: ' . \Carbon\Carbon::parse($record->bom->lead_time)->format('d M Y');
+                            }
+                        }
+                        return null;
+                    }),
                 Tables\Columns\TextColumn::make('ok_qtys')
                     ->label('OK Qtys')
                     ->sortable()
@@ -607,12 +824,13 @@ class WorkOrderResource extends Resource
             ->actions([
                 ActionGroup::make([
                     EditAction::make()
-                        ->visible(fn ($record) => (auth()->user()->hasRole('Operator') && $record->status !== 'Closed') ||
-                        $isAdminOrManager
+                        ->visible(
+                            fn($record) => (auth()->user()->hasRole('Operator') && $record->status !== 'Closed') ||
+                                $isAdminOrManager
                         ),
                     ViewAction::make()->hiddenLabel(),
                     Action::make('Alert Manager')
-                        ->visible(fn () => Auth::check() && Auth::user()->hasRole('Operator'))
+                        ->visible(fn() => Auth::check() && Auth::user()->hasRole('Operator'))
                         ->form([
                             Forms\Components\Textarea::make('comments')
                                 ->label('Comments')
@@ -633,7 +851,7 @@ class WorkOrderResource extends Resource
                         ->button(), // Ensures it's a button, not a link
 
                     Action::make('Alert Operator')
-                        ->visible(fn () => Auth::check() && (Auth::user()->hasRole('Manager') || Auth::user()->hasRole('Factory Admin')))
+                        ->visible(fn() => Auth::check() && (Auth::user()->hasRole('Manager') || Auth::user()->hasRole('Factory Admin')))
                         ->form([
                             Forms\Components\Textarea::make('comments')
                                 ->label('Comments')
@@ -703,7 +921,6 @@ class WorkOrderResource extends Resource
             $userId = Auth::id(); // Get the logged-in user's ID
             $query->whereHas('operator', function ($operatorQuery) use ($userId) {
                 $operatorQuery->where('user_id', $userId);
-
             });
         }
 
@@ -728,5 +945,132 @@ class WorkOrderResource extends Resource
         return [
             \App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderProgress::class,
         ];
+    }
+
+    /**
+     * Get scheduling validation error message for form rules
+     */
+    protected static function getSchedulingValidationError(callable $get, $machineId, $startTime, $endTime): ?string
+    {
+        $factoryId = Auth::user()->factory_id ?? null;
+        $recordId = $get('id');
+
+        if (!$factoryId) {
+            return null;
+        }
+
+        try {
+            $validation = WorkOrder::validateScheduling([
+                'machine_id' => $machineId,
+                'factory_id' => $factoryId,
+                'start_time' => $startTime,
+                'end_time' => $endTime,
+                'id' => $recordId
+            ]);
+
+            if (!$validation['is_valid']) {
+                $conflictMessages = [];
+                foreach ($validation['conflicts'] as $conflict) {
+                    $conflictMessages[] = "Conflict with WO #{$conflict['work_order_unique_id']} ({$conflict['status']}) from " .
+                        \Carbon\Carbon::parse($conflict['planned_start'])->format('M d, H:i') .
+                        " to " . \Carbon\Carbon::parse($conflict['planned_end'])->format('M d, H:i');
+                }
+                return 'Machine scheduling conflict detected: ' . implode('; ', $conflictMessages);
+            }
+        } catch (\Exception $e) {
+            return 'Unable to validate machine scheduling: ' . $e->getMessage();
+        }
+
+        return null;
+    }
+
+    /**
+     * Validate machine scheduling for conflicts
+     */
+    protected static function validateMachineScheduling(callable $get, callable $set)
+    {
+        $machineId = $get('machine_id');
+        $startTime = $get('start_time');
+        $endTime = $get('end_time');
+        $factoryId = Auth::user()->factory_id ?? null;
+        $recordId = $get('id'); // For edit mode
+
+        // Only validate if we have all required data
+        if (!$machineId || !$startTime || !$endTime || !$factoryId) {
+            return;
+        }
+
+        try {
+            // Prepare validation data
+            $workOrderData = [
+                'machine_id' => $machineId,
+                'factory_id' => $factoryId,
+                'start_time' => $startTime,
+                'end_time' => $endTime,
+                'id' => $recordId
+            ];
+
+            // Validate scheduling
+            $validation = WorkOrder::validateScheduling($workOrderData);
+
+            // Show notifications based on validation results
+            if (!$validation['is_valid']) {
+                // Show conflict notification
+                $conflictMessages = [];
+                foreach ($validation['conflicts'] as $conflict) {
+                    $conflictMessages[] = "Conflict with WO #{$conflict['work_order_unique_id']} ({$conflict['status']}) from " .
+                        \Carbon\Carbon::parse($conflict['planned_start'])->format('M d, H:i') .
+                        " to " . \Carbon\Carbon::parse($conflict['planned_end'])->format('M d, H:i');
+                }
+
+                Notification::make()
+                    ->title('🚨 Machine Scheduling Conflict!')
+                    ->body('The selected time slot conflicts with existing work orders:' . PHP_EOL . implode(PHP_EOL, $conflictMessages))
+                    ->danger()
+                    ->persistent()
+                    ->send();
+
+                // Show recommendations if available
+                if (!empty($validation['recommendations'])) {
+                    $recommendationMessages = [];
+                    foreach ($validation['recommendations'] as $recommendation) {
+                        if ($recommendation['type'] === 'reschedule_after_conflicts') {
+                            $recommendationMessages[] = "💡 " . $recommendation['message'];
+                        }
+                    }
+
+                    if (!empty($recommendationMessages)) {
+                        Notification::make()
+                            ->title('Scheduling Recommendations')
+                            ->body(implode(PHP_EOL, $recommendationMessages))
+                            ->warning()
+                            ->persistent()
+                            ->send();
+                    }
+                }
+            } else {
+                // Show warnings if machine is currently occupied
+                if (!empty($validation['warnings'])) {
+                    foreach ($validation['warnings'] as $warning) {
+                        if ($warning['type'] === 'machine_currently_occupied') {
+                            Notification::make()
+                                ->title('⚠️ Machine Currently Occupied')
+                                ->body($warning['message'] . " (Est. completion: " .
+                                    \Carbon\Carbon::parse($warning['estimated_completion'])->format('M d, H:i') . ")")
+                                ->warning()
+                                ->send();
+                        }
+                    }
+                }
+                // Removed the success notification to avoid spam
+            }
+        } catch (\Exception $e) {
+            // Handle any validation errors gracefully
+            Notification::make()
+                ->title('Validation Error')
+                ->body('Unable to validate machine scheduling: ' . $e->getMessage())
+                ->warning()
+                ->send();
+        }
     }
 }

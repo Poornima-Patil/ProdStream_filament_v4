@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Auth;
 
 class WorkOrder extends Model
 {
-    use HasFactory,SoftDeletes;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'bom_id',
@@ -186,5 +186,192 @@ class WorkOrder extends Model
         // }
 
         return $query;
+    }
+
+    /**
+     * Check for scheduling conflicts when planning a new Work Order
+     * 
+     * @param int $machineId
+     * @param \Carbon\Carbon $newStartTime
+     * @param \Carbon\Carbon $newEndTime
+     * @param int $factoryId - Factory ID for multi-tenancy
+     * @param int|null $excludeWorkOrderId - Exclude current WO when updating
+     * @return array
+     */
+    public static function checkSchedulingConflicts($machineId, $newStartTime, $newEndTime, $factoryId, $excludeWorkOrderId = null)
+    {
+        $conflicts = [];
+
+        // Query existing WOs for the same machine within the same factory
+        $existingWorkOrders = self::where('machine_id', $machineId)
+            ->where('factory_id', $factoryId) // Multi-tenancy: filter by factory
+            ->whereIn('status', ['Assigned', 'Start']) // Only check active/planned WOs
+            ->when($excludeWorkOrderId, function ($query) use ($excludeWorkOrderId) {
+                return $query->where('id', '!=', $excludeWorkOrderId);
+            })
+            ->get();
+
+        foreach ($existingWorkOrders as $existingWO) {
+            // Check time overlap: (new_start < existing_end) AND (new_end > existing_start)
+            if ($newStartTime < $existingWO->end_time && $newEndTime > $existingWO->start_time) {
+                $conflicts[] = [
+                    'work_order_id' => $existingWO->id,
+                    'work_order_unique_id' => $existingWO->unique_id,
+                    'status' => $existingWO->status,
+                    'planned_start' => $existingWO->start_time,
+                    'planned_end' => $existingWO->end_time,
+                    'operator_id' => $existingWO->operator_id,
+                    'bom_id' => $existingWO->bom_id,
+                    'conflict_type' => self::getConflictType($newStartTime, $newEndTime, $existingWO->start_time, $existingWO->end_time),
+                    'overlap_duration' => self::calculateOverlapDuration($newStartTime, $newEndTime, $existingWO->start_time, $existingWO->end_time),
+                ];
+            }
+        }
+
+        return $conflicts;
+    }
+
+    /**
+     * Determine the type of scheduling conflict
+     */
+    private static function getConflictType($newStart, $newEnd, $existingStart, $existingEnd)
+    {
+        if ($newStart >= $existingStart && $newEnd <= $existingEnd) {
+            return 'completely_within'; // New WO is completely within existing WO
+        } elseif ($newStart <= $existingStart && $newEnd >= $existingEnd) {
+            return 'completely_covers'; // New WO completely covers existing WO
+        } elseif ($newStart < $existingStart && $newEnd > $existingStart) {
+            return 'overlaps_start'; // New WO overlaps with start of existing WO
+        } elseif ($newStart < $existingEnd && $newEnd > $existingEnd) {
+            return 'overlaps_end'; // New WO overlaps with end of existing WO
+        }
+
+        return 'partial_overlap';
+    }
+
+    /**
+     * Calculate the duration of overlap between two time periods
+     */
+    private static function calculateOverlapDuration($newStart, $newEnd, $existingStart, $existingEnd)
+    {
+        $overlapStart = max($newStart, $existingStart);
+        $overlapEnd = min($newEnd, $existingEnd);
+
+        return $overlapStart->diffInMinutes($overlapEnd);
+    }
+
+    /**
+     * Check if a machine is currently occupied (has WO in "Start" status)
+     * 
+     * @param int $machineId
+     * @param int $factoryId - Factory ID for multi-tenancy
+     * @return bool
+     */
+    public static function isMachineCurrentlyOccupied($machineId, $factoryId)
+    {
+        return self::where('machine_id', $machineId)
+            ->where('factory_id', $factoryId) // Multi-tenancy: filter by factory
+            ->where('status', 'Start')
+            ->exists();
+    }
+
+    /**
+     * Get current running Work Order for a machine
+     * 
+     * @param int $machineId
+     * @param int $factoryId - Factory ID for multi-tenancy
+     * @return WorkOrder|null
+     */
+    public static function getCurrentRunningWorkOrder($machineId, $factoryId)
+    {
+        return self::where('machine_id', $machineId)
+            ->where('factory_id', $factoryId) // Multi-tenancy: filter by factory
+            ->where('status', 'Start')
+            ->first();
+    }
+
+    /**
+     * Validate scheduling for a new Work Order
+     * Returns validation result with conflicts and recommendations
+     * 
+     * @param array $workOrderData
+     * @return array
+     */
+    public static function validateScheduling($workOrderData)
+    {
+        $machineId = $workOrderData['machine_id'];
+        $factoryId = $workOrderData['factory_id']; // Multi-tenancy: get factory ID
+        $startTime = \Carbon\Carbon::parse($workOrderData['start_time']);
+        $endTime = \Carbon\Carbon::parse($workOrderData['end_time']);
+        $excludeId = $workOrderData['id'] ?? null;
+
+        $validation = [
+            'is_valid' => true,
+            'conflicts' => [],
+            'warnings' => [],
+            'recommendations' => []
+        ];
+
+        // Check if machine is currently occupied within the same factory
+        if (self::isMachineCurrentlyOccupied($machineId, $factoryId)) {
+            $currentWO = self::getCurrentRunningWorkOrder($machineId, $factoryId);
+            $validation['warnings'][] = [
+                'type' => 'machine_currently_occupied',
+                'message' => "Machine is currently running Work Order: {$currentWO->unique_id}",
+                'current_work_order' => $currentWO->unique_id,
+                'estimated_completion' => $currentWO->end_time
+            ];
+        }
+
+        // Check for scheduling conflicts within the same factory
+        $conflicts = self::checkSchedulingConflicts($machineId, $startTime, $endTime, $factoryId, $excludeId);
+
+        if (!empty($conflicts)) {
+            $validation['is_valid'] = false;
+            $validation['conflicts'] = $conflicts;
+
+            // Add recommendations based on conflicts
+            $validation['recommendations'] = self::generateSchedulingRecommendations($machineId, $startTime, $endTime, $conflicts);
+        }
+
+        return $validation;
+    }
+
+    /**
+     * Generate scheduling recommendations to resolve conflicts
+     */
+    private static function generateSchedulingRecommendations($machineId, $startTime, $endTime, $conflicts)
+    {
+        $recommendations = [];
+        $duration = $startTime->diffInMinutes($endTime);
+
+        // Find next available slot after conflicts
+        $latestConflictEnd = null;
+        foreach ($conflicts as $conflict) {
+            $conflictEnd = \Carbon\Carbon::parse($conflict['planned_end']);
+            if (!$latestConflictEnd || $conflictEnd > $latestConflictEnd) {
+                $latestConflictEnd = $conflictEnd;
+            }
+        }
+
+        if ($latestConflictEnd) {
+            $recommendedStart = $latestConflictEnd->copy()->addMinutes(15); // 15 min buffer
+            $recommendedEnd = $recommendedStart->copy()->addMinutes($duration);
+
+            $recommendations[] = [
+                'type' => 'reschedule_after_conflicts',
+                'suggested_start_time' => $recommendedStart,
+                'suggested_end_time' => $recommendedEnd,
+                'message' => "Reschedule to start at {$recommendedStart->format('Y-m-d H:i')} (after conflicting work orders)"
+            ];
+        }
+
+        // Suggest alternative machines (if needed, this would require machine compatibility logic)
+        $recommendations[] = [
+            'type' => 'consider_alternative_machine',
+            'message' => 'Consider using an alternative machine if available and compatible'
+        ];
+
+        return $recommendations;
     }
 }
