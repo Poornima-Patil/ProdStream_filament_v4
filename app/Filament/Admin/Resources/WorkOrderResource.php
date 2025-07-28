@@ -346,10 +346,11 @@ class WorkOrderResource extends Resource
                                 $machineId = $get('machine_id');
                                 $startTime = $get('start_time');
                                 $endTime = $get('end_time');
+                                $status = $get('status');
                                 $factoryId = Auth::user()->factory_id ?? null;
 
                                 if (!$machineId || !$factoryId) {
-                                    return 'Select a machine to see status';
+                                    return new \Illuminate\Support\HtmlString('<div class="text-gray-500 italic">Select a machine to see status</div>');
                                 }
 
                                 try {
@@ -357,36 +358,138 @@ class WorkOrderResource extends Resource
                                     $machine = \App\Models\Machine::find($machineId);
                                     $machineName = $machine ? "({$machine->assetId} - {$machine->name})" : "";
 
+                                    // Check if user is trying to start this work order
+                                    if ($status === 'Start') {
+                                        $startValidation = WorkOrder::validateStartStatusTransition($machineId, $factoryId, $get('id'));
+                                        if (!$startValidation['can_start']) {
+                                            $conflictingWO = $startValidation['conflicting_work_order'];
+                                            $operatorName = $conflictingWO->operator?->user
+                                                ? "{$conflictingWO->operator->user->first_name} {$conflictingWO->operator->user->last_name}"
+                                                : 'Unknown';
+                                            $estimatedCompletion = $conflictingWO->end_time
+                                                ? \Carbon\Carbon::parse($conflictingWO->end_time)->format('M d, H:i')
+                                                : 'Unknown';
+
+                                            // Generate the edit URL for the conflicting work order
+                                            $woLink = url("/admin/{$factoryId}/work-orders/{$conflictingWO->id}");
+
+                                            // Determine if it's a running conflict or scheduled conflict
+                                            if ($conflictingWO->status === 'Start') {
+                                                // Work order is actually running
+                                                return new \Illuminate\Support\HtmlString(
+                                                    '<div class="bg-red-50 border border-red-200 rounded-lg p-3">' .
+                                                        '<div class="flex items-center text-red-800 font-semibold mb-2">' .
+                                                        '<span class="text-lg mr-2">🔴</span>' .
+                                                        '<span>CANNOT START ' . htmlspecialchars($machineName) . '</span>' .
+                                                        '</div>' .
+                                                        '<div class="text-red-700 text-sm">' .
+                                                        'Already running <a href="' . $woLink . '" class="font-medium text-red-600 underline hover:text-red-800" target="_blank">WO #' . htmlspecialchars($conflictingWO->unique_id) . '</a><br>' .
+                                                        '<span class="text-gray-600">Operator:</span> ' . htmlspecialchars($operatorName) . '<br>' .
+                                                        '<span class="text-gray-600">Est. completion:</span> ' . htmlspecialchars($estimatedCompletion) . '<br>' .
+                                                        '<span class="text-gray-600 italic">Complete or hold the running work order first.</span>' .
+                                                        '</div>' .
+                                                        '</div>'
+                                                );
+                                            } else {
+                                                // Work order is scheduled (planned conflict)
+                                                $scheduledStart = \Carbon\Carbon::parse($conflictingWO->start_time)->format('M d, H:i');
+                                                $scheduledEnd = \Carbon\Carbon::parse($conflictingWO->end_time)->format('M d, H:i');
+
+                                                return new \Illuminate\Support\HtmlString(
+                                                    '<div class="bg-orange-50 border border-orange-200 rounded-lg p-3">' .
+                                                        '<div class="flex items-center text-orange-800 font-semibold mb-2">' .
+                                                        '<span class="text-lg mr-2">⏰</span>' .
+                                                        '<span>SCHEDULED CONFLICT ' . htmlspecialchars($machineName) . '</span>' .
+                                                        '</div>' .
+                                                        '<div class="text-orange-700 text-sm">' .
+                                                        'Conflicts with planned <a href="' . $woLink . '" class="font-medium text-orange-600 underline hover:text-orange-800" target="_blank">WO #' . htmlspecialchars($conflictingWO->unique_id) . '</a><br>' .
+                                                        '<span class="text-gray-600">Operator:</span> ' . htmlspecialchars($operatorName) . '<br>' .
+                                                        '<span class="text-gray-600">Planned:</span> ' . htmlspecialchars($scheduledStart) . ' - ' . htmlspecialchars($scheduledEnd) . '<br>' .
+                                                        '<span class="text-gray-600 italic">This work order is scheduled to run during this time slot.</span>' .
+                                                        '</div>' .
+                                                        '</div>'
+                                                );
+                                            }
+                                        }
+                                    }
+
                                     // Check if machine is currently occupied
                                     if (WorkOrder::isMachineCurrentlyOccupied($machineId, $factoryId)) {
                                         $currentWO = WorkOrder::getCurrentRunningWorkOrder($machineId, $factoryId);
-                                        return "🔴 OCCUPIED {$machineName} - Running WO #{$currentWO->unique_id} (Est. completion: " .
-                                            \Carbon\Carbon::parse($currentWO->end_time)->format('M d, H:i') . ")";
+                                        // Don't show as occupied if it's the current work order being edited
+                                        if (!$get('id') || $currentWO->id !== $get('id')) {
+                                            $woLink = url("/admin/{$factoryId}/work-orders/{$currentWO->id}");
+                                            $estimatedCompletion = \Carbon\Carbon::parse($currentWO->end_time)->format('M d, H:i');
+
+                                            return new \Illuminate\Support\HtmlString(
+                                                '<div class="bg-red-50 border border-red-200 rounded-lg p-3">' .
+                                                    '<div class="flex items-center text-red-800 font-semibold mb-2">' .
+                                                    '<span class="text-lg mr-2">🔴</span>' .
+                                                    '<span>OCCUPIED ' . htmlspecialchars($machineName) . '</span>' .
+                                                    '</div>' .
+                                                    '<div class="text-red-700 text-sm">' .
+                                                    'Running <a href="' . $woLink . '" class="font-medium text-red-600 underline hover:text-red-800" target="_blank">WO #' . htmlspecialchars($currentWO->unique_id) . '</a><br>' .
+                                                    '<span class="text-gray-600">Est. completion:</span> ' . htmlspecialchars($estimatedCompletion) .
+                                                    '</div>' .
+                                                    '</div>'
+                                            );
+                                        }
                                     }
 
-                                    // If start and end times are provided, check for conflicts
+                                    // If start and end times are provided, check for scheduling conflicts
                                     if ($startTime && $endTime) {
                                         $validation = WorkOrder::validateScheduling([
                                             'machine_id' => $machineId,
                                             'factory_id' => $factoryId,
                                             'start_time' => $startTime,
                                             'end_time' => $endTime,
+                                            'status' => $status,
                                             'id' => $get('id') // For edit mode
                                         ]);
 
                                         if (!$validation['is_valid']) {
                                             $conflictCount = count($validation['conflicts']);
-                                            return "⚠️ CONFLICTS DETECTED {$machineName} - {$conflictCount} scheduling conflict(s) found";
+                                            return new \Illuminate\Support\HtmlString(
+                                                '<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">' .
+                                                    '<div class="flex items-center text-yellow-800 font-semibold">' .
+                                                    '<span class="text-lg mr-2">⚠️</span>' .
+                                                    '<span>CONFLICTS DETECTED ' . htmlspecialchars($machineName) . '</span>' .
+                                                    '</div>' .
+                                                    '<div class="text-yellow-700 text-sm mt-1">' .
+                                                    htmlspecialchars($conflictCount) . ' scheduling conflict(s) found' .
+                                                    '</div>' .
+                                                    '</div>'
+                                            );
                                         }
                                     }
 
-                                    return "🟢 AVAILABLE {$machineName} - Machine is ready for scheduling";
+                                    return new \Illuminate\Support\HtmlString(
+                                        '<div class="bg-green-50 border border-green-200 rounded-lg p-3">' .
+                                            '<div class="flex items-center text-green-800 font-semibold">' .
+                                            '<span class="text-lg mr-2">🟢</span>' .
+                                            '<span>AVAILABLE ' . htmlspecialchars($machineName) . '</span>' .
+                                            '</div>' .
+                                            '<div class="text-green-700 text-sm mt-1">' .
+                                            'Machine is ready for scheduling' .
+                                            '</div>' .
+                                            '</div>'
+                                    );
                                 } catch (\Exception $e) {
-                                    return 'Unable to check machine status';
+                                    // Log the actual error for debugging
+                                    \Illuminate\Support\Facades\Log::error('Machine status check failed: ' . $e->getMessage(), [
+                                        'exception' => $e,
+                                        'machine_id' => $machineId,
+                                        'factory_id' => $factoryId,
+                                        'status' => $status
+                                    ]);
+
+                                    return new \Illuminate\Support\HtmlString(
+                                        '<div class="text-red-500 italic">Unable to check machine status<br>' .
+                                            '<small>Error: ' . htmlspecialchars($e->getMessage()) . '</small></div>'
+                                    );
                                 }
                             })
                             ->live(),
-
                         Forms\Components\Placeholder::make('upcoming_schedule')
                             ->label('Relevant Schedule')
                             ->content(function (callable $get) {
@@ -396,7 +499,7 @@ class WorkOrderResource extends Resource
                                 $factoryId = Auth::user()->factory_id ?? null;
 
                                 if (!$machineId || !$factoryId) {
-                                    return 'Select a machine to see relevant schedule';
+                                    return new \Illuminate\Support\HtmlString('<div class="text-gray-500 italic">Select a machine to see relevant schedule</div>');
                                 }
 
                                 try {
@@ -421,25 +524,39 @@ class WorkOrderResource extends Resource
                                             $includeInList = false;
                                             $icon = "📅";
                                             $status = "";
+                                            $bgColor = "bg-blue-50 border-blue-200";
+                                            $textColor = "text-blue-800";
 
                                             // Check if this WO conflicts (overlaps) with the new scheduling
                                             if ($newStart < $woEnd && $newEnd > $woStart) {
                                                 $icon = "⚠️";
-                                                $status = " (CONFLICT)";
+                                                $status = "CONFLICT";
+                                                $bgColor = "bg-red-50 border-red-200";
+                                                $textColor = "text-red-800";
                                                 $includeInList = true;
                                             }
                                             // Check if it's on the same date but doesn't conflict
                                             else if ($woStart->isSameDay($newStart)) {
                                                 $icon = "📍";
-                                                $status = " (Same Day)";
+                                                $status = "Same Day";
+                                                $bgColor = "bg-yellow-50 border-yellow-200";
+                                                $textColor = "text-yellow-800";
                                                 $includeInList = true;
                                             }
 
                                             // Only add to schedule if it meets our criteria
                                             if ($includeInList) {
-                                                $schedule[] = "{$icon} WO #{$wo->unique_id}: " .
-                                                    $woStart->format('M d, H:i') .
-                                                    " - " . $woEnd->format('H:i') . $status;
+                                                $woLink = url("/admin/{$factoryId}/work-orders/{$wo->id}");
+                                                $schedule[] = [
+                                                    'work_order' => $wo,
+                                                    'link' => $woLink,
+                                                    'icon' => $icon,
+                                                    'status' => $status,
+                                                    'bg_color' => $bgColor,
+                                                    'text_color' => $textColor,
+                                                    'start_formatted' => $woStart->format('M d, H:i'),
+                                                    'end_formatted' => $woEnd->format('H:i')
+                                                ];
                                             }
                                         }
                                     } else {
@@ -453,21 +570,74 @@ class WorkOrderResource extends Resource
                                             ->get();
 
                                         foreach ($upcomingWOs as $wo) {
-                                            $schedule[] = "📅 WO #{$wo->unique_id}: " .
-                                                \Carbon\Carbon::parse($wo->start_time)->format('M d, H:i') .
-                                                " - " . \Carbon\Carbon::parse($wo->end_time)->format('H:i');
+                                            $woLink = url("/admin/{$factoryId}/work-orders/{$wo->id}");
+                                            $schedule[] = [
+                                                'work_order' => $wo,
+                                                'link' => $woLink,
+                                                'icon' => '📅',
+                                                'status' => 'Upcoming',
+                                                'bg_color' => 'bg-blue-50 border-blue-200',
+                                                'text_color' => 'text-blue-800',
+                                                'start_formatted' => \Carbon\Carbon::parse($wo->start_time)->format('M d, H:i'),
+                                                'end_formatted' => \Carbon\Carbon::parse($wo->end_time)->format('H:i')
+                                            ];
                                         }
                                     }
 
                                     if (empty($schedule)) {
-                                        return $startTime && $endTime ?
+                                        $message = $startTime && $endTime ?
                                             'No conflicting or same-day work orders found' :
                                             'No upcoming scheduled work orders';
+                                        return new \Illuminate\Support\HtmlString(
+                                            '<div class="bg-green-50 border border-green-200 rounded-lg p-3">' .
+                                                '<div class="flex items-center text-green-800">' .
+                                                '<span class="text-lg mr-2">✅</span>' .
+                                                '<span>' . htmlspecialchars($message) . '</span>' .
+                                                '</div>' .
+                                                '</div>'
+                                        );
                                     }
 
-                                    return implode("\n", $schedule);
+                                    // Build the HTML content
+                                    $content = '<div class="space-y-2">';
+                                    foreach ($schedule as $item) {
+                                        $operatorName = $item['work_order']->operator?->user
+                                            ? "{$item['work_order']->operator->user->first_name} {$item['work_order']->operator->user->last_name}"
+                                            : 'Unassigned';
+
+                                        $content .= '<div class="' . $item['bg_color'] . ' border rounded-lg p-3">' .
+                                            '<div class="flex items-center justify-between mb-2">' .
+                                            '<div class="flex items-center">' .
+                                            '<span class="text-lg mr-2">' . $item['icon'] . '</span>' .
+                                            '<a href="' . $item['link'] . '" class="font-medium ' . $item['text_color'] . ' underline hover:opacity-80" target="_blank">' .
+                                            'WO #' . htmlspecialchars($item['work_order']->unique_id) . '</a>' .
+                                            '</div>' .
+                                            '<span class="px-2 py-1 text-xs rounded-full bg-white ' . $item['text_color'] . ' font-medium">' .
+                                            htmlspecialchars($item['status']) . '</span>' .
+                                            '</div>' .
+                                            '<div class="text-sm ' . $item['text_color'] . '">' .
+                                            '<div><span class="font-medium">Time:</span> ' . htmlspecialchars($item['start_formatted']) . ' - ' . htmlspecialchars($item['end_formatted']) . '</div>' .
+                                            '<div><span class="font-medium">Operator:</span> ' . htmlspecialchars($operatorName) . '</div>' .
+                                            '</div>' .
+                                            '</div>';
+                                    }
+                                    $content .= '</div>';
+
+                                    return new \Illuminate\Support\HtmlString($content);
                                 } catch (\Exception $e) {
-                                    return 'Unable to load schedule information';
+                                    // Log the actual error for debugging
+                                    \Illuminate\Support\Facades\Log::error('Schedule information failed: ' . $e->getMessage(), [
+                                        'exception' => $e,
+                                        'machine_id' => $machineId,
+                                        'factory_id' => $factoryId,
+                                        'start_time' => $startTime,
+                                        'end_time' => $endTime
+                                    ]);
+
+                                    return new \Illuminate\Support\HtmlString(
+                                        '<div class="text-red-500 italic">Unable to load schedule information<br>' .
+                                            '<small>Error: ' . htmlspecialchars($e->getMessage()) . '</small></div>'
+                                    );
                                 }
                             })
                             ->live(),
@@ -510,8 +680,28 @@ class WorkOrderResource extends Resource
                             'Completed' => 'Completed',
                         ];
                     })
+                    ->rules([
+                        function (callable $get) {
+                            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                // Only validate when trying to transition to 'Start' status
+                                if ($value === 'Start') {
+                                    $machineId = $get('machine_id');
+                                    $factoryId = Auth::user()->factory_id ?? null;
+                                    $recordId = $get('id');
+
+                                    if ($machineId && $factoryId) {
+                                        $startValidation = WorkOrder::validateStartStatusTransition($machineId, $factoryId, $recordId);
+
+                                        if (!$startValidation['can_start']) {
+                                            $fail($startValidation['message']);
+                                        }
+                                    }
+                                }
+                            };
+                        }
+                    ])
                     ->reactive()
-                    ->afterStateUpdated(function ($set, $get, $livewire, $record) {
+                    ->afterStateUpdated(function ($set, $get, $livewire, $record, $state) {
                         $status = $get('status');
                         if ($status !== 'Hold') {
                             $livewire->data['hold_reason_id'] = null;
@@ -526,6 +716,11 @@ class WorkOrderResource extends Resource
                             if (!$existingLog) {
                                 $record->createWorkOrderLog('Start');
                             }
+                        }
+
+                        // Trigger machine status update when status changes
+                        if ($state && $get('machine_id')) {
+                            self::validateMachineScheduling($get, $set);
                         }
                     }),
 
@@ -954,6 +1149,7 @@ class WorkOrderResource extends Resource
     {
         $factoryId = Auth::user()->factory_id ?? null;
         $recordId = $get('id');
+        $status = $get('status');
 
         if (!$factoryId) {
             return null;
@@ -965,9 +1161,16 @@ class WorkOrderResource extends Resource
                 'factory_id' => $factoryId,
                 'start_time' => $startTime,
                 'end_time' => $endTime,
+                'status' => $status,
                 'id' => $recordId
             ]);
 
+            // Check for start status conflicts first (more critical)
+            if (isset($validation['start_validation']) && !$validation['start_validation']['can_start']) {
+                return $validation['start_validation']['message'];
+            }
+
+            // Check for scheduling conflicts
             if (!$validation['is_valid']) {
                 $conflictMessages = [];
                 foreach ($validation['conflicts'] as $conflict) {

@@ -291,6 +291,93 @@ class WorkOrder extends Model
     }
 
     /**
+     * Validate if a Work Order can transition to 'Start' status
+     * Ensures only one WO can be in 'Start' status per machine at any time
+     * Also checks if starting would conflict with planned schedules
+     * 
+     * @param int $machineId
+     * @param int $factoryId - Factory ID for multi-tenancy
+     * @param int|null $excludeWorkOrderId - Exclude current WO when updating
+     * @return array
+     */
+    public static function validateStartStatusTransition($machineId, $factoryId, $excludeWorkOrderId = null)
+    {
+        $validation = [
+            'can_start' => true,
+            'conflicting_work_order' => null,
+            'message' => null
+        ];
+
+        // Check if another WO is already in 'Start' status on this machine
+        $runningWorkOrder = self::where('machine_id', $machineId)
+            ->where('factory_id', $factoryId) // Multi-tenancy: filter by factory
+            ->where('status', 'Start')
+            ->when($excludeWorkOrderId, function ($query) use ($excludeWorkOrderId) {
+                return $query->where('id', '!=', $excludeWorkOrderId);
+            })
+            ->with(['operator.user', 'machine']) // Load related data for detailed message
+            ->first();
+
+        if ($runningWorkOrder) {
+            $operatorName = $runningWorkOrder->operator?->user
+                ? "{$runningWorkOrder->operator->user->first_name} {$runningWorkOrder->operator->user->last_name}"
+                : 'Unknown';
+
+            $machineName = $runningWorkOrder->machine
+                ? "{$runningWorkOrder->machine->assetId} - {$runningWorkOrder->machine->name}"
+                : 'Unknown Machine';
+
+            $estimatedCompletion = $runningWorkOrder->end_time
+                ? \Carbon\Carbon::parse($runningWorkOrder->end_time)->format('M d, H:i')
+                : 'Unknown';
+
+            $validation['can_start'] = false;
+            $validation['conflicting_work_order'] = $runningWorkOrder;
+            $validation['message'] = "Cannot start: Machine {$machineName} is already running Work Order #{$runningWorkOrder->unique_id} (Operator: {$operatorName}, Est. completion: {$estimatedCompletion}). Complete or hold the running work order first.";
+
+            return $validation;
+        }
+
+        // If no running WO found, check for scheduled conflicts with planned times
+        $currentTime = now();
+
+        // Check if the current time falls within any scheduled work order's planned time window
+        $conflictingScheduledWO = self::where('machine_id', $machineId)
+            ->where('factory_id', $factoryId)
+            ->where('status', 'Assigned') // Only check scheduled (assigned) work orders
+            ->when($excludeWorkOrderId, function ($query) use ($excludeWorkOrderId) {
+                return $query->where('id', '!=', $excludeWorkOrderId);
+            })
+            ->whereNotNull('start_time')
+            ->whereNotNull('end_time')
+            ->where(function ($query) use ($currentTime) {
+                $query->where('start_time', '<=', $currentTime)
+                    ->where('end_time', '>', $currentTime);
+            })
+            ->with(['operator.user', 'machine'])
+            ->first();
+
+        if ($conflictingScheduledWO) {
+            $operatorName = $conflictingScheduledWO->operator?->user
+                ? "{$conflictingScheduledWO->operator->user->first_name} {$conflictingScheduledWO->operator->user->last_name}"
+                : 'Unknown';
+
+            $machineName = $conflictingScheduledWO->machine
+                ? "{$conflictingScheduledWO->machine->assetId} - {$conflictingScheduledWO->machine->name}"
+                : 'Unknown Machine';
+
+            $scheduledStart = \Carbon\Carbon::parse($conflictingScheduledWO->start_time)->format('M d, H:i');
+            $scheduledEnd = \Carbon\Carbon::parse($conflictingScheduledWO->end_time)->format('M d, H:i');
+
+            $validation['can_start'] = false;
+            $validation['conflicting_work_order'] = $conflictingScheduledWO;
+            $validation['message'] = "Cannot start: Current time conflicts with planned Work Order #{$conflictingScheduledWO->unique_id} on {$machineName} (Operator: {$operatorName}, Planned: {$scheduledStart} - {$scheduledEnd}). This work order is scheduled to run during this time slot.";
+        }
+
+        return $validation;
+    }
+
+    /**
      * Validate scheduling for a new Work Order
      * Returns validation result with conflicts and recommendations
      * 
@@ -304,23 +391,37 @@ class WorkOrder extends Model
         $startTime = \Carbon\Carbon::parse($workOrderData['start_time']);
         $endTime = \Carbon\Carbon::parse($workOrderData['end_time']);
         $excludeId = $workOrderData['id'] ?? null;
+        $newStatus = $workOrderData['status'] ?? null;
 
         $validation = [
             'is_valid' => true,
             'conflicts' => [],
             'warnings' => [],
-            'recommendations' => []
+            'recommendations' => [],
+            'start_validation' => null
         ];
 
-        // Check if machine is currently occupied within the same factory
+        // Check if trying to transition to 'Start' status
+        if ($newStatus === 'Start') {
+            $startValidation = self::validateStartStatusTransition($machineId, $factoryId, $excludeId);
+            $validation['start_validation'] = $startValidation;
+
+            if (!$startValidation['can_start']) {
+                $validation['is_valid'] = false;
+            }
+        }
+
+        // Check if machine is currently occupied within the same factory (for scheduling purposes)
         if (self::isMachineCurrentlyOccupied($machineId, $factoryId)) {
             $currentWO = self::getCurrentRunningWorkOrder($machineId, $factoryId);
-            $validation['warnings'][] = [
-                'type' => 'machine_currently_occupied',
-                'message' => "Machine is currently running Work Order: {$currentWO->unique_id}",
-                'current_work_order' => $currentWO->unique_id,
-                'estimated_completion' => $currentWO->end_time
-            ];
+            if (!$excludeId || $currentWO->id !== $excludeId) {
+                $validation['warnings'][] = [
+                    'type' => 'machine_currently_occupied',
+                    'message' => "Machine is currently running Work Order: {$currentWO->unique_id}",
+                    'current_work_order' => $currentWO->unique_id,
+                    'estimated_completion' => $currentWO->end_time
+                ];
+            }
         }
 
         // Check for scheduling conflicts within the same factory
@@ -355,7 +456,7 @@ class WorkOrder extends Model
         }
 
         if ($latestConflictEnd) {
-            $recommendedStart = $latestConflictEnd->copy()->addMinutes(15); // 15 min buffer
+            $recommendedStart = $latestConflictEnd->copy(); // Add buffer here with ->addMinuteds() if required
             $recommendedEnd = $recommendedStart->copy()->addMinutes($duration);
 
             $recommendations[] = [
