@@ -16,7 +16,7 @@ class PermissionsTableSeeder_new extends Seeder
     {
         // Define permissions
         $permissions = [
-            /* 'View Bom',
+             'View Bom',
             'Create Bom',
             'Edit Bom',
             'Delete Bom',
@@ -90,7 +90,7 @@ class PermissionsTableSeeder_new extends Seeder
             'Create HoldReason',
             'View HoldReason',
             'Edit HoldReason',
-            'Delete HoldReason',*/
+            'Delete HoldReason',
 
             'Create MachineGroup',
             'Edit MachineGroup',
@@ -108,10 +108,10 @@ class PermissionsTableSeeder_new extends Seeder
                 'name' => $permission,
                 'group' => $groupName,  // Add the group attribute
                 'guard_name' => 'web',
-                'factory_id' => 3,
+                'factory_id' => 6,
             ]);
 
-            // $role1 = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web', 'factory_id'=> 1]);
+            $role1 = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web', 'factory_id'=> 1]);
 
             // Assign role
             $perm->assignRole('Super Admin');
