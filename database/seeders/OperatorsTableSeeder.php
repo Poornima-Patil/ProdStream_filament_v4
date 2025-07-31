@@ -14,55 +14,39 @@ class OperatorsTableSeeder extends Seeder
     {
         $factoryId = env('SEED_FACTORY_ID', 1);
 
-        // Get 12 operator users
-        $operatorUsers = User::role('operator')->take(12)->get();
+        // Get all users with 'operator' role in this factory
+        $operatorUsers = User::whereHas('roles', function ($query) {
+                $query->where('name', 'operator');
+            })
+            ->where('factory_id', $factoryId)
+            ->get();
 
-        if ($operatorUsers->count() < 12) {
-            $this->command->error('Not enough operator users (need 12)');
+        if ($operatorUsers->isEmpty()) {
+            $this->command->error('No operator users found in the users table.');
             return;
         }
 
-        $shifts = Shift::take(4)->get();
-        if ($shifts->count() < 4) {
-            $this->command->error('Not enough shifts (need 4)');
+        // Get all available shifts and proficiencies
+        $shifts = Shift::where('factory_id', $factoryId)->get();
+        $proficiencies = OperatorProficiency::where('factory_id', $factoryId)->get();
+
+        if ($shifts->isEmpty() || $proficiencies->isEmpty()) {
+            $this->command->error('Shifts or Proficiencies not found.');
             return;
         }
 
-        $levels = ['Fresher', 'Assist', 'Max'];
-        $skills = ['Fabricator', 'Maintenance Technician', 'Quality Inspector'];
+        foreach ($operatorUsers as $index => $user) {
+            $shift = $shifts[$index % $shifts->count()];
+            $proficiency = $proficiencies[$index % $proficiencies->count()];
 
-        // Build combinations
-        $combinations = [];
-
-        foreach ($levels as $level) {
-            foreach ($skills as $skill) {
-                $proficiencyName = "$level $skill";
-                $proficiency = OperatorProficiency::where('proficiency', $proficiencyName)
-                    ->where('factory_id', $factoryId)
-                    ->first();
-
-                if ($proficiency) {
-                    $combinations[$level][] = $proficiency;
-                }
-            }
+            Operator::create([
+                'user_id' => $user->id,
+                'shift_id' => $shift->id,
+                'operator_proficiency_id' => $proficiency->id,
+                'factory_id' => $factoryId,
+            ]);
         }
 
-        // Assign 4 users to each level
-        $userIndex = 0;
-        foreach ($levels as $level) {
-            $proficiencies = $combinations[$level];
-            for ($i = 0; $i < 4; $i++) {
-                $user = $operatorUsers[$userIndex++];
-                $proficiency = $proficiencies[$i % count($proficiencies)];
-                $shift = $shifts[$i % count($shifts)];
-
-                Operator::create([
-                    'user_id' => $user->id,
-                    'operator_proficiency_id' => $proficiency->id,
-                    'shift_id' => $shift->id,
-                    'factory_id' => $factoryId,
-                ]);
-            }
-        }
+        $this->command->info("Seeded {$operatorUsers->count()} operators with shift and proficiency assignments.");
     }
 }

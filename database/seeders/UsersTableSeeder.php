@@ -1,34 +1,5 @@
 <?php
 
-/*namespace Database\Seeders;
-
-use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;*/
-
-/*class UserTableSeeder extends Seeder
-{
-    /**
-     * Run the database seeds.
-     */
-   /* public function run(): void
-    {
-        $user = DB::table('users')->insert([
-            [
-                'first_name' => 'Super',
-                'last_name' => 'Admin',
-                'email' => 'admin@example.com',
-                'password' => Hash::make('password'), // Hashing the password
-                'email_verified_at' => now(), // Optional: set to now if you want to mark the email as verified
-                'remember_token' => null, // Optional: used for "remember me" functionality
-                'created_at' => now(),
-                'updated_at' => now(),
-
-            ],
-        ]);
-    }
-}*/
-
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -42,51 +13,60 @@ class UsersTableSeeder extends Seeder
     {
         $factoryId = env('SEED_FACTORY_ID', 1);
 
-        // Fetch 6 departments for operators and managers
+        // Fetch all non-management departments
         $departments = Department::where('factory_id', $factoryId)
-            ->where('name', '!=', 'Management') // Optional: if Management exists
-            ->take(6)
+            ->where('name', '!=', 'Management')
             ->get();
 
-        if ($departments->count() < 6) {
-            $this->command->error('Not enough departments found for factory_id: ' . $factoryId);
+        $departmentCount = $departments->count();
+
+        if ($departmentCount === 0) {
+            $this->command->error("No departments found for factory_id: $factoryId");
             return;
         }
 
-        // Create 12 operators (2 per department)
-        $operatorCount = 0;
-        foreach ($departments as $department) {
-            for ($i = 1; $i <= 2; $i++) {
-                $operatorCount++;
+        // Define total number of operators to create
+        $totalOperators = 12;
+
+        // Calculate distribution of operators across departments
+        $operatorsPerDepartment = intdiv($totalOperators, $departmentCount);
+        $remaining = $totalOperators % $departmentCount;
+
+        $operatorIndex = 1;
+
+        foreach ($departments as $index => $department) {
+            $operatorsToCreate = $operatorsPerDepartment + ($index < $remaining ? 1 : 0);
+
+            // Create operators for this department
+            for ($i = 0; $i < $operatorsToCreate; $i++) {
                 $user = User::create([
                     'first_name' => fake()->firstName,
                     'last_name' => fake()->lastName,
-                    'emp_id' => 'OPR' . str_pad($operatorCount, 3, '0', STR_PAD_LEFT),
-                    'email' => 'operator' . $operatorCount . '@beta.com',
+                    'emp_id' => 'OPR' . str_pad($operatorIndex, 3, '0', STR_PAD_LEFT),
+                    'email' => 'operator' . $operatorIndex . '@beta.com',
                     'password' => Hash::make('password'),
                     'factory_id' => $factoryId,
                     'department_id' => $department->id,
                     'email_verified_at' => now(),
                 ]);
                 $user->assignRole('operator');
+                $operatorIndex++;
             }
-        }
 
-        // Create 6 managers — one per department
-        $managerCount = 0;
-        foreach ($departments as $department) {
-            $managerCount++;
-            $user = User::create([
+            // Create 1 manager for this department
+            $manager = User::create([
                 'first_name' => 'Manager',
                 'last_name' => 'Dept' . $department->id,
-                'emp_id' => 'MGR' . str_pad($managerCount, 3, '0', STR_PAD_LEFT),
-                'email' => 'manager' . $managerCount . '@beta.com',
+                'emp_id' => 'MGR' . str_pad($index + 1, 3, '0', STR_PAD_LEFT),
+                'email' => 'manager' . ($index + 1) . '@beta.com',
                 'password' => Hash::make('password'),
                 'factory_id' => $factoryId,
                 'department_id' => $department->id,
                 'email_verified_at' => now(),
             ]);
-            $user->assignRole('manager');
+            $manager->assignRole('manager');
         }
+
+        $this->command->info("Created 12 operators and {$departmentCount} managers across departments.");
     }
 }

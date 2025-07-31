@@ -3,26 +3,49 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use App\Models\Shift;
+use Illuminate\Support\Facades\DB;
 
 class ShiftsTableSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         $factoryId = env('SEED_FACTORY_ID', 1); // Default to 1 if not set
 
         $shifts = [
-            ['name' => '1st Shift (06:00 - 14:00)', 'factory_id' => $factoryId],
-            ['name' => '2nd Shift (14:00 - 22:00)', 'factory_id' => $factoryId],
-            ['name' => '3rd Shift (22:00 - 06:00)', 'factory_id' => $factoryId],
-            ['name' => 'Maintenance Shift (10:00 - 14:00)', 'factory_id' => $factoryId],
+            [
+                'factory_id' => $factoryId,
+                'name' => '1st Shift',
+                'start_time' => '06:00:00',
+                'end_time' => '14:00:00', // 8 hours
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'factory_id' => $factoryId,
+                'name' => '2nd Shift',
+                'start_time' => '14:00:00',
+                'end_time' => '22:00:00', // 8 hours
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'factory_id' => $factoryId,
+                'name' => '3rd Shift',
+                'start_time' => '22:00:00',
+                'end_time' => '06:00:00', // 8 hours (overnight)
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'factory_id' => $factoryId,
+                'name' => 'Half Day Shift',
+                'start_time' => '10:00:00',
+                'end_time' => '14:00:00', // 4 hours
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
         ];
 
-        foreach ($shifts as $shift) {
-            Shift::create($shift);
-        }
+        DB::table('shifts')->insert($shifts);
     }
 }
