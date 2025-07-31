@@ -35,15 +35,15 @@ class UserResource extends Resource
                 Forms\Components\TextInput::make('email')
                     ->email()
                     ->required()
-                    ->unique(),
+                    ->unique(ignoreRecord: true),
                 Forms\Components\TextInput::make('emp_id')
                     ->default('0'),
                 Forms\Components\TextInput::make('password')
                     ->password()
                     ->required()
-                    ->dehydrateStateUsing(fn ($state) => Hash::make($state))
-                    ->dehydrated(fn ($state) => filled($state))
-                    ->required(fn (Page $livewire) => ($livewire instanceof CreateUser)),
+                    ->dehydrateStateUsing(fn($state) => Hash::make($state))
+                    ->dehydrated(fn($state) => filled($state))
+                    ->required(fn(Page $livewire) => ($livewire instanceof CreateUser)),
                 Forms\Components\Select::make('roles')
                     ->label('Roles')
                     ->multiple()
@@ -52,7 +52,7 @@ class UserResource extends Resource
                     ->required(),
                 Forms\Components\Hidden::make('factory_id')
                     ->default(Auth::user()->factory_id) // Set the default value dynamically
-                    ->dehydrated(fn ($state) => $state ?? Auth::user()->factory_id),
+                    ->dehydrated(fn($state) => $state ?? Auth::user()->factory_id),
                 Forms\Components\Select::make('department_id')
                     ->relationship('department', 'name', function ($query) {
                         // Filter by the current user's factory_id
