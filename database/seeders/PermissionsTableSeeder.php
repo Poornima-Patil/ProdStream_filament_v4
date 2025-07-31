@@ -16,7 +16,7 @@ class PermissionsTableSeeder extends Seeder
     {
         // Define permissions
         $permissions = [
-            'View Bom',
+            /*'View Bom',
             'Create Bom',
             'Edit Bom',
             'Delete Bom',
@@ -84,29 +84,43 @@ class PermissionsTableSeeder extends Seeder
             'Create Factory',
             'View Factory',
             'Edit Factory',
-            'Delete Factory',
+            'Delete Factory',*/
+
+            'View Customer Information',
+            'Create Customer Information',
+            'Edit Customer Information',
+            'Delete Customer Information',
         ];
+
+        // Create role if it doesn't exist
+        $role = Role::firstOrCreate([
+            'name' => 'Super Admin',
+            'guard_name' => 'web',
+            'factory_id' => 1,
+        ]);
 
         foreach ($permissions as $permission) {
             // Extract group name by removing the first word
             $words = explode(' ', $permission, 2);
-            $groupName = $words[1] ?? $permission; // Group name is everything after the first word
+            $groupName = $words[1] ?? $permission;
 
-            // Create permission with the group name
+            // Create permission
             $perm = Permission::firstOrCreate([
                 'name' => $permission,
-                'group' => $groupName,  // Add the group attribute
+                'group' => $groupName,
                 'guard_name' => 'web',
-                'factory_id' => 3,
+                'factory_id' => 1,
             ]);
 
-            // $role1 = Role::firstOrCreate(['name' => 'Super Admin', 'guard_name' => 'web', 'factory_id'=> 1]);
-
-            // Assign role
-            $perm->assignRole('Super Admin');
-
+            // Assign permission to role
+            $perm->assignRole($role);
         }
+
+        // Assign role to user
         $user = User::find(1);
-        $user->assignRole('Super Admin');
+        if ($user) {
+            $user->assignRole('Super Admin');
+        }
     }
 }
+
