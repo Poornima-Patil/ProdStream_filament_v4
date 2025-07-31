@@ -50,7 +50,6 @@ class MachineResource extends Resource
                     ->required()  // You can make this required or optional
                     ->searchable(),
             ]);
-
     }
 
     public static function table(Table $table): Table
@@ -76,6 +75,12 @@ class MachineResource extends Resource
                     ->label('Edit Machine'),
                 Tables\Actions\ViewAction::make()
                     ->hiddenLabel(),
+                Tables\Actions\Action::make('calendar')
+                    ->label('View Schedule')
+                    ->icon('heroicon-o-calendar-days')
+                    ->color('info')
+                    ->url(fn($record) => MachineResource::getUrl('view', ['record' => $record]) . '#machine-schedule-section')
+                    ->openUrlInNewTab(false),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

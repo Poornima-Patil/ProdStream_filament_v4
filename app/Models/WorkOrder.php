@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class WorkOrder extends Model
 {
@@ -37,7 +38,7 @@ class WorkOrder extends Model
 
     public function bom()
     {
-        \Log::info('Accessing BOM for Work Order:', [
+        Log::info('Accessing BOM for Work Order:', [
             'work_order_id' => $this->id,
             'work_order_unique_id' => $this->unique_id,
             'bom_id' => $this->bom_id,
@@ -203,32 +204,75 @@ class WorkOrder extends Model
         $conflicts = [];
 
         // Query existing WOs for the same machine within the same factory
+        // Include all active statuses that have scheduled times
         $existingWorkOrders = self::where('machine_id', $machineId)
             ->where('factory_id', $factoryId) // Multi-tenancy: filter by factory
-            ->whereIn('status', ['Assigned', 'Start']) // Only check active/planned WOs
+            ->whereIn('status', ['Assigned', 'Start', 'Hold']) // Include Hold status as they may resume
+            ->whereNotNull('start_time') // Only check WOs with scheduled times
+            ->whereNotNull('end_time')
             ->when($excludeWorkOrderId, function ($query) use ($excludeWorkOrderId) {
                 return $query->where('id', '!=', $excludeWorkOrderId);
             })
+            ->with('workOrderLogs') // Load logs to get actual start time
             ->get();
 
         foreach ($existingWorkOrders as $existingWO) {
-            // Check time overlap: (new_start < existing_end) AND (new_end > existing_start)
-            if ($newStartTime < $existingWO->end_time && $newEndTime > $existingWO->start_time) {
+            // For running work orders (status = 'Start'), calculate realistic end time based on actual start
+            if ($existingWO->status === 'Start') {
+                $adjustedEndTime = self::calculateRealisticEndTime($existingWO);
+                $conflictStartTime = $existingWO->start_time; // Use planned start for conflict calculation
+                $conflictEndTime = $adjustedEndTime;
+            } else {
+                // For planned/held work orders, use original planned times
+                $conflictStartTime = $existingWO->start_time;
+                $conflictEndTime = $existingWO->end_time;
+            }
+
+            // Time-based conflict detection: check if new WO time overlaps with existing WO time
+            // Only report conflict if there's actual time overlap
+            if ($newStartTime < $conflictEndTime && $newEndTime > $conflictStartTime) {
                 $conflicts[] = [
                     'work_order_id' => $existingWO->id,
                     'work_order_unique_id' => $existingWO->unique_id,
                     'status' => $existingWO->status,
                     'planned_start' => $existingWO->start_time,
                     'planned_end' => $existingWO->end_time,
+                    'realistic_end' => $existingWO->status === 'Start' ? $conflictEndTime : null,
                     'operator_id' => $existingWO->operator_id,
                     'bom_id' => $existingWO->bom_id,
-                    'conflict_type' => self::getConflictType($newStartTime, $newEndTime, $existingWO->start_time, $existingWO->end_time),
-                    'overlap_duration' => self::calculateOverlapDuration($newStartTime, $newEndTime, $existingWO->start_time, $existingWO->end_time),
+                    'conflict_type' => self::getConflictType($newStartTime, $newEndTime, $conflictStartTime, $conflictEndTime),
+                    'overlap_duration' => self::calculateOverlapDuration($newStartTime, $newEndTime, $conflictStartTime, $conflictEndTime),
                 ];
             }
         }
 
         return $conflicts;
+    }
+
+    /**
+     * Calculate realistic end time for a running work order based on actual start time
+     */
+    private static function calculateRealisticEndTime($workOrder)
+    {
+        // Get the actual start time from work order logs
+        $startLog = $workOrder->workOrderLogs()
+            ->where('status', 'Start')
+            ->orderBy('changed_at', 'asc')
+            ->first();
+
+        if ($startLog) {
+            // Calculate original planned duration
+            $plannedDuration = $workOrder->start_time->diffInMinutes($workOrder->end_time);
+
+            // Calculate realistic end time: actual start + planned duration
+            $actualStartTime = \Carbon\Carbon::parse($startLog->changed_at);
+            $realisticEndTime = $actualStartTime->copy()->addMinutes($plannedDuration);
+
+            return $realisticEndTime;
+        }
+
+        // Fallback to planned end time if no start log found
+        return $workOrder->end_time;
     }
 
     /**

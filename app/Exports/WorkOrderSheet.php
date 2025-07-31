@@ -8,6 +8,7 @@ use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+
 class WorkOrderSheet implements FromCollection, WithHeadings
 {
     public function __construct(public string $start, public string $end) {}
@@ -16,7 +17,7 @@ class WorkOrderSheet implements FromCollection, WithHeadings
     {
 
         $factoryId = Auth::user()->factory_id;
-    \Log::info('Factory ID: ', ['factory_id' => $factoryId]);
+        Log::info('Factory ID: ', ['factory_id' => $factoryId]);
         $data = WorkOrder::with([
             'bom.purchaseOrder.partNumber',
             'machine',
@@ -45,26 +46,26 @@ class WorkOrderSheet implements FromCollection, WithHeadings
             });
         //\Log::info('start =', $this->start);
         //\Log::info('end =', $this->end);
-        \Log::info('Export Collection: ', $data->toArray());
+        Log::info('Export Collection: ', $data->toArray());
 
-            return $data;
+        return $data;
     }
 
     public function headings(): array
-{
-    return [
-        'Work Order No',
-        'BOM',
-        'Part Number',
-        'Revision',
-        'Machine',
-        'Operator',
-        'Qty',
-        'Status',
-        'Start Time',
-        'End Time',
-        'OK Qty',
-        'KO Qty',
-    ];
-}
+    {
+        return [
+            'Work Order No',
+            'BOM',
+            'Part Number',
+            'Revision',
+            'Machine',
+            'Operator',
+            'Qty',
+            'Status',
+            'Start Time',
+            'End Time',
+            'OK Qty',
+            'KO Qty',
+        ];
+    }
 }
