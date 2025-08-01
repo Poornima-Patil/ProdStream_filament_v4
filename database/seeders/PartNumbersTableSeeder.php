@@ -4,17 +4,13 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 class PartNumbersTableSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        $factoryId = env('SEED_FACTORY_ID',1); 
+        $factoryId = env('SEED_FACTORY_ID', 1); 
         $revisions = ['0', 'A', 'B', 'C'];
         $now = Carbon::now();
 
@@ -28,7 +24,6 @@ class PartNumbersTableSeeder extends Seeder
         ];
 
         foreach ($componentTypes as $index => $component) {
-            // Generate a unique 10-digit part number
             $partNumber = (string) random_int(1000000000, 9999999999);
 
             foreach ($revisions as $revision) {
@@ -37,6 +32,7 @@ class PartNumbersTableSeeder extends Seeder
                     'revision'     => $revision,
                     'description'  => "{$component} - Rev {$revision}",
                     'factory_id'   => $factoryId,
+                    'cycle_time'   => random_int(30, 300), // e.g., 30s to 5 mins
                     'created_at'   => $now,
                     'updated_at'   => $now,
                 ]);
