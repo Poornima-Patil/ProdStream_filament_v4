@@ -104,11 +104,35 @@ class WorkOrder extends Model
             $fpy = $total > 0 ? ($scrappedQtys / $total) * 100 : 0;
         }
 
+        // Handle seeding context where Auth::id() might be null
+        $userId = Auth::id();
+        if (!$userId && app()->runningInConsole()) {
+            // During seeding, try to find a Factory Admin for this specific factory
+            if ($this->factory_id) {
+                $factoryAdmin = \App\Models\User::where('factory_id', $this->factory_id)
+                    ->whereHas('roles', function ($query) {
+                        $query->where('name', 'Factory Admin');
+                    })->first();
+                $userId = $factoryAdmin?->id;
+            }
+
+            // Fallback to any super admin
+            if (!$userId) {
+                $superAdmin = \App\Models\User::role('Super Admin')->first();
+                $userId = $superAdmin?->id;
+            }
+
+            // Final fallback to first user or default ID
+            if (!$userId) {
+                $userId = \App\Models\User::first()?->id ?? 1;
+            }
+        }
+
         $log = WorkOrderLog::create([
             'work_order_id' => $this->id,
             'status' => $newStatus,
             'changed_at' => now(),
-            'user_id' => Auth::id(),
+            'user_id' => $userId,
             'ok_qtys' => $okQtys,
             'scrapped_qtys' => $scrappedQtys,
             'remaining' => $this->qty - ($okQtys + $scrappedQtys),
