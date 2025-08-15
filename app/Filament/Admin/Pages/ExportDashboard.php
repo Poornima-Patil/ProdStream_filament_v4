@@ -64,6 +64,8 @@ namespace App\Filament\Admin\Pages;
 use Filament\Pages\Page;
 use Filament\Forms\Form;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Actions;
+use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Illuminate\Support\Facades\Auth;
@@ -98,6 +100,40 @@ class ExportDashboard extends Page implements HasForms
                 DatePicker::make('endDate')
                     ->label('End Date')
                     ->required(),
+
+                Actions::make([
+                    Action::make('download_excel')
+                        ->label('Download Excel')
+                        ->icon('heroicon-o-document-arrow-down')
+                        ->color('primary')
+                        ->action('download'),
+
+                    Action::make('download_csv')
+                        ->label('Download CSV')
+                        ->icon('heroicon-o-document-text')
+                        ->color('success')
+                        ->action('downloadCsv'),
+
+                    Action::make('pivot_table')
+                        ->label('Create Pivot Table')
+                        ->icon('heroicon-o-table-cells')
+                        ->color('info')
+                        ->url('/pivot-table-builder')
+                        ->openUrlInNewTab(),
+
+                    Action::make('auto_pivot_table')
+                        ->label('⚡ Auto Pivot (No Upload)')
+                        ->icon('heroicon-o-bolt')
+                        ->color('warning')
+                        ->url('/auto-pivot')
+                        ->openUrlInNewTab(),
+
+                    Action::make('download_and_pivot')
+                        ->label('Download CSV & Create Pivot')
+                        ->icon('heroicon-o-arrow-path')
+                        ->color('warning')
+                        ->action('downloadCsvAndRedirect'),
+                ])
             ])
             ->statePath('data');
     }
@@ -126,6 +162,13 @@ class ExportDashboard extends Page implements HasForms
         );
         return $export->downloadCsv();
     }
+
+    public function downloadCsvAndRedirect()
+    {
+        // First download the CSV
+        $this->downloadCsv();
+
+        // Then redirect to pivot table builder
+        return redirect('/pivot-table-builder');
+    }
 }
-
-

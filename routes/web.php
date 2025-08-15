@@ -11,6 +11,16 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// KPI Dashboard Route (Direct Access) - Updated for tenant structure
+Route::get('/admin/{tenant}/kpi-dashboard', \App\Livewire\KPIDashboard::class)
+    ->middleware(['auth'])
+    ->name('tenant.kpi.dashboard');
+
+// Keep the non-tenant route for testing
+Route::get('/kpi-dashboard', \App\Livewire\KPIDashboard::class)
+    ->middleware(['auth'])
+    ->name('kpi.dashboard');
+
 Route::get('/okquantity/download/{id}', function ($id) {
     $okQuantity = OkQuantity::findOrFail($id);
 
@@ -62,14 +72,14 @@ Route::get('/work-order-quantity/{id}/download', function ($id) {
         \Illuminate\Support\Facades\Log::error("WorkOrderQuantity not found: {$id}");
         abort(404, 'Work Order Quantity not found');
     } catch (\Exception $e) {
-        \Illuminate\Support\Facades\Log::error('Error downloading report: '.$e->getMessage());
+        \Illuminate\Support\Facades\Log::error('Error downloading report: ' . $e->getMessage());
         abort(500, 'Error downloading report');
     }
 })->name('workorderquantity.download');
 
 // Add a direct file access route for testing
 Route::get('/storage/{path}', function ($path) {
-    $fullPath = storage_path('app/public/'.$path);
+    $fullPath = storage_path('app/public/' . $path);
     if (file_exists($fullPath)) {
         return response()->download($fullPath);
     }
@@ -102,3 +112,18 @@ Route::get('/debug-workorders', function () {
     $export = new \App\Exports\WorkOrderSheet('2025-06-01', '2025-06-30');
     dd($export->collection());
 });
+
+// Pivot Table Builder Route
+Route::get('/pivot-table-builder', \App\Livewire\PivotTableBuilder::class)
+    ->middleware(['auth'])
+    ->name('pivot.table.builder');
+
+// Simple Pivot Table Builder Route for testing
+Route::get('/simple-pivot', \App\Livewire\SimplePivotTableBuilder::class)
+    ->middleware(['auth'])
+    ->name('simple.pivot.builder');
+
+// Auto Pivot Table Builder Route - No CSV upload required
+Route::get('/auto-pivot', \App\Livewire\AutoPivotTableBuilder::class)
+    ->middleware(['auth'])
+    ->name('auto.pivot.builder');

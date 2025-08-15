@@ -30,6 +30,9 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
+            ->darkMode() // Enable dark mode toggle
+            ->globalSearch(false) // Disable global search that can cause blue patches
+            ->breadcrumbs(false) // Disable breadcrumbs that can cause blue patches
             ->colors([
                 'primary' => '#106EBE',
             ])
@@ -42,7 +45,7 @@ class AdminPanelProvider extends PanelProvider
             // ->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\\Filament\\Admin\\Widgets')
             ->widgets([
                 Widgets\AccountWidget::class,
-                Widgets\FilamentInfoWidget::class,
+                // Widgets\FilamentInfoWidget::class, // Removed to eliminate blue patch on refresh  
                 //\App\Filament\Admin\Widgets\WorkOrderWidgetsCard::class, // Keep only the widgets you want globally
             ])
             ->viteTheme('resources/css/app.css')
@@ -64,6 +67,5 @@ class AdminPanelProvider extends PanelProvider
             ->tenant(Factory::class, ownershipRelationship: 'owner')
             ->tenantRegistration(RegisterFactory::class)
             ->tenantProfile(EditFactoryProfile::class);
-
     }
 }

@@ -66,7 +66,7 @@
         <!-- Simple legend with just color indicators -->
         <div class="flex items-center justify-center space-x-8">
             <div class="flex items-center">
-                <div class="w-5 h-5 rounded shadow-sm border border-orange-600" style="background-color: #fb923c;"></div>
+                <div class="w-5 h-5 bg-[#fb923c] rounded shadow-sm border border-orange-600"></div>
                 <div class="text-sm font-medium text-gray-700 dark:text-gray-300 px-2">Planned</div>
             </div>
             <div class="flex items-center">
