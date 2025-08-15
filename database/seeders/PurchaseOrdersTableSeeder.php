@@ -12,11 +12,11 @@ class PurchaseOrdersTableSeeder extends Seeder
     public function run(): void
     {
         $factoryId = env('SEED_FACTORY_ID', 1);
-        $customers = DB::table('customer_information')->take(6)->get();
+        $customers = DB::table('customer_information')->get();
         $partNumbers = DB::table('part_numbers')->get();
 
-        if ($partNumbers->count() < 12) {
-            throw new \Exception("At least 12 part numbers are required (2 per customer × 6 customers).");
+        if ($partNumbers->count() < count($customers) * 2) {
+            throw new \Exception("At least " . (count($customers) * 2) . " part numbers are required (2 per customer × " . count($customers) . " customers).");
         }
 
         $unitOptions = ['Kgs', 'Numbers'];
@@ -75,9 +75,10 @@ class PurchaseOrdersTableSeeder extends Seeder
 
             $deliveryTargetDate = Carbon::parse($customer->created_at)
                 ->addSeconds($qty * $cycleTime)
-                ->addDays(6)
+                ->addDays(4)
                 ->toDateString();
-
+                $this->command->info("customer info for PO {$uniqueId} is {$customer->id},customer created at {$customer->created_at}");
+$this->command->info("delivery target date for PO {$uniqueId} is {$deliveryTargetDate}");
             DB::table('purchase_orders')->insert([
                 'unique_id' => $uniqueId,
                 'part_number_id' => $part->id,
