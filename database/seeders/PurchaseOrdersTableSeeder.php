@@ -12,8 +12,8 @@ class PurchaseOrdersTableSeeder extends Seeder
     public function run(): void
     {
         $factoryId = env('SEED_FACTORY_ID', 1);
-        $customers = DB::table('customer_information')->get();
-        $partNumbers = DB::table('part_numbers')->get();
+        $customers = DB::table('customer_information')->where('factory_id', $factoryId)->get();
+        $partNumbers = DB::table('part_numbers')->where('factory_id', $factoryId)->get();
 
         if ($partNumbers->count() < count($customers) * 2) {
             throw new \Exception("At least " . (count($customers) * 2) . " part numbers are required (2 per customer × " . count($customers) . " customers).");

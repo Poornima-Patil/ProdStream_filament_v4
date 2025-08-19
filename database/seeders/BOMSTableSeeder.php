@@ -13,11 +13,11 @@ class BomsTableSeeder extends Seeder
         $factoryId = env('SEED_FACTORY_ID', 1);
 
         // Fetch all purchase orders sorted by creation date
-        $purchaseOrders = DB::table('purchase_orders')->orderBy('created_at')->get();
+        $purchaseOrders = DB::table('purchase_orders')->where('factory_id', $factoryId)->orderBy('created_at')->get();
 
         // Machine and operator references
-        $machineGroups = DB::table('machine_groups')->pluck('id')->toArray();
-        $operatorProficiencies = DB::table('operator_proficiencies')->pluck('id')->toArray();
+        $machineGroups = DB::table('machine_groups')->where('factory_id', $factoryId)->pluck('id')->toArray();
+        $operatorProficiencies = DB::table('operator_proficiencies')->where('factory_id', $factoryId)->pluck('id')->toArray();
         $machineGroupCount = count($machineGroups);
         $operatorProficiencyCount = count($operatorProficiencies);
 
@@ -34,8 +34,8 @@ class BomsTableSeeder extends Seeder
             $serial = str_pad($serialCounters[$monthYear]++, 4, '0', STR_PAD_LEFT);
 
             // Fetch related data from foreign tables
-            $customer = DB::table('customer_information')->where('id', $po->cust_id)->first();
-            $part = DB::table('part_numbers')->where('id', $po->part_number_id)->first();
+            $customer = DB::table('customer_information')->where('factory_id', $factoryId)->where('id', $po->cust_id)->first();
+            $part = DB::table('part_numbers')->where('factory_id', $factoryId)->where('id', $po->part_number_id)->first();
 
             // Skip if data is missing
             if (!$customer || !$part) {

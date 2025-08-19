@@ -19,7 +19,7 @@ class CustomerInformationTableSeeder extends Seeder
             $randomDate = Carbon::createFromTimestamp(rand($startDate->timestamp, $endDate->timestamp));
 
             DB::table('customer_information')->insert([
-                'customer_id' => $customerIndex * 10 + 1000,
+                'customer_id' => $customerIndex * 10 + 2000,
                 'factory_id' => $factoryId,
                 'name' => fake()->company,
                 'address' => fake()->address,
