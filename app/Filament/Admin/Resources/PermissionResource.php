@@ -33,7 +33,7 @@ class PermissionResource extends Resource
                     ->required(),
                 Forms\Components\Hidden::make('factory_id')
                     ->default(Auth::user()->factory_id) // Set the default value dynamically
-                    ->dehydrated(fn ($state) => $state ?? Auth::user()->factory_id),
+                    ->dehydrated(fn($state) => $state ?? Auth::user()->factory_id),
             ]);
     }
 

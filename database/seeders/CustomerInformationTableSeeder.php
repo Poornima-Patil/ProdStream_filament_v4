@@ -20,7 +20,7 @@ class CustomerInformationTableSeeder extends Seeder
             ->where('factory_id', $factoryId)
             ->orderByDesc('customer_id')
             ->first();
-        $customerId = $lastCustomer ? $lastCustomer->customer_id + 10 : 1010;
+	$customerId = $lastCustomer ? ((int) $lastCustomer->customer_id + 10) : 2010;
 
         $added = 0;
         for ($customerIndex = 1; $customerIndex <= $customerCount; $customerIndex++) {
