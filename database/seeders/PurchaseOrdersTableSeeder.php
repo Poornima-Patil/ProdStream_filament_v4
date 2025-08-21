@@ -24,8 +24,17 @@ class PurchaseOrdersTableSeeder extends Seeder
 
         $purchaseOrders = collect();
 
-        // First: Create all PO data and collect with correct created_at
         foreach ($customers as $customerIndex => $customer) {
+            // Check if PO already exists for this customer
+            $existingPOCount = DB::table('purchase_orders')
+                ->where('factory_id', $factoryId)
+                ->where('cust_id', $customer->id)
+                ->count();
+
+            if ($existingPOCount > 0) {
+                continue; // Skip customers who already have POs
+            }
+
             $assignedParts = $partNumbers->slice($customerIndex * 2, 2);
 
             foreach ($assignedParts as $part) {
@@ -47,10 +56,10 @@ class PurchaseOrdersTableSeeder extends Seeder
             }
         }
 
-        // Then: Sort by created_at ASC
+        // Sort by created_at ASC
         $purchaseOrders = $purchaseOrders->sortBy('created_at')->values();
 
-        // Now: Assign serials per month and insert
+        // Assign serials per month and insert
         $currentMonthYear = '';
         $poIndex = 1;
 
@@ -67,7 +76,18 @@ class PurchaseOrdersTableSeeder extends Seeder
             // Reset serial if month changes
             if ($monthYear !== $currentMonthYear) {
                 $currentMonthYear = $monthYear;
-                $poIndex = 1;
+                // Find last PO serial for this month in DB
+                $lastUniqueId = DB::table('purchase_orders')
+                    ->where('unique_id', 'like', "S%_{$monthYear}_%")
+                    ->orderByDesc('unique_id')
+                    ->value('unique_id');
+                if ($lastUniqueId) {
+                    // Extract serial from unique_id (e.g. S0005_082025_...)
+                    preg_match('/^S(\d{4})_/', $lastUniqueId, $matches);
+                    $poIndex = isset($matches[1]) ? intval($matches[1]) + 1 : 1;
+                } else {
+                    $poIndex = 1;
+                }
             }
 
             $serial = str_pad($poIndex++, 4, '0', STR_PAD_LEFT);
@@ -77,8 +97,10 @@ class PurchaseOrdersTableSeeder extends Seeder
                 ->addSeconds($qty * $cycleTime)
                 ->addDays(4)
                 ->toDateString();
-                $this->command->info("customer info for PO {$uniqueId} is {$customer->id},customer created at {$customer->created_at}");
-$this->command->info("delivery target date for PO {$uniqueId} is {$deliveryTargetDate}");
+
+            $this->command->info("customer info for PO {$uniqueId} is {$customer->id},customer created at {$customer->created_at}");
+            $this->command->info("delivery target date for PO {$uniqueId} is {$deliveryTargetDate}");
+
             DB::table('purchase_orders')->insert([
                 'unique_id' => $uniqueId,
                 'part_number_id' => $part->id,
@@ -90,7 +112,6 @@ $this->command->info("delivery target date for PO {$uniqueId} is {$deliveryTarge
                 'delivery_target_date' => $deliveryTargetDate,
                 'created_at' => $createdAt,
                 'updated_at' => $createdAt,
-                
             ]);
         }
     }

@@ -24,12 +24,33 @@ class BomsTableSeeder extends Seeder
         $serialCounters = [];
 
         foreach ($purchaseOrders as $index => $po) {
+            // Check for duplicate BOM for this PO
+            $existingBom = DB::table('boms')
+                ->where('factory_id', $factoryId)
+                ->where('purchase_order_id', $po->id)
+                ->first();
+
+            if ($existingBom) {
+                continue; // Skip if BOM already exists for this PO
+            }
+
             $bomCreatedAt = Carbon::parse($po->created_at)->addDay();
             $monthYear = $bomCreatedAt->format('mY');
 
             // Reset serial number for new month
             if (!isset($serialCounters[$monthYear])) {
-                $serialCounters[$monthYear] = 1;
+                // Find last BOM serial for this month in DB
+                $lastUniqueId = DB::table('boms')
+                    ->where('unique_id', 'like', "O%_{$monthYear}_%")
+                    ->orderByDesc('unique_id')
+                    ->value('unique_id');
+                if ($lastUniqueId) {
+                    // Extract serial from unique_id (e.g. O0005_082025_...)
+                    preg_match('/^O(\d{4})_/', $lastUniqueId, $matches);
+                    $serialCounters[$monthYear] = isset($matches[1]) ? intval($matches[1]) + 1 : 1;
+                } else {
+                    $serialCounters[$monthYear] = 1;
+                }
             }
             $serial = str_pad($serialCounters[$monthYear]++, 4, '0', STR_PAD_LEFT);
 

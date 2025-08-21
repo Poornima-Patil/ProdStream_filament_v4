@@ -8,20 +8,15 @@ use App\Models\Operator;
 use App\Models\Machine;
 use App\Models\Shift;
 use App\Models\PartNumber;
-use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
+use App\Models\User;
 
 class WorkOrdersTableSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         $factoryId = env('SEED_FACTORY_ID', 1);
-
-        // Get Factory Admin user for this factory (Spatie hasRole)
+ // Get Factory Admin user for this factory (Spatie hasRole)
         $factoryAdminUser = User::where('factory_id', $factoryId)
             ->whereHas('roles', function($q) {
                 $q->where('name', 'Factory Admin');
@@ -32,19 +27,13 @@ class WorkOrdersTableSeeder extends Seeder
             $this->command->error("No Factory Admin found for factory_id $factoryId");
             return;
         }
-
-        // Get all eligible BOMs for the factory (with PO)
+        // Pick all BOMs whose WOs have not been created
         $boms = Bom::where('factory_id', $factoryId)
             ->whereHas('purchaseOrder')
+            ->whereDoesntHave('workOrders')
             ->orderBy('created_at')
             ->get();
 
-        if ($boms->isEmpty()) {
-            $this->command->error('No BOMs found for the factory.');
-            return;
-        }
-
-        // Get all shifts for the factory
         $shifts = Shift::where('factory_id', $factoryId)->orderBy('start_time')->get();
         if ($shifts->isEmpty()) {
             $this->command->error('No shifts found.');
@@ -53,6 +42,7 @@ class WorkOrdersTableSeeder extends Seeder
 
         $woCreated = 0;
         static $woSerialCounters = [];
+        $woCalcToggle = 1; // 1 for calc 1, 2 for calc 2
 
         foreach ($boms as $bom) {
             $purchaseOrder = $bom->purchaseOrder;
@@ -88,27 +78,27 @@ class WorkOrdersTableSeeder extends Seeder
                 $current->addDay();
             }
 
-            // Calculate qty per day for this BOM so last WO ends on target date
-            $poQtyRemaining = $purchaseOrder->QTY - WorkOrder::where('bom_id', $bom->id)->sum('qty');
+            $poQtyRemaining = $purchaseOrder->QTY;
             $daysCount = count($bomDays);
-            if ($daysCount == 0) continue;
-            $qtyPerDay = (int) floor($purchaseOrder->QTY / $daysCount);
-            $extraQty = $purchaseOrder->QTY % $daysCount; // Distribute remainder
 
-            foreach ($bomDays as $dayIndex => $day) {
-                // Distribute extra qty to the first few days
-                $todayQty = $qtyPerDay + ($dayIndex < $extraQty ? 1 : 0);
-
-                $qtyLeftForDay = $todayQty - WorkOrder::where('bom_id', $bom->id)
-                    ->whereDate('start_time', $day->toDateString())
-                    ->sum('qty');
-                if ($qtyLeftForDay <= 0) continue;
+            foreach ($bomDays as $day) {
+                if ($poQtyRemaining <= 0) break;
 
                 $machineUsedTimeByDayShift = [];
                 $operatorUsedTimeByDayShift = [];
 
                 foreach ($shifts as $shift) {
-                    if ($qtyLeftForDay <= 0) break;
+                    if ($poQtyRemaining <= 0) break;
+
+                    // Filter operators for this shift and proficiency
+                    $availableOperators = $operators->filter(function ($op) use ($shift) {
+                        return isset($op->shift_id) && $op->shift_id == $shift->id;
+                    });
+
+                    if ($availableOperators->isEmpty()) {
+                        $this->command->info("No eligible operators for BOM {$bom->id} in shift {$shift->id} on {$day->toDateString()}.");
+                        continue;
+                    }
 
                     $shiftStart = $day->copy()->setTimeFromTimeString($shift->start_time);
                     if ($shift->end_time <= $shift->start_time) {
@@ -118,7 +108,7 @@ class WorkOrdersTableSeeder extends Seeder
                     }
 
                     foreach ($machines as $machine) {
-                        foreach ($operators as $operator) {
+                        foreach ($availableOperators as $operator) {
                             $machineKey = $day->format('Y-m-d') . '_' . $shift->id . '_' . $machine->id;
                             $operatorKey = $day->format('Y-m-d') . '_' . $shift->id . '_' . $operator->id;
                             $machineTime = $machineUsedTimeByDayShift[$machineKey] ?? 0;
@@ -128,15 +118,15 @@ class WorkOrdersTableSeeder extends Seeder
                             if ($startTime->gte($shiftEnd)) continue;
 
                             // Strict overlap check for machine/operator
-                            $woEnd = $startTime->copy()->addSeconds($qtyLeftForDay * $cycleTime);
+                            $woEnd = $startTime->copy()->addSeconds($poQtyRemaining * $cycleTime);
                             $machineConflict = WorkOrder::where('machine_id', $machine->id)
                                 ->where('factory_id', $factoryId)
                                 ->where(function ($q) use ($startTime, $woEnd) {
                                     $q->where(function ($query) use ($startTime, $woEnd) {
                                         $query->where('start_time', '<', $woEnd)
                                               ->where('end_time', '>', $startTime);
-                                });
-                            })->exists();
+                                    });
+                                })->exists();
 
                             $operatorConflict = WorkOrder::where('operator_id', $operator->id)
                                 ->where('factory_id', $factoryId)
@@ -144,24 +134,34 @@ class WorkOrdersTableSeeder extends Seeder
                                     $q->where(function ($query) use ($startTime, $woEnd) {
                                         $query->where('start_time', '<', $woEnd)
                                               ->where('end_time', '>', $startTime);
-                                });
-                            })->exists();
+                                    });
+                                })->exists();
 
                             if ($machineConflict || $operatorConflict) continue;
 
-                            $remainingSecs = $startTime->diffInSeconds($shiftEnd);
-                            $maxQty = floor($remainingSecs / $cycleTime);
-                            $qty = min($maxQty, $qtyLeftForDay);
+                            // Toggle between calc 1 and calc 2 for each WO
+                            if ($woCalcToggle == 1) {
+                                // Calc 1: Based on PO_target_delivery_date (try to fit as much as possible in shift)
+                                $maxPossibleQty = floor($startTime->diffInSeconds($shiftEnd) / $cycleTime);
+                                $qty = min($maxPossibleQty, $poQtyRemaining);
+                            } else {
+                                // Calc 2: Equally distribute qty across working days except Sundays
+                                $qtyPerDay = (int) floor($purchaseOrder->QTY / $daysCount);
+                                $extraQty = $purchaseOrder->QTY % $daysCount;
+                                $qty = $qtyPerDay + ($extraQty > 0 ? 1 : 0);
+                                $qty = min($qty, $poQtyRemaining, floor($startTime->diffInSeconds($shiftEnd) / $cycleTime));
+                                if ($extraQty > 0) $extraQty--;
+                            }
 
                             if ($qty <= 0) continue;
+
+                            $woEnd = $startTime->copy()->addSeconds($qty * $cycleTime);
 
                             $monthYear = $day->format('mY');
                             if (!isset($woSerialCounters[$monthYear])) $woSerialCounters[$monthYear] = 1;
                             $woSerial = str_pad($woSerialCounters[$monthYear], 4, '0', STR_PAD_LEFT);
                             $woDate = $startTime->format('mdy');
                             $woUniqueId = "W{$woSerial}_{$woDate}_{$bom->unique_id}";
-
-                            $woEnd = $startTime->copy()->addSeconds($qty * $cycleTime);
 
                             WorkOrder::create([
                                 'bom_id' => $bom->id,
@@ -177,20 +177,25 @@ class WorkOrdersTableSeeder extends Seeder
                                 'factory_id' => $factoryId,
                             ]);
 
+                            $this->command->info("Created WO for BOM {$bom->id} with qty $qty, machine {$machine->id}, operator {$operator->id}, shift {$shift->id}, start $startTime, end $woEnd, using calc {$woCalcToggle}");
+
                             $machineUsedTimeByDayShift[$machineKey] = $machineTime + ($qty * $cycleTime);
                             $operatorUsedTimeByDayShift[$operatorKey] = $operatorTime + ($qty * $cycleTime);
 
                             $woSerialCounters[$monthYear]++;
                             $woCreated++;
-                            $qtyLeftForDay -= $qty;
+                            $poQtyRemaining -= $qty;
 
-                            if ($qtyLeftForDay <= 0) break 2;
+                            // Alternate calculation for next WO
+                            $woCalcToggle = ($woCalcToggle == 1) ? 2 : 1;
+
+                            if ($poQtyRemaining <= 0) break 3;
                         }
                     }
                 }
             }
         }
 
-        $this->command->info("Seeded $woCreated work orders for all BOMs, with last WO for each BOM ending on its PO target date, qty per day split across shifts, and no machine/operator overlap.");
+        $this->command->info("Seeded $woCreated work orders for all BOMs with alternating qty calculation.");
     }
 }

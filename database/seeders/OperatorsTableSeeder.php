@@ -35,7 +35,18 @@ class OperatorsTableSeeder extends Seeder
             return;
         }
 
+        $createdCount = 0;
+
         foreach ($operatorUsers as $index => $user) {
+            // Skip if operator already exists
+            $exists = Operator::where('user_id', $user->id)
+                ->where('factory_id', $factoryId)
+                ->exists();
+
+            if ($exists) {
+                continue; // avoid duplication
+            }
+
             $shift = $shifts[$index % $shifts->count()];
             $proficiency = $proficiencies[$index % $proficiencies->count()];
 
@@ -45,8 +56,11 @@ class OperatorsTableSeeder extends Seeder
                 'operator_proficiency_id' => $proficiency->id,
                 'factory_id' => $factoryId,
             ]);
+
+            $createdCount++;
+            $this->command->info("Created Operator for user_id {$user->id}");
         }
 
-        $this->command->info("Seeded {$operatorUsers->count()} operators with shift and proficiency assignments.");
+        $this->command->info("Operators seeding completed. New operators created: {$createdCount}");
     }
 }
