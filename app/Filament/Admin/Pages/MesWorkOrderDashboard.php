@@ -54,6 +54,11 @@ class MesWorkOrderDashboard extends Page
     public $filteredCount = 0;
     public $totalRecords = 0;
 
+    // Pagination properties
+    public $currentPage = 1;
+    public $perPage = 25;
+    public $totalPages = 1;
+
     public function mount()
     {
         // Set default date range to last 6 months to ensure we get some data
@@ -94,6 +99,9 @@ class MesWorkOrderDashboard extends Page
             $this->filterDateFrom = $this->startDate;
             $this->filterDateTo = $this->endDate;
 
+            // Reset pagination when filters change
+            $this->currentPage = 1;
+
             $this->loadWorkOrders();
             $this->calculateStatusDistribution();
             $this->calculateKPIs();
@@ -103,6 +111,8 @@ class MesWorkOrderDashboard extends Page
         // Legacy support
         if (in_array($property, ['filterStatus', 'filterMachine', 'filterOperator', 'filterDateFrom', 'filterDateTo'])) {
             Log::info('Legacy filter updated');
+            // Reset pagination when filters change
+            $this->currentPage = 1;
             $this->loadWorkOrders();
             $this->calculateStatusDistribution();
             $this->calculateKPIs();
@@ -446,7 +456,25 @@ class MesWorkOrderDashboard extends Page
     private function loadWorkOrders()
     {
         // Work Orders (filtered)
-        $query = WorkOrder::query()->with(['machine', 'operator'])->where('factory_id', Auth::user()->factory_id);
+        $query = WorkOrder::query()
+            ->with(['machine', 'operator.user', 'bom.purchaseOrder.partNumber'])
+            ->where('factory_id', Auth::user()->factory_id);
+
+        // Additional constraint: if machine_id is set, ensure machine belongs to same factory
+        $query->where(function ($q) {
+            $q->whereNull('machine_id')
+                ->orWhereHas('machine', function ($subQuery) {
+                    $subQuery->where('factory_id', Auth::user()->factory_id);
+                });
+        });
+
+        // Additional constraint: if operator_id is set, ensure operator belongs to same factory
+        $query->where(function ($q) {
+            $q->whereNull('operator_id')
+                ->orWhereHas('operator', function ($subQuery) {
+                    $subQuery->where('factory_id', Auth::user()->factory_id);
+                });
+        });
 
         Log::info('Loading work orders for factory: ' . Auth::user()->factory_id);
 
@@ -474,13 +502,39 @@ class MesWorkOrderDashboard extends Page
             Log::info('Filtering to date: ' . $this->filterDateTo);
         }
 
+        // Get total count for pagination first
+        $totalQuery = clone $query;
+        $totalCount = $totalQuery->count();
+        $this->totalPages = max(1, ceil($totalCount / $this->perPage));
+
+        // Ensure current page is within valid range
+        if ($this->currentPage > $this->totalPages) {
+            $this->currentPage = $this->totalPages;
+        }
+        if ($this->currentPage < 1) {
+            $this->currentPage = 1;
+        }
+
         // Get the SQL query for debugging
         Log::info('Work order query SQL: ' . $query->toSql());
         Log::info('Work order query bindings: ', $query->getBindings());
+        Log::info('Total work orders found: ' . $totalCount . ', Page: ' . $this->currentPage . '/' . $this->totalPages);
 
-        $workOrders = $query->with(['machine', 'operator.user', 'bom.purchaseOrder.partNumber'])->limit(20)->get();
+        // Apply pagination
+        $offset = ($this->currentPage - 1) * $this->perPage;
+        $workOrders = $query->offset($offset)->limit($this->perPage)->get();
 
-        Log::info('Found ' . $workOrders->count() . ' work orders');
+        Log::info('Loaded ' . $workOrders->count() . ' work orders for page ' . $this->currentPage);
+
+        // Debug: Check for cross-factory references
+        foreach ($workOrders as $wo) {
+            if ($wo->machine && $wo->machine->factory_id != $wo->factory_id) {
+                Log::warning('Cross-factory machine detected - WO: ' . $wo->id . ' (factory: ' . $wo->factory_id . '), Machine: ' . $wo->machine->id . ' (factory: ' . $wo->machine->factory_id . ')');
+            }
+            if ($wo->operator && $wo->operator->factory_id != $wo->factory_id) {
+                Log::warning('Cross-factory operator detected - WO: ' . $wo->id . ' (factory: ' . $wo->factory_id . '), Operator: ' . $wo->operator->id . ' (factory: ' . $wo->operator->factory_id . ')');
+            }
+        }
 
         $this->workOrders = $workOrders->map(function ($wo) {
             // Get part number and revision through the relationship chain
@@ -498,14 +552,35 @@ class MesWorkOrderDashboard extends Page
             // Calculate real yield based on ok vs total produced
             $yield = $producedQty > 0 ? round((($wo->ok_qtys ?? 0) / $producedQty) * 100, 1) : 0;
 
+            // Ensure machine and operator belong to the same factory as the work order
+            $machineName = 'N/A';
+            if ($wo->machine && $wo->machine->factory_id == $wo->factory_id) {
+                $machineName = $wo->machine->name;
+            } elseif ($wo->machine) {
+                // Log a warning if machine belongs to different factory
+                Log::warning('Work Order ' . $wo->id . ' has machine from different factory. WO Factory: ' . $wo->factory_id . ', Machine Factory: ' . $wo->machine->factory_id);
+                $machineName = 'Cross-Factory Machine';
+            }
+
+            $operatorName = 'N/A';
+            if ($wo->operator && $wo->operator->factory_id == $wo->factory_id && $wo->operator->user) {
+                $operatorName = $wo->operator->user->getFilamentName();
+            } elseif ($wo->operator && $wo->operator->factory_id != $wo->factory_id) {
+                // Log a warning if operator belongs to different factory
+                Log::warning('Work Order ' . $wo->id . ' has operator from different factory. WO Factory: ' . $wo->factory_id . ', Operator Factory: ' . $wo->operator->factory_id);
+                $operatorName = 'Cross-Factory Operator';
+            } elseif ($wo->operator && !$wo->operator->user) {
+                $operatorName = 'Unassigned';
+            }
+
             return [
                 'id' => $wo->id, // Add the database ID for linking
                 'factory_id' => $wo->factory_id, // Add factory ID for the URL
                 'wo_number' => $wo->unique_id ?? ('WO-' . $wo->id),
                 'number' => $wo->unique_id ?? $wo->id,
                 'part_number' => $partNumber,
-                'machine' => optional($wo->machine)->name ?? 'N/A',
-                'operator' => $wo->operator && $wo->operator->user ? $wo->operator->user->getFilamentName() : 'N/A',
+                'machine' => $machineName,
+                'operator' => $operatorName,
                 'status' => $wo->status,
                 'progress' => $progress,
                 'ok' => $wo->ok_qtys ?? 0,
@@ -534,6 +609,9 @@ class MesWorkOrderDashboard extends Page
         $this->endDate = now()->format('Y-m-d');
         $this->filterDateFrom = $this->startDate;
         $this->filterDateTo = $this->endDate;
+
+        // Reset pagination
+        $this->currentPage = 1;
 
         $this->loadWorkOrders();
         $this->calculateStatusDistribution();
@@ -584,6 +662,9 @@ class MesWorkOrderDashboard extends Page
         $this->filterDateFrom = $this->startDate;
         $this->filterDateTo = $this->endDate;
 
+        // Reset pagination when date range changes
+        $this->currentPage = 1;
+
         // Refresh data
         $this->loadWorkOrders();
         $this->calculateStatusDistribution();
@@ -621,6 +702,39 @@ class MesWorkOrderDashboard extends Page
         $this->filteredCount = $query->count();
     }
 
+    // Pagination methods
+    public function nextPage()
+    {
+        if ($this->currentPage < $this->totalPages) {
+            $this->currentPage++;
+            $this->loadWorkOrders();
+        }
+    }
+
+    public function previousPage()
+    {
+        if ($this->currentPage > 1) {
+            $this->currentPage--;
+            $this->loadWorkOrders();
+        }
+    }
+
+    public function goToPage($page)
+    {
+        $page = max(1, min($page, $this->totalPages));
+        if ($page != $this->currentPage) {
+            $this->currentPage = $page;
+            $this->loadWorkOrders();
+        }
+    }
+
+    public function changePerPage($perPage)
+    {
+        $this->perPage = $perPage;
+        $this->currentPage = 1; // Reset to first page
+        $this->loadWorkOrders();
+    }
+
     public function getChartConfig()
     {
         $this->calculateStatusDistribution();
@@ -632,6 +746,52 @@ class MesWorkOrderDashboard extends Page
                 'hold' => $this->statusDistribution['Hold'] ?? ($this->statusDistribution['On Hold'] ?? 0)
             ],
             'machineData' => $this->getMachineUtilizationData()
+        ];
+    }
+
+    /**
+     * Debug method to identify cross-factory data integrity issues
+     * Call this method if you want to check for data inconsistencies
+     */
+    public function checkDataIntegrity()
+    {
+        $userFactoryId = Auth::user()->factory_id;
+        Log::info('Checking data integrity for factory: ' . $userFactoryId);
+
+        // Check work orders with cross-factory machine references
+        $crossFactoryMachines = WorkOrder::where('factory_id', $userFactoryId)
+            ->whereHas('machine', function ($q) use ($userFactoryId) {
+                $q->where('factory_id', '!=', $userFactoryId);
+            })
+            ->with('machine')
+            ->get();
+
+        if ($crossFactoryMachines->count() > 0) {
+            Log::warning('Found ' . $crossFactoryMachines->count() . ' work orders with cross-factory machine references');
+            foreach ($crossFactoryMachines as $wo) {
+                Log::warning('WO ID: ' . $wo->id . ', WO Factory: ' . $wo->factory_id . ', Machine: ' . $wo->machine->name . ', Machine Factory: ' . $wo->machine->factory_id);
+            }
+        }
+
+        // Check work orders with cross-factory operator references
+        $crossFactoryOperators = WorkOrder::where('factory_id', $userFactoryId)
+            ->whereHas('operator', function ($q) use ($userFactoryId) {
+                $q->where('factory_id', '!=', $userFactoryId);
+            })
+            ->with('operator.user')
+            ->get();
+
+        if ($crossFactoryOperators->count() > 0) {
+            Log::warning('Found ' . $crossFactoryOperators->count() . ' work orders with cross-factory operator references');
+            foreach ($crossFactoryOperators as $wo) {
+                $operatorName = $wo->operator->user ? $wo->operator->user->getFilamentName() : 'Unknown';
+                Log::warning('WO ID: ' . $wo->id . ', WO Factory: ' . $wo->factory_id . ', Operator: ' . $operatorName . ', Operator Factory: ' . $wo->operator->factory_id);
+            }
+        }
+
+        return [
+            'cross_factory_machines' => $crossFactoryMachines->count(),
+            'cross_factory_operators' => $crossFactoryOperators->count()
         ];
     }
 }

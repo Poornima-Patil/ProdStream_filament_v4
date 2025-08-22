@@ -454,9 +454,28 @@
                 @if($activeTab === 'details')
                     <div class="space-y-6">
                         <div class="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6">
-                            <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Work Order Details</h3>
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Work Order Details</h3>
+                                <div class="flex items-center gap-4">
+                                    <div class="flex items-center gap-2">
+                                        <label class="text-sm text-gray-600 dark:text-slate-300">Show:</label>
+                                        <select wire:change="changePerPage($event.target.value)" class="text-xs rounded border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white">
+                                            <option value="10" {{ $perPage == 10 ? 'selected' : '' }}>10</option>
+                                            <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
+                                            <option value="50" {{ $perPage == 50 ? 'selected' : '' }}>50</option>
+                                            <option value="100" {{ $perPage == 100 ? 'selected' : '' }}>100</option>
+                                        </select>
+                                    </div>
+                                    <div class="text-sm text-gray-600 dark:text-slate-300">
+                                        Showing {{ (($currentPage - 1) * $perPage) + 1 }} to {{ min($currentPage * $perPage, $filteredCount) }} of {{ $filteredCount }} entries
+                                    </div>
+                                </div>
+                            </div>
                             @if(!empty($workOrders))
-                                <div class="overflow-x-auto">
+                                <div class="overflow-x-auto" wire:loading.class="opacity-50" wire:target="nextPage,previousPage,goToPage,changePerPage">
+                                    <div wire:loading wire:target="nextPage,previousPage,goToPage,changePerPage" class="absolute inset-0 bg-white dark:bg-slate-800 bg-opacity-75 flex items-center justify-center z-10">
+                                        <div class="text-gray-600 dark:text-slate-300">Loading...</div>
+                                    </div>
                                     <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-600">
                                         <thead class="bg-gray-50 dark:bg-slate-700">
                                             <tr>
@@ -471,7 +490,7 @@
                                             </tr>
                                         </thead>
                                         <tbody class="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-600">
-                                            @foreach(array_slice($workOrders, 0, 10) as $wo)
+                                            @foreach($workOrders as $wo)
                                                 <tr class="hover:bg-gray-50 dark:hover:bg-slate-700">
                                                     <td class="px-2 py-1 whitespace-nowrap">
                                                         <a href="http://prodstream_v1.1.test/admin/{{ $wo['factory_id'] ?? 1 }}/work-orders/{{ $wo['id'] ?? 1 }}" 
@@ -518,6 +537,54 @@
                                         </tbody>
                                     </table>
                                 </div>
+                                
+                                <!-- Pagination Controls -->
+                                @if($totalPages > 1)
+                                    <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-slate-600">
+                                        <div class="flex items-center gap-2">
+                                            <button wire:click="previousPage" 
+                                                    {{ $currentPage <= 1 ? 'disabled' : '' }}
+                                                    class="px-3 py-1 text-xs bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 rounded hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                Previous
+                                            </button>
+                                            
+                                            @php
+                                                $start = max(1, $currentPage - 2);
+                                                $end = min($totalPages, $currentPage + 2);
+                                            @endphp
+                                            
+                                            @if($start > 1)
+                                                <button wire:click="goToPage(1)" class="px-2 py-1 text-xs bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 rounded hover:bg-gray-200 dark:hover:bg-slate-600">1</button>
+                                                @if($start > 2)
+                                                    <span class="text-gray-500 dark:text-slate-400 text-xs">...</span>
+                                                @endif
+                                            @endif
+                                            
+                                            @for($i = $start; $i <= $end; $i++)
+                                                <button wire:click="goToPage({{ $i }})" 
+                                                        class="px-2 py-1 text-xs rounded {{ $i == $currentPage ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600' }}">
+                                                    {{ $i }}
+                                                </button>
+                                            @endfor
+                                            
+                                            @if($end < $totalPages)
+                                                @if($end < $totalPages - 1)
+                                                    <span class="text-gray-500 dark:text-slate-400 text-xs">...</span>
+                                                @endif
+                                                <button wire:click="goToPage({{ $totalPages }})" class="px-2 py-1 text-xs bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 rounded hover:bg-gray-200 dark:hover:bg-slate-600">{{ $totalPages }}</button>
+                                            @endif
+                                            
+                                            <button wire:click="nextPage" 
+                                                    {{ $currentPage >= $totalPages ? 'disabled' : '' }}
+                                                    class="px-3 py-1 text-xs bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 rounded hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                Next
+                                            </button>
+                                        </div>
+                                        <div class="text-xs text-gray-600 dark:text-slate-300">
+                                            Page {{ $currentPage }} of {{ $totalPages }}
+                                        </div>
+                                    </div>
+                                @endif
                             @else
                                 <div class="text-center py-8">
                                     <p class="text-gray-600 dark:text-slate-400">No work orders found with current filters.</p>

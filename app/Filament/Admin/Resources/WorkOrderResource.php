@@ -106,8 +106,9 @@ class WorkOrderResource extends Resource
                             return []; // BOM not found or has no associated machine group
                         }
 
-                        // Fetch all active machines in the machine group
+                        // Fetch all active machines in the machine group within the current factory
                         return \App\Models\Machine::where('machine_group_id', $bom->machine_group_id)
+                            ->where('factory_id', \Illuminate\Support\Facades\Auth::user()->factory_id)
                             ->active()
                             ->get()
                             ->mapWithKeys(fn($machine) => [
@@ -354,9 +355,16 @@ class WorkOrderResource extends Resource
                                 }
 
                                 try {
-                                    // Get machine details
-                                    $machine = \App\Models\Machine::find($machineId);
-                                    $machineName = $machine ? "({$machine->assetId} - {$machine->name})" : "";
+                                    // Get machine details and ensure it belongs to the same factory
+                                    $machine = \App\Models\Machine::where('id', $machineId)
+                                        ->where('factory_id', $factoryId)
+                                        ->first();
+
+                                    if (!$machine) {
+                                        return new \Illuminate\Support\HtmlString('<div class="text-red-600">⚠️ Machine not found or belongs to different factory</div>');
+                                    }
+
+                                    $machineName = "({$machine->assetId} - {$machine->name})";
 
                                     // Check if user is trying to start this work order
                                     if ($status === 'Start') {
@@ -1139,6 +1147,7 @@ class WorkOrderResource extends Resource
     {
         return [
             \App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderProgress::class,
+            \App\Filament\Admin\Resources\WorkOrderResource\Widgets\SimpleWorkOrderGantt::class,
         ];
     }
 
