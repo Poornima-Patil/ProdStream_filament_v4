@@ -79,6 +79,7 @@ class SimulateWorkOrderExecution extends Command
 
         $successCount = 0;
         $errorCount = 0;
+        $statusCounts = ['Start' => 0, 'Hold' => 0, 'Completed' => 0];
 
         foreach ($workOrders as $workOrder) {
             try {
@@ -96,11 +97,16 @@ class SimulateWorkOrderExecution extends Command
                 $this->simulateWorkOrderExecution($workOrder);
                 $successCount++;
 
+                // Refresh work order to get updated status and count it
+                $workOrder->refresh();
+                $statusCounts[$workOrder->status]++;
+
                 // Log successful completion
                 Log::info("Successfully simulated Work Order", [
                     'work_order_id' => $workOrder->id,
                     'work_order_unique_id' => $workOrder->unique_id,
                     'factory_id' => $workOrder->factory_id,
+                    'final_status' => $workOrder->status,
                 ]);
             } catch (\Exception $e) {
                 $this->newLine();
@@ -123,6 +129,10 @@ class SimulateWorkOrderExecution extends Command
 
         $this->info("Simulation completed!");
         $this->info("Successfully processed: {$successCount}");
+        $this->info("Final Status Distribution:");
+        $this->info("  - Start: {$statusCounts['Start']}");
+        $this->info("  - Hold: {$statusCounts['Hold']}");
+        $this->info("  - Completed: {$statusCounts['Completed']}");
         if ($errorCount > 0) {
             $this->warn("Errors encountered: {$errorCount}");
         }
@@ -135,6 +145,7 @@ class SimulateWorkOrderExecution extends Command
             'total_work_orders_found' => $workOrders->count(),
             'successfully_processed' => $successCount,
             'errors_encountered' => $errorCount,
+            'status_distribution' => $statusCounts,
             'command_execution_time' => now()->toDateTimeString(),
         ]);
 
@@ -150,43 +161,82 @@ class SimulateWorkOrderExecution extends Command
             $startTime = Carbon::parse($workOrder->start_time);
             $endTime = Carbon::parse($workOrder->end_time);
             $totalDuration = $startTime->diffInMinutes($endTime);
-            $halfwayTime = $startTime->copy()->addMinutes($totalDuration / 2);
-            $resumeTime = $halfwayTime->copy()->addMinutes(10); // 10 minute break
 
             // Generate batch number
             $batchNumber = $this->generateBatchNumber($workOrder);
 
-            // Calculate quantities
-            $totalQty = $workOrder->qty;
-            $quantities = $this->calculateQuantities($totalQty);
-
             // Get operator user ID
             $operatorUserId = $this->getOperatorUserId($workOrder);
 
-            // Temporarily disable all WorkOrder model events to prevent automatic log creation
-            WorkOrder::withoutEvents(function () use ($workOrder, $batchNumber, $startTime, $halfwayTime, $resumeTime, $endTime, $operatorUserId, $quantities) {
+            // Randomly determine final status: 30% Start, 30% Hold, 40% Completed
+            $finalStatus = $this->getRandomFinalStatus();
 
-                // Step 1: Start the work order
-                $workOrder->update(['status' => 'Start', 'material_batch' => $batchNumber]);
+            // Temporarily disable all WorkOrder model events to prevent automatic log creation
+            WorkOrder::withoutEvents(function () use ($workOrder, $batchNumber, $startTime, $endTime, $totalDuration, $operatorUserId, $finalStatus) {
+
+                // Step 1: Start the work order (all work orders start)
+                $workOrder->update([
+                    'status' => 'Start',
+                    'material_batch' => $batchNumber,
+                    'ok_qtys' => 0,
+                    'scrapped_qtys' => 0
+                ]);
                 $startLog = $this->createManualWorkOrderLog($workOrder, 'Start', $startTime, $operatorUserId, 0, 0);
 
-                // Step 2: Process first half and put on Hold
-                $workOrder->update(['status' => 'Hold']);
-                $holdLog = $this->createManualWorkOrderLog($workOrder, 'Hold', $halfwayTime, $operatorUserId, $quantities['first_half']['ok'], $quantities['first_half']['ko']);
+                if ($finalStatus === 'Start') {
+                    // Work order remains in Start status - no further processing
+                    return;
+                }
 
-                // Create first quantity entry
-                $this->createQuantityEntry($workOrder, $holdLog, $quantities['first_half']);
+                // For Hold and Completed status, determine when to put on hold
+                $holdPercentages = [10, 30, 60, 90]; // Randomize hold timing
+                $holdPercentage = $holdPercentages[array_rand($holdPercentages)];
+                $holdTime = $startTime->copy()->addMinutes($totalDuration * ($holdPercentage / 100));
 
-                // Step 3: Resume from Hold to Start
-                $workOrder->update(['status' => 'Start']);
-                $resumeLog = $this->createManualWorkOrderLog($workOrder, 'Start', $resumeTime, $operatorUserId, $quantities['first_half']['ok'], $quantities['first_half']['ko']);
+                // Calculate quantities based on hold percentage
+                $quantities = $this->calculateQuantitiesForHoldPercentage($workOrder->qty, $holdPercentage);
 
-                // Step 4: Complete the work order
-                $workOrder->update(['status' => 'Completed', 'ok_qtys' => $quantities['total_ok'], 'scrapped_qtys' => $quantities['total_ko']]);
+                // Step 2: Put work order on Hold and UPDATE quantities
+                $workOrder->update([
+                    'status' => 'Hold',
+                    'ok_qtys' => $quantities['hold_ok'],
+                    'scrapped_qtys' => $quantities['hold_ko']
+                ]);
+                $holdLog = $this->createManualWorkOrderLog($workOrder, 'Hold', $holdTime, $operatorUserId, $quantities['hold_ok'], $quantities['hold_ko']);
+
+                // Create quantity entry for hold
+                $this->createQuantityEntry($workOrder, $holdLog, [
+                    'ok' => $quantities['hold_ok'],
+                    'ko' => $quantities['hold_ko']
+                ]);
+
+                if ($finalStatus === 'Hold') {
+                    // Work order remains in Hold status - quantities already updated above
+                    return;
+                }
+
+                // Step 3: Resume from Hold to Start (only if completing)
+                $resumeTime = $holdTime->copy()->addMinutes(rand(5, 20)); // Random break time
+                $workOrder->update([
+                    'status' => 'Start',
+                    'ok_qtys' => $quantities['hold_ok'], // Keep hold quantities
+                    'scrapped_qtys' => $quantities['hold_ko']
+                ]);
+                $resumeLog = $this->createManualWorkOrderLog($workOrder, 'Start', $resumeTime, $operatorUserId, $quantities['hold_ok'], $quantities['hold_ko']);
+
+                // Step 4: Complete the work order with FINAL quantities
+                $workOrder->update([
+                    'status' => 'Completed',
+                    'ok_qtys' => $quantities['total_ok'],
+                    'scrapped_qtys' => $quantities['total_ko']
+                ]);
                 $completeLog = $this->createManualWorkOrderLog($workOrder, 'Completed', $endTime, $operatorUserId, $quantities['total_ok'], $quantities['total_ko']);
 
-                // Create second quantity entry
-                $this->createQuantityEntry($workOrder, $completeLog, $quantities['second_half']);
+                // Create remaining quantity entry for completion
+                $this->createQuantityEntry($workOrder, $completeLog, [
+                    'ok' => $quantities['remaining_ok'],
+                    'ko' => $quantities['remaining_ko']
+                ]);
             });
         });
     }
@@ -213,6 +263,55 @@ class SimulateWorkOrderExecution extends Command
         // Final fallback to super admin
         $superAdmin = \App\Models\User::role('Super Admin')->first();
         return $superAdmin?->id ?? 1;
+    }
+
+    /**
+     * Randomly determine the final status for work order simulation
+     */
+    private function getRandomFinalStatus(): string
+    {
+        $random = rand(1, 100);
+
+        if ($random <= 30) {
+            return 'Start';  // 30% chance
+        } elseif ($random <= 60) {
+            return 'Hold';   // 30% chance
+        } else {
+            return 'Completed'; // 40% chance
+        }
+    }
+
+    /**
+     * Calculate quantities based on hold percentage
+     */
+    private function calculateQuantitiesForHoldPercentage(int $totalQty, int $holdPercentage): array
+    {
+        // Simulate realistic production with some defects
+        $yieldRate = rand(85, 98) / 100; // 85-98% yield rate
+        $totalOk = (int) floor($totalQty * $yieldRate);
+        $totalKo = $totalQty - $totalOk;
+
+        // Calculate quantities produced until hold point
+        $holdQty = (int) floor($totalQty * ($holdPercentage / 100));
+        $holdOk = (int) floor($holdQty * $yieldRate);
+        $holdKo = $holdQty - $holdOk;
+
+        // Remaining quantities after hold (for completion)
+        $remainingOk = $totalOk - $holdOk;
+        $remainingKo = $totalKo - $holdKo;
+
+        // Ensure non-negative values
+        $remainingOk = max(0, $remainingOk);
+        $remainingKo = max(0, $remainingKo);
+
+        return [
+            'hold_ok' => $holdOk,
+            'hold_ko' => $holdKo,
+            'remaining_ok' => $remainingOk,
+            'remaining_ko' => $remainingKo,
+            'total_ok' => $totalOk,
+            'total_ko' => $totalKo,
+        ];
     }
 
     /**

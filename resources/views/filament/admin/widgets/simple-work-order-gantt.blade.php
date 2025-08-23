@@ -182,30 +182,67 @@
                                                     $stackIdx = $bar['stackIdx'];
                                                     $barTop = 20 + $stackIdx * 24;
                                                     $isHidden = $barIdx >= $maxVisibleBars;
-                                                    $barColor = $bar['type'] === 'planned' ? '#3b82f6' : '#10B981';
-                                                    $barBgClass = $bar['type'] === 'planned' ? 'bg-blue-500 dark:bg-blue-700' : 'bg-green-500 dark:bg-green-700';
                                                     
                                                     // Calculate percentage for actual bars
                                                     $totalQty = $wo['qty'] ?? 0;
                                                     $okQtys = $wo['ok_qtys'] ?? 0;
                                                     $percent = $totalQty > 0 ? round(($okQtys / $totalQty) * 100) : 0;
                                                     
-                                                    // Determine display text
+                                                    // Add missing variables for calendar view
+                                                    $factoryId = auth()->user()?->factory_id ?? 1;
+                                                    
                                                     if($bar['type'] === 'planned') {
+                                                        // Planned bars always remain blue
                                                         $displayText = $wo['unique_id'];
                                                     } else {
+                                                        // Actual bars use status-based colors with progress
+                                                        // For simple widget, we'll use the status from the work order directly
+                                                        $currentStatus = strtolower($wo['status'] ?? 'start');
+                                                        
+                                                        // Get status color for progress bar
+                                                        $statusColor = match($currentStatus) {
+                                                            'assigned' => '#6b7280',  // gray-500
+                                                            'start' => '#eab308',     // yellow-500
+                                                            'hold' => '#ef4444',      // red-500
+                                                            'completed' => '#22c55e', // green-500
+                                                            'closed' => '#a855f7',    // purple-500
+                                                            default => '#eab308'      // yellow-500
+                                                        };
+                                                        
                                                         $displayText = $percent > 0 ? $percent . '%' : $wo['unique_id'];
                                                     }
                                                 @endphp
-                                                <a href="{{ url('admin/' . (auth()->user()?->factory_id ?? 1) . '/work-orders/' . $wo['id']) }}"
-                                                    class="absolute left-1 right-1 h-5 rounded flex items-center shadow hover:bg-blue-700 dark:hover:bg-blue-800 transition group {{ $barBgClass }}"
-                                                    style="top: {{ $barTop }}px; z-index: 10; text-decoration: none; {{ $isHidden ? 'display:none;' : '' }}"
-                                                    data-bar="{{ $cellId }}_bar_{{ $barIdx }}"
-                                                    title="{{ $bar['type'] === 'planned' ? 'Planned' : 'Actual' }}: {{ $wo['unique_id'] }}">
-                                                    <span class="text-[10px] text-white font-semibold px-2 truncate w-full" style="line-height: 20px;">
-                                                        {{ $displayText }}
-                                                    </span>
-                                                </a>
+
+                                                @if($bar['type'] === 'planned')
+                                                    {{-- Planned bar (solid blue) --}}
+                                                    <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo['id']) }}"
+                                                        class="absolute left-1 right-1 h-5 rounded flex items-center shadow hover:opacity-80 transition group bg-blue-500 dark:bg-blue-700"
+                                                        style="top: {{ $barTop }}px; z-index: 10; text-decoration: none; {{ $isHidden ? 'display:none;' : '' }}"
+                                                        data-bar="{{ $cellId }}_bar_{{ $barIdx }}"
+                                                        title="Planned: {{ $wo['unique_id'] }}">
+                                                        <span class="text-[10px] text-white font-semibold px-2 truncate w-full" style="line-height: 20px;">
+                                                            {{ $displayText }}
+                                                        </span>
+                                                    </a>
+                                                @else
+                                                    {{-- Actual bar (progress bar style) --}}
+                                                    <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo['id']) }}"
+                                                        class="absolute left-1 right-1 h-5 rounded flex items-center shadow hover:opacity-80 transition group bg-gray-200 dark:bg-gray-700 overflow-hidden"
+                                                        style="top: {{ $barTop }}px; z-index: 10; text-decoration: none; {{ $isHidden ? 'display:none;' : '' }}"
+                                                        data-bar="{{ $cellId }}_bar_{{ $barIdx }}"
+                                                        title="Actual: {{ $wo['unique_id'] }} ({{ ucfirst($currentStatus) }}) - {{ $percent }}% Complete">
+                                                        
+                                                        {{-- Progress fill --}}
+                                                        <div class="absolute top-0 left-0 h-full transition-all duration-300"
+                                                             style="width: {{ $percent }}%; background-color: {{ $statusColor }}; z-index: 1;"></div>
+                                                        
+                                                        {{-- Text overlay --}}
+                                                        <span class="relative text-[10px] font-semibold px-2 truncate w-full z-10 mix-blend-difference text-white" 
+                                                              style="line-height: 20px;">
+                                                            {{ $displayText }}
+                                                        </span>
+                                                    </a>
+                                                @endif
                                             @endforeach
 
                                             @if(count($hiddenBars) > 0)
@@ -281,8 +318,20 @@
                     <span>Planned (Work Order ID)</span>
                 </div>
                 <div class="flex items-center gap-1">
-                    <div class="w-3 h-3 bg-green-500 rounded"></div>
-                    <span>Actual (Completion %)</span>
+                    <div class="w-3 h-3 bg-gray-300 rounded border border-gray-400"></div>
+                    <span>Actual (Progress Bar with Status Colors)</span>
+                </div>
+                <div class="flex items-center gap-2 ml-4">
+                    <div class="w-2 h-2 bg-gray-500 rounded"></div>
+                    <span class="text-xs">Assigned</span>
+                    <div class="w-2 h-2 bg-yellow-500 rounded"></div>
+                    <span class="text-xs">Start</span>
+                    <div class="w-2 h-2 bg-red-500 rounded"></div>
+                    <span class="text-xs">Hold</span>
+                    <div class="w-2 h-2 bg-green-500 rounded"></div>
+                    <span class="text-xs">Completed</span>
+                    <div class="w-2 h-2 bg-purple-500 rounded"></div>
+                    <span class="text-xs">Closed</span>
                 </div>
             </div>
             <div class="text-xs">

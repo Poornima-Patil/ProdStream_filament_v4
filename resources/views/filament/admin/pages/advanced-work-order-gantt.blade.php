@@ -172,30 +172,70 @@
                                                     $stackIdx = $bar['stackIdx'];
                                                     $barTop = 20 + $stackIdx * 24;
                                                     $isHidden = $barIdx >= $maxVisibleBars;
-                                                    $barColor = $bar['type'] === 'planned' ? '#3b82f6' : '#10B981';
-                                                    $barBgClass = $bar['type'] === 'planned' ? 'bg-blue-500 dark:bg-blue-700' : 'bg-green-500 dark:bg-green-700';
                                                     
                                                     // Calculate percentage for actual bars
                                                     $totalQty = $wo->qty ?? 0;
                                                     $okQtys = $wo->ok_qtys ?? 0;
                                                     $percent = $totalQty > 0 ? round(($okQtys / $totalQty) * 100) : 0;
                                                     
-                                                    // Determine display text
+                                                    // Add missing variables for calendar view
+                                                    $factoryId = Auth::user()?->factory_id ?? 3;
+                                                    $barHeight = 20; // Standard height for calendar view bars
+                                                    $barWidthPercentage = 100; // Full width for calendar cells
+                                                    $extraWidth = 0; // No extra width needed for calendar view
+                                                    
                                                     if($bar['type'] === 'planned') {
+                                                        // Planned bars always remain blue
                                                         $displayText = $wo->unique_id;
                                                     } else {
+                                                        // Actual bars use status-based colors with progress
+                                                        $actualEndLog = $wo->workOrderLogs->whereIn('status', ['Closed', 'Completed', 'Hold'])->sortByDesc('changed_at')->first();
+                                                        $currentStatus = $actualEndLog ? strtolower($actualEndLog->status) : strtolower($wo->status);
+                                                        
+                                                        // Get status color for progress bar
+                                                        $statusColor = match($currentStatus) {
+                                                            'assigned' => '#6b7280',  // gray-500
+                                                            'start' => '#eab308',     // yellow-500
+                                                            'hold' => '#ef4444',      // red-500
+                                                            'completed' => '#22c55e', // green-500
+                                                            'closed' => '#a855f7',    // purple-500
+                                                            default => '#eab308'      // yellow-500
+                                                        };
+                                                        
                                                         $displayText = $percent > 0 ? $percent . '%' : $wo->unique_id;
                                                     }
                                                 @endphp
-                                                <a href="{{ url('admin/' . (Auth::user()?->factory_id ?? 3) . '/work-orders/' . $wo->id) }}"
-                                                    class="absolute left-1 right-1 h-5 rounded flex items-center shadow hover:bg-blue-700 dark:hover:bg-blue-800 transition group {{ $barBgClass }}"
-                                                    style="top: {{ $barTop }}px; z-index: 10; text-decoration: none; {{ $isHidden ? 'display:none;' : '' }}"
-                                                    data-bar="{{ $cellId }}_bar_{{ $barIdx }}"
-                                                    title="{{ $bar['type'] === 'planned' ? 'Planned' : 'Actual' }}: {{ $wo->unique_id }}">
-                                                    <span class="text-[10px] text-white font-semibold px-2 truncate w-full" style="line-height: 20px;">
-                                                        {{ $displayText }}
-                                                    </span>
-                                                </a>
+            
+                                                @if($bar['type'] === 'planned')
+                                                    {{-- Planned bar (solid blue) --}}
+                                                    <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo->id) }}"
+                                                        class="absolute left-1 right-1 h-5 rounded flex items-center shadow hover:opacity-80 transition group bg-blue-500 dark:bg-blue-700"
+                                                        style="top: {{ $barTop }}px; z-index: 10; text-decoration: none; {{ $isHidden ? 'display:none;' : '' }}"
+                                                        data-bar="{{ $cellId }}_bar_{{ $barIdx }}"
+                                                        title="Planned: {{ $wo->unique_id }}">
+                                                        <span class="text-[10px] text-white font-semibold px-2 truncate w-full" style="line-height: 20px;">
+                                                            {{ $displayText }}
+                                                        </span>
+                                                    </a>
+                                                @else
+                                                    {{-- Actual bar (progress bar style) --}}
+                                                    <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo->id) }}"
+                                                        class="absolute left-1 right-1 h-5 rounded flex items-center shadow hover:opacity-80 transition group bg-gray-200 dark:bg-gray-700 overflow-hidden"
+                                                        style="top: {{ $barTop }}px; z-index: 10; text-decoration: none; {{ $isHidden ? 'display:none;' : '' }}"
+                                                        data-bar="{{ $cellId }}_bar_{{ $barIdx }}"
+                                                        title="Actual: {{ $wo->unique_id }} ({{ ucfirst($currentStatus ?? $wo->status) }}) - {{ $percent }}% Complete">
+                                                        
+                                                        {{-- Progress fill --}}
+                                                        <div class="absolute top-0 left-0 h-full transition-all duration-300"
+                                                             style="width: {{ $percent }}%; background-color: {{ $statusColor }}; z-index: 1;"></div>
+                                                        
+                                                        {{-- Text overlay --}}
+                                                        <span class="relative text-[10px] font-semibold px-2 truncate w-full z-10 mix-blend-difference text-white" 
+                                                              style="line-height: 20px;">
+                                                            {{ $displayText }}
+                                                        </span>
+                                                    </a>
+                                                @endif
                                             @endforeach
 
                                             @if(count($hiddenBars) > 0)
@@ -439,53 +479,78 @@
                                                 id="{{ $cellId }}_td"
                                             >
                                                 <div id="{{ $cellId }}" class="relative h-full w-full" style="min-height: 60px; position: relative;">
-                                                    @foreach($visibleBars as $barIndex => $bar)
-                                                        @php
-                                                            $wo = $bar['wo'];
-                                                            $stackIdx = $barIndex;
-                                                            $factoryId = Auth::user()?->factory_id ?? 'default-factory';
-                                                            $statusColors = config('work_order_status');
-                                                            $barTop = 8 + $stackIdx * ($barHeight + $barGap);
-                                                            $spanSlots = $bar['spanSlots'];
-                                                            $totalQty = $wo->qty ?? 0;
-                                                            $okQtys = $wo->ok_qtys ?? 0;
-                                                            $percent = $totalQty > 0 ? round(($okQtys / $totalQty) * 100) : 0;
-                                                            
-                                                            // Get status color for actual bars
-                                                            $actualEndLog = $wo->workOrderLogs->whereIn('status', ['Closed', 'Completed', 'Hold'])->sortByDesc('changed_at')->first();
-                                                            $actualStatusKey = $actualEndLog ? strtolower($actualEndLog->status) : strtolower($wo->status);
-                                                            $actualColor = $statusColors[$actualStatusKey] ?? '#10B981';
-                                                            
-                                                            if($bar['type'] === 'planned') {
-                                                                $barBgClass = 'bg-blue-500 dark:bg-blue-600';
-                                                                $hoverClass = 'hover:bg-blue-600 dark:hover:bg-blue-700';
-                                                                $displayText = $wo->unique_id;
-                                                            } else {
-                                                                $barBgClass = 'bg-green-500 dark:bg-green-600';
-                                                                $hoverClass = 'hover:bg-green-600 dark:hover:bg-green-700';
-                                                                $displayText = $percent > 0 ? $percent . '%' : $wo->unique_id;
-                                                            }
-                                                            
-                                                            // Calculate the stretched bar width more simply
-                                                            $barWidthPercentage = $spanSlots * 100;
-                                                            $extraWidth = ($spanSlots - 1) * 2; // Account for borders
-                                                        @endphp
-                                                        <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo->id) }}"
-                                                           class="absolute {{ $barBgClass }} {{ $hoverClass }} rounded flex items-center shadow transition group"
-                                                           style="top: {{ $barTop }}px; 
-                                                                  left: 4px; 
-                                                                  height: {{ $barHeight }}px; 
-                                                                  width: calc({{ $barWidthPercentage }}% + {{ $extraWidth }}px - 8px); 
-                                                                  min-width: 50px; 
-                                                                  z-index: {{ 100 + $barIndex }}; 
-                                                                  text-decoration: none;
-                                                                  position: absolute;"
-                                                           title="{{ $bar['type'] === 'planned' ? 'Planned' : 'Actual' }}: {{ $wo->unique_id }}">
-                                                            <span class="text-[10px] text-white font-semibold px-2 truncate w-full" style="line-height: {{ $barHeight }}px;">
-                                                                {{ $displayText }}
-                                                            </span>
-                                                        </a>
-                                                    @endforeach
+                                                   @foreach($visibleBars as $barIndex => $bar)
+    @php
+        $wo = $bar['wo'];
+        $stackIdx = $barIndex;
+        $factoryId = Auth::user()?->factory_id ?? 'default-factory';
+        $barTop = 8 + $stackIdx * ($barHeight + $barGap);
+        $spanSlots = $bar['spanSlots'];
+        $totalQty = $wo->qty ?? 0;
+        $okQtys = $wo->ok_qtys ?? 0;
+        $percent = $totalQty > 0 ? round(($okQtys / $totalQty) * 100) : 0;
+        
+        if($bar['type'] === 'planned') {
+            $displayText = $wo->unique_id;
+        } else {
+            $actualEndLog = $wo->workOrderLogs->whereIn('status', ['Closed', 'Completed', 'Hold'])->sortByDesc('changed_at')->first();
+            $currentStatus = $actualEndLog ? strtolower($actualEndLog->status) : strtolower($wo->status);
+            
+            $statusColor = match($currentStatus) {
+                'assigned' => '#6b7280',
+                'start' => '#eab308',
+                'hold' => '#ef4444',
+                'completed' => '#22c55e',
+                'closed' => '#a855f7',
+                default => '#eab308'
+            };
+            
+            $displayText = $percent > 0 ? $percent . '%' : $wo->unique_id;
+        }
+        
+        $barWidthPercentage = $spanSlots * 100;
+        $extraWidth = ($spanSlots - 1) * 2;
+    @endphp
+    
+    @if($bar['type'] === 'planned')
+        <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo->id) }}"
+           class="absolute bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 rounded flex items-center shadow transition group"
+           style="top: {{ $barTop }}px; 
+                  left: 4px; 
+                  height: {{ $barHeight }}px; 
+                  width: calc({{ $barWidthPercentage }}% + {{ $extraWidth }}px - 8px); 
+                  min-width: 50px; 
+                  z-index: {{ 100 + $barIndex }}; 
+                  text-decoration: none;
+                  position: absolute;"
+           title="Planned: {{ $wo->unique_id }}">
+            <span class="text-[10px] text-white font-semibold px-2 truncate w-full" style="line-height: {{ $barHeight }}px;">
+                {{ $displayText }}
+            </span>
+        </a>
+    @else
+        <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo->id) }}"
+           class="absolute bg-gray-200 dark:bg-gray-700 hover:opacity-80 rounded flex items-center shadow transition group overflow-hidden"
+           style="top: {{ $barTop }}px; 
+                  left: 4px; 
+                  height: {{ $barHeight }}px; 
+                  width: calc({{ $barWidthPercentage }}% + {{ $extraWidth }}px - 8px); 
+                  min-width: 50px; 
+                  z-index: {{ 100 + $barIndex }}; 
+                  text-decoration: none;
+                  position: absolute;"
+           title="Actual: {{ $wo->unique_id }} ({{ ucfirst($currentStatus ?? $wo->status) }}) - {{ $percent }}% Complete">
+            
+            <div class="absolute top-0 left-0 h-full transition-all duration-300"
+                 style="width: {{ $percent }}%; background-color: {{ $statusColor }}; z-index: 1;"></div>
+            
+            <span class="relative text-[10px] font-semibold px-2 truncate w-full z-10 mix-blend-difference text-white" 
+                  style="line-height: {{ $barHeight }}px;">
+                {{ $displayText }}
+            </span>
+        </a>
+    @endif
+@endforeach
 
                                                     @if(count($hiddenBars) > 0)
                                                         <button 
@@ -502,49 +567,79 @@
                                                             +{{ count($hiddenBars) }} more
                                                         </button>
                                                         <div id="{{ $cellId }}_more" class="absolute inset-0" style="display:none;">
-                                                            @foreach($hiddenBars as $barIndex => $bar)
-                                                                @php
-                                                                    $wo = $bar['wo'];
-                                                                    $realIndex = $maxVisibleBars + $barIndex;
-                                                                    $stackIdx = $realIndex;
-                                                                    $factoryId = Auth::user()?->factory_id ?? 'default-factory';
-                                                                    $statusColors = config('work_order_status');
-                                                                    $barTop = 8 + $stackIdx * ($barHeight + $barGap);
-                                                                    $spanSlots = $bar['spanSlots'];
-                                                                    $totalQty = $wo->qty ?? 0;
-                                                                    $okQtys = $wo->ok_qtys ?? 0;
-                                                                    $percent = $totalQty > 0 ? round(($okQtys / $totalQty) * 100) : 0;
-                                                                    
-                                                                    if($bar['type'] === 'planned') {
-                                                                        $barBgClass = 'bg-blue-500 dark:bg-blue-600';
-                                                                        $hoverClass = 'hover:bg-blue-600 dark:hover:bg-blue-700';
-                                                                        $displayText = $wo->unique_id;
-                                                                    } else {
-                                                                        $barBgClass = 'bg-green-500 dark:bg-green-600';
-                                                                        $hoverClass = 'hover:bg-green-600 dark:hover:bg-green-700';
-                                                                        $displayText = $percent > 0 ? $percent . '%' : $wo->unique_id;
-                                                                    }
-                                                                    
-                                                                    // Calculate the stretched bar width more simply
-                                                                    $barWidthPercentage = $spanSlots * 100;
-                                                                    $extraWidth = ($spanSlots - 1) * 2;
-                                                                @endphp
-                                                                <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo->id) }}"
-                                                                   class="absolute {{ $barBgClass }} {{ $hoverClass }} rounded flex items-center shadow transition group"
-                                                                   style="top: {{ $barTop }}px; 
-                                                                          left: 4px; 
-                                                                          height: {{ $barHeight }}px; 
-                                                                          width: calc({{ $barWidthPercentage }}% + {{ $extraWidth }}px - 8px); 
-                                                                          min-width: 50px; 
-                                                                          z-index: {{ 100 + $realIndex }}; 
-                                                                          text-decoration: none;
-                                                                          position: absolute;"
-                                                                   title="{{ $bar['type'] === 'planned' ? 'Planned' : 'Actual' }}: {{ $wo->unique_id }}">
-                                                                    <span class="text-[10px] text-white font-semibold px-2 truncate w-full" style="line-height: {{ $barHeight }}px;">
-                                                                        {{ $displayText }}
-                                                                    </span>
-                                                                </a>
-                                                            @endforeach
+@foreach($hiddenBars as $barIndex => $bar)
+    @php
+        $wo = $bar['wo'];
+        $realIndex = $maxVisibleBars + $barIndex;
+        $stackIdx = $realIndex;
+        $factoryId = Auth::user()?->factory_id ?? 'default-factory';
+        $barTop = 8 + $stackIdx * ($barHeight + $barGap);
+        $spanSlots = $bar['spanSlots'];
+        $totalQty = $wo->qty ?? 0;
+        $okQtys = $wo->ok_qtys ?? 0;
+        $percent = $totalQty > 0 ? round(($okQtys / $totalQty) * 100) : 0;
+        
+        if($bar['type'] === 'planned') {
+            $displayText = $wo->unique_id;
+        } else {
+            $actualEndLog = $wo->workOrderLogs->whereIn('status', ['Closed', 'Completed', 'Hold'])->sortByDesc('changed_at')->first();
+            $currentStatus = $actualEndLog ? strtolower($actualEndLog->status) : strtolower($wo->status);
+            
+            $statusColor = match($currentStatus) {
+                'assigned' => '#6b7280',
+                'start' => '#eab308',
+                'hold' => '#ef4444',
+                'completed' => '#22c55e',
+                'closed' => '#a855f7',
+                default => '#eab308'
+            };
+            
+            $displayText = $percent > 0 ? $percent . '%' : $wo->unique_id;
+        }
+        
+        $barWidthPercentage = $spanSlots * 100;
+        $extraWidth = ($spanSlots - 1) * 2;
+    @endphp
+    
+    @if($bar['type'] === 'planned')
+        <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo->id) }}"
+           class="absolute bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 rounded flex items-center shadow transition group"
+           style="top: {{ $barTop }}px; 
+                  left: 4px; 
+                  height: {{ $barHeight }}px; 
+                  width: calc({{ $barWidthPercentage }}% + {{ $extraWidth }}px - 8px); 
+                  min-width: 50px; 
+                  z-index: {{ 100 + $realIndex }}; 
+                  text-decoration: none;
+                  position: absolute;"
+           title="Planned: {{ $wo->unique_id }}">
+            <span class="text-[10px] text-white font-semibold px-2 truncate w-full" style="line-height: {{ $barHeight }}px;">
+                {{ $displayText }}
+            </span>
+        </a>
+    @else
+        <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo->id) }}"
+           class="absolute bg-gray-200 dark:bg-gray-700 hover:opacity-80 rounded flex items-center shadow transition group overflow-hidden"
+           style="top: {{ $barTop }}px; 
+                  left: 4px; 
+                  height: {{ $barHeight }}px; 
+                  width: calc({{ $barWidthPercentage }}% + {{ $extraWidth }}px - 8px); 
+                  min-width: 50px; 
+                  z-index: {{ 100 + $realIndex }}; 
+                  text-decoration: none;
+                  position: absolute;"
+           title="Actual: {{ $wo->unique_id }} ({{ ucfirst($currentStatus ?? $wo->status) }}) - {{ $percent }}% Complete">
+            
+            <div class="absolute top-0 left-0 h-full transition-all duration-300"
+                 style="width: {{ $percent }}%; background-color: {{ $statusColor }}; z-index: 1;"></div>
+            
+            <span class="relative text-[10px] font-semibold px-2 truncate w-full z-10 mix-blend-difference text-white" 
+                  style="line-height: {{ $barHeight }}px;">
+                {{ $displayText }}
+            </span>
+        </a>
+    @endif
+@endforeach
                                                             <button
                                                                 onclick="
                                                                     document.getElementById('{{ $cellId }}_more').style.display='none';
