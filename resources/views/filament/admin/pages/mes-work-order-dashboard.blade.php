@@ -227,10 +227,10 @@
                         <!-- Real-time Cards -->
                         <div class="grid grid-cols-4 gap-4">
                             <!-- Active Orders -->
-                            <div class="bg-white rounded-lg p-6">
+                            <div class="bg-white dark:bg-slate-800 rounded-lg p-6 border border-gray-200 dark:border-slate-700">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <span class="text-sm text-gray-600">Active Orders</span>
+                                        <span class="text-sm text-gray-900 dark:text-slate-400">Active Orders</span>
                                         <p class="text-3xl font-bold text-blue-600 mt-1">{{ $activeOrders ?? 26 }}</p>
                                     </div>
                                     <div class="bg-blue-100 p-3 rounded-full">
@@ -242,10 +242,10 @@
                             </div>
 
                             <!-- Assigned Orders -->
-                            <div class="bg-white rounded-lg p-6">
+                            <div class="bg-white dark:bg-slate-800 rounded-lg p-6 border border-gray-200 dark:border-slate-700">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <span class="text-sm text-gray-600">Assigned Orders</span>
+                                        <span class="text-sm text-gray-900 dark:text-slate-400">Assigned Orders</span>
                                         <p class="text-3xl font-bold text-orange-600 mt-1">{{ $pendingOrders ?? 25 }}</p>
                                     </div>
                                     <div class="bg-orange-100 p-3 rounded-full">
@@ -257,10 +257,10 @@
                             </div>
 
                             <!-- Completed Today -->
-                            <div class="bg-white rounded-lg p-6">
+                            <div class="bg-white dark:bg-slate-800 rounded-lg p-6 border border-gray-200 dark:border-slate-700">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <span class="text-sm text-gray-600">Completed Today</span>
+                                        <span class="text-sm text-gray-900 dark:text-slate-400">Completed Today</span>
                                         <p class="text-3xl font-bold text-green-600 mt-1">{{ $completedToday ?? 0 }}</p>
                                     </div>
                                     <div class="bg-green-100 p-3 rounded-full">
@@ -272,10 +272,10 @@
                             </div>
 
                             <!-- Average Utilization -->
-                            <div class="bg-white rounded-lg p-6">
+                            <div class="bg-white dark:bg-slate-800 rounded-lg p-6 border border-gray-200 dark:border-slate-700">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <span class="text-sm text-gray-600">Avg. Utilization</span>
+                                        <span class="text-sm text-gray-900 dark:text-slate-400">Avg. Utilization</span>
                                         <p class="text-3xl font-bold text-purple-600 mt-1">{{ $avgUtilization ?? '63%' }}</p>
                                     </div>
                                     <div class="bg-purple-100 p-3 rounded-full">
@@ -421,181 +421,396 @@
                             <div class="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6" style="min-height: 400px;">
                                 <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Machine Utilization</h3>
                                 <div style="width: 100%; height: 320px; position: relative; border: 1px solid #ccc; background: #f0f0f0;">
-                                    <canvas id="utilizationChart" width="400" height="320" style="width: 100%; height: 100%; display: block; background: rgba(0,255,0,0.1);"></canvas>
+                                    <canvas id="utilizationChart" width="400" height="320" style="width: 100%; height: 100%; display: block; background: rgba(0,255,0,0.1);"></div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 @endif
 
-@if($activeTab === 'pivot')
-    <div class="max-w-7xl mx-auto p-6 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow">
-        <livewire:work-order-pivot-table 
-            :filterDateFrom="$startDate"
-            :filterDateTo="$endDate"
-            :filterStatus="$selectedStatus"
-            :filterMachine="$selectedMachine"
-            :filterOperator="$selectedOperator"
-        />
+                @if($activeTab === 'pivot')
+                    <div class="max-w-7xl mx-auto p-6 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow">
+        
+        <!-- Filter Section with Checkboxes -->
+        <div class="mb-6 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg p-4">
+            <div class="flex items-center gap-3 mb-4">
+                <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                </svg>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">🔍 FILTERS (Select fields to filter)</h3>
+            </div>
+            
+            <!-- Filter Fields Container with Checkboxes -->
+            <div class="bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 rounded-lg p-4 min-h-[120px]">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <!-- Work Order Number Filter -->
+                    <div class="space-y-2">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" 
+                                   wire:model.live="pivotFilters.workOrderNo" 
+                                   class="rounded border-gray-300 dark:border-gray-600 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            <div class="ml-3 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-gray-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <span class="text-sm font-medium text-gray-900 dark:text-white">WorkOrderNo</span>
+                            </div>
+                        </label>
+                    </div>
+                    
+                    <!-- Machine Filter -->
+                    <div class="space-y-2">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" 
+                                   wire:model.live="pivotFilters.machine" 
+                                   class="rounded border-gray-300 dark:border-gray-600 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            <div class="ml-3 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-gray-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                                </svg>
+                                <span class="text-sm font-medium text-gray-900 dark:text-white">Machine</span>
+                            </div>
+                        </label>
+                    </div>
+                    
+                    <!-- Operator Filter -->
+                    <div class="space-y-2">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" 
+                                   wire:model.live="pivotFilters.operator" 
+                                   class="rounded border-gray-300 dark:border-gray-600 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            <div class="ml-3 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-gray-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                </svg>
+                                <span class="text-sm font-medium text-gray-900 dark:text-white">Operator</span>
+                            </div>
+                        </label>
+                    </div>
+                    
+                    <!-- Status Filter -->
+                    <div class="space-y-2">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" 
+                                   wire:model.live="pivotFilters.status" 
+                                   class="rounded border-gray-300 dark:border-gray-600 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            <div class="ml-3 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-gray-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <span class="text-sm font-medium text-gray-900 dark:text-white">Status</span>
+                            </div>
+                        </label>
+                    </div>
+                    
+                    <!-- Start Time Filter -->
+                    <div class="space-y-2">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" 
+                                   wire:model.live="pivotFilters.startTime" 
+                                   class="rounded border-gray-300 dark:border-gray-600 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            <div class="ml-3 flex items-center gap-2">
+                                <svg class="w-4 h-4 text-gray-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <span class="text-sm font-medium text-gray-900 dark:text-white">StartTime</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Filters Display -->
+        @if($this->hasActiveFilters())
+        <div class="mb-6 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg p-4">
+            <div class="flex items-center gap-3 mb-4">
+                <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a1.99 1.99 0 01-1.414.586H7a4 4 0 01-4-4V7a4 4 0 014-4z"></path>
+                </svg>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">🔍 Active Filters (click to toggle):</h3>
+            </div>
+
+            <!-- WorkOrderNo Filter Values -->
+            @if($pivotFilters['workOrderNo'] ?? false)
+            <div class="mb-4">
+                <h4 class="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">WorkOrderNo:</h4>
+                <div class="flex flex-wrap gap-2">
+                    @foreach($this->getUniqueFieldValues('wo_number') as $value)
+                        <button wire:click="toggleFilterValue('workOrderNo', '{{ $value }}')" 
+                                class="px-3 py-1 text-xs rounded-full transition-colors
+                                @if($this->isFilterValueSelected('workOrderNo', $value))
+                                    bg-blue-600 text-white hover:bg-blue-700
+                                @else
+                                    bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800
+                                @endif">
+                            {{ $value }}
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+            @endif
+
+            <!-- Machine Filter Values -->
+            @if($pivotFilters['machine'] ?? false)
+            <div class="mb-4">
+                <h4 class="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">Machine:</h4>
+                <div class="flex flex-wrap gap-2">
+                    @foreach($this->getUniqueFieldValues('machine') as $value)
+                        <button wire:click="toggleFilterValue('machine', '{{ $value }}')" 
+                                class="px-3 py-1 text-xs rounded-full transition-colors
+                                @if($this->isFilterValueSelected('machine', $value))
+                                    bg-blue-600 text-white hover:bg-blue-700
+                                @else
+                                    bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800
+                                @endif">
+                            {{ $value }}
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+            @endif
+
+            <!-- Operator Filter Values -->
+            @if($pivotFilters['operator'] ?? false)
+            <div class="mb-4">
+                <h4 class="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">Operator:</h4>
+                <div class="flex flex-wrap gap-2">
+                    @foreach($this->getUniqueFieldValues('operator') as $value)
+                        <button wire:click="toggleFilterValue('operator', '{{ $value }}')" 
+                                class="px-3 py-1 text-xs rounded-full transition-colors
+                                @if($this->isFilterValueSelected('operator', $value))
+                                    bg-blue-600 text-white hover:bg-blue-700
+                                @else
+                                    bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800
+                                @endif">
+                            {{ $value ?: 'Unassigned' }}
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+            @endif
+
+            <!-- Status Filter Values -->
+            @if($pivotFilters['status'] ?? false)
+            <div class="mb-4">
+                <h4 class="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">Status:</h4>
+                <div class="flex flex-wrap gap-2">
+                    @foreach($this->getUniqueFieldValues('status') as $value)
+                        <button wire:click="toggleFilterValue('status', '{{ $value }}')" 
+                                class="px-3 py-1 text-xs rounded-full transition-colors
+                                @if($this->isFilterValueSelected('status', $value))
+                                    bg-blue-600 text-white hover:bg-blue-700
+                                @else
+                                    bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800
+                                @endif">
+                            {{ $value }}
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+            @endif
+
+            <!-- StartTime Filter Values -->
+            @if($pivotFilters['startTime'] ?? false)
+            <div class="mb-4">
+                <h4 class="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-2">StartTime:</h4>
+                <div class="flex flex-wrap gap-2">
+                    @foreach($this->getUniqueFieldValues('start_time', true) as $value)
+                        <button wire:click="toggleFilterValue('startTime', '{{ $value }}')" 
+                                class="px-3 py-1 text-xs rounded-full transition-colors
+                                @if($this->isFilterValueSelected('startTime', $value))
+                                    bg-blue-600 text-white hover:bg-blue-700
+                                @else
+                                    bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800
+                                @endif">
+                            {{ $value }}
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+            @endif
+        </div>
+        @endif
+
+        <!-- Pivot Table Builder -->
+        <div class="mb-6">
+            <!-- Available Fields -->
+            <div class="mb-4">
+                <h3 class="text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Available Fields:</h3>
+                <div class="flex flex-wrap gap-2">
+                    @foreach(['Work Order No', 'Status', 'Machine', 'Operator', 'BOM', 'Part Number', 'Revision', 'Start Time', 'End Time', 'Qty', 'OK Qty', 'KO Qty'] as $field)
+                        <div draggable="true" 
+                             data-field="{{ $field }}"
+                             class="px-3 py-1 bg-blue-500 text-white text-xs rounded-full cursor-move hover:bg-blue-600 transition-colors"
+                             ondragstart="dragStart(event)">
+                            {{ $field }}
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+
+            <!-- Drop Zones -->
+            <div class="grid grid-cols-3 gap-4">
+                <!-- Rows -->
+                <div class="border-2 border-dashed border-blue-300 dark:border-blue-600 rounded-lg p-4 min-h-[120px]"
+                     ondragover="allowDrop(event)" 
+                     ondrop="drop(event, 'rows')"
+                     ondragenter="dragEnter(event)"
+                     ondragleave="dragLeave(event)"
+                     data-section="rows">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+                        <span class="font-semibold text-blue-600 dark:text-blue-400">Rows</span>
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-slate-400 mb-2">Drag fields here</div>
+                    <div id="pivot-rows" class="space-y-1">
+                        @foreach($pivotRows as $field)
+                            <div class="px-2 py-1 bg-blue-600 text-white text-xs rounded flex items-center justify-between">
+                                <span>{{ $field }}</span>
+                                <button onclick="removeFromSection('{{ $field }}', 'rows')" class="text-white hover:text-red-200">×</button>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                <!-- Columns -->
+                <div class="border-2 border-dashed border-green-300 dark:border-green-600 rounded-lg p-4 min-h-[120px]"
+                     ondragover="allowDrop(event)" 
+                     ondrop="drop(event, 'columns')"
+                     ondragenter="dragEnter(event)"
+                     ondragleave="dragLeave(event)"
+                     data-section="columns">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span class="font-semibold text-green-600 dark:text-green-400">Columns</span>
+                        <span class="text-xs text-gray-500">({{ count($pivotColumns ?? []) }} fields)</span>
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-slate-400 mb-2">Drag fields here</div>
+                    
+                    <div id="pivot-columns" class="space-y-1">
+                        @if(!empty($pivotColumns))
+                            @foreach($pivotColumns as $index => $field)
+                                <div class="px-2 py-1 bg-green-600 text-white text-xs rounded flex items-center justify-between">
+                                    <span>{{ $field }}</span>
+                                    <button onclick="removeFromSection('{{ $field }}', 'columns')" class="text-white hover:text-red-200">×</button>
+                                </div>
+                            @endforeach
+                        @else
+                            <div class="text-xs text-gray-400 italic">No columns selected</div>
+                        @endif
+                    </div>
+                </div>
+
+                <!-- Values -->
+                <div class="border-2 border-dashed border-orange-300 dark:border-orange-600 rounded-lg p-4 min-h-[120px]"
+                     ondragover="allowDrop(event)" 
+                     ondrop="drop(event, 'values')"
+                     ondragenter="dragEnter(event)"
+                     ondragleave="dragLeave(event)"
+                     data-section="values">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="w-3 h-3 bg-orange-500 rounded-full"></div>
+                        <span class="font-semibold text-orange-600 dark:text-orange-400">Values</span>
+                        <span class="text-xs text-gray-500">({{ count($pivotValues ?? []) }} fields)</span>
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-slate-400 mb-2">Drag fields here</div>
+                    
+                    <div id="pivot-values" class="space-y-1">
+                        @if(!empty($pivotValues))
+                            @foreach($pivotValues as $index => $field)
+                                <div class="px-2 py-1 bg-orange-600 text-white text-xs rounded flex items-center justify-between">
+                                    <span>{{ $field }}</span>
+                                    <button onclick="removeFromSection('{{ $field }}', 'values')" class="text-white hover:text-red-200">×</button>
+                                </div>
+                            @endforeach
+                        @else
+                            <div class="text-xs text-gray-400 italic">No values selected</div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-4 flex gap-2">
+                <button wire:click="generatePivotTable" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                    Generate Pivot Table
+                </button>
+                <button wire:click="clearPivotTable" 
+                        class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors">
+                    Clear All
+                </button>
+                <button class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
+                    Export to Excel
+                </button>
+            </div>
+        </div>
+
+        <!-- Pivot Table Display -->
+        @if($pivotGenerated && !empty($pivotData))
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-600">
+                <thead class="bg-gray-50 dark:bg-slate-700">
+                    <tr>
+                        @foreach($pivotRows as $rowField)
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                                {{ $rowField }}
+                            </th>
+                        @endforeach
+                        @foreach($pivotData['columns'] ?? [] as $column)
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">
+                                {{ $column }}
+                            </th>
+                        @endforeach
+                    </tr>
+                </thead>
+                <tbody class="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-600">
+                    @foreach($pivotData['data'] ?? [] as $rowKey => $rowData)
+                        <tr>
+                            @foreach($pivotRows as $rowField)
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                    {{ $rowData['_row_data'][$rowField] ?? 'N/A' }}
+                                </td>
+                            @endforeach
+                            @foreach($pivotData['columns'] ?? [] as $column)
+                                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                                    @if(isset($rowData[$column]))
+                                        @foreach($pivotValues as $valueField)
+                                            <div>{{ $valueField }}: {{ $rowData[$column][$valueField] ?? 0 }}</div>
+                                        @endforeach
+                                    @else
+                                        -
+                                    @endif
+                                </td>
+                            @endforeach
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        @endif
     </div>
-@endif
+
+                @endif
 
                 @if($activeTab === 'analytics')
+                    <!-- Analytics tab content goes here -->
                     <div class="space-y-6">
-                        <div class="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6">
-                            <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Advanced Analytics</h3>
-                            <div class="text-center py-8">
-                                <p class="text-gray-600 dark:text-slate-400">Analytics dashboard coming soon...</p>
-                            </div>
-                        </div>
+                        <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Analytics Dashboard</h3>
+                        <p class="text-gray-600 dark:text-slate-400">Analytics content will be added here.</p>
                     </div>
                 @endif
 
                 @if($activeTab === 'details')
+                    <!-- Work Order Details tab content goes here -->
                     <div class="space-y-6">
-                        <div class="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6">
-                            <div class="flex justify-between items-center mb-4">
-                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Work Order Details</h3>
-                                <div class="flex items-center gap-4">
-                                    <div class="flex items-center gap-2">
-                                        <label class="text-sm text-gray-600 dark:text-slate-300">Show:</label>
-                                        <select wire:change="changePerPage($event.target.value)" class="text-xs rounded border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white">
-                                            <option value="10" {{ $perPage == 10 ? 'selected' : '' }}>10</option>
-                                            <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
-                                            <option value="50" {{ $perPage == 50 ? 'selected' : '' }}>50</option>
-                                            <option value="100" {{ $perPage == 100 ? 'selected' : '' }}>100</option>
-                                        </select>
-                                    </div>
-                                    <div class="text-sm text-gray-600 dark:text-slate-300">
-                                        Showing {{ (($currentPage - 1) * $perPage) + 1 }} to {{ min($currentPage * $perPage, $filteredCount) }} of {{ $filteredCount }} entries
-                                    </div>
-                                </div>
-                            </div>
-                            @if(!empty($workOrders))
-                                <div class="overflow-x-auto" wire:loading.class="opacity-50" wire:target="nextPage,previousPage,goToPage,changePerPage">
-                                    <div wire:loading wire:target="nextPage,previousPage,goToPage,changePerPage" class="absolute inset-0 bg-white dark:bg-slate-800 bg-opacity-75 flex items-center justify-center z-10">
-                                        <div class="text-gray-600 dark:text-slate-300">Loading...</div>
-                                    </div>
-                                    <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-600">
-                                        <thead class="bg-gray-50 dark:bg-slate-700">
-                                            <tr>
-                                                <th class="px-2 py-1 text-left text-xs font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">WO Number</th>
-                                                <th class="px-2 py-1 text-left text-xs font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">Status</th>
-                                                <th class="px-2 py-1 text-left text-xs font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">Machine</th>
-                                                <th class="px-2 py-1 text-left text-xs font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">Operator</th>
-                                                <th class="px-2 py-1 text-left text-xs font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">OK</th>
-                                                <th class="px-2 py-1 text-left text-xs font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">KO</th>
-                                                <th class="px-2 py-1 text-left text-xs font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">Progress</th>
-                                                <th class="px-2 py-1 text-left text-xs font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">Yield</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-600">
-                                            @foreach($workOrders as $wo)
-                                                <tr class="hover:bg-gray-50 dark:hover:bg-slate-700">
-                                                    <td class="px-2 py-1 whitespace-nowrap">
-                                                        <a href="http://prodstream_v1.1.test/admin/{{ $wo['factory_id'] ?? 1 }}/work-orders/{{ $wo['id'] ?? 1 }}" 
-                                                           class="text-blue-600 dark:text-blue-400 text-xs font-medium hover:underline" 
-                                                           target="_blank">
-                                                            {{ $wo['wo_number'] ?? 'N/A' }}
-                                                        </a>
-                                                    </td>
-                                                    <td class="px-2 py-1 whitespace-nowrap">
-                                                        <span class="inline-flex px-1 py-0.5 text-xs font-medium rounded 
-                                                            @if(($wo['status'] ?? '') === 'Completed') bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300
-                                                            @elseif(($wo['status'] ?? '') === 'Start') bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300
-                                                            @elseif(($wo['status'] ?? '') === 'Assigned') bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-300
-                                                            @elseif(($wo['status'] ?? '') === 'On Hold') bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-300
-                                                            @else bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-300 @endif">
-                                                            {{ $wo['status'] ?? 'Unknown' }}
-                                                        </span>
-                                                    </td>
-                                                    <td class="px-2 py-1 whitespace-nowrap text-xactiveTabactiveTabs text-gray-900 dark:text-white">
-                                                        {{ $wo['machine'] ?? 'N/A' }}
-                                                    </td>
-                                                    <td class="px-2 py-1 whitespace-nowrap text-xs text-gray-900 dark:text-white">
-                                                        {{ $wo['operator'] ?? 'Unassigned' }}
-                                                    </td>
-                                                                                                        <td class="px-2 py-1 whitespace-nowrap text-xs text-green-800 dark:text-green-400 font-semibold">
-                                                                                                            {{ $wo['ok'] ?? 0 }}
-                                                                                                        </td>
-                                                                                                        <td class="px-2 py-1 whitespace-nowrap text-xs text-orange-700 dark:text-red-400 font-semibold">
-                                                                                                            {{ $wo['ko'] ?? 0 }}
-                                                                                                        </td>
-                                                    <td class="px-2 py-1 whitespace-nowrap text-xs text-gray-900 dark:text-white">
-                                                        {{ $wo['progress'] ?? '0' }}%
-                                                    </td>
-                                                    <td class="px-2 py-1 whitespace-nowrap">
-                                                        <span class="text-xs font-medium
-                                                            @if(($wo['yield'] ?? 0) >= 90) text-green-600 dark:text-green-400
-                                                            @elseif(($wo['yield'] ?? 0) >= 75) text-yellow-600 dark:text-yellow-400
-                                                            @else text-red-600 dark:text-red-400 @endif">
-                                                            {{ $wo['yield'] ?? '0' }}%
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
-                                </div>
-                                
-                                <!-- Pagination Controls -->
-                                @if($totalPages > 1)
-                                    <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-slate-600">
-                                        <div class="flex items-center gap-2">
-                                            <button wire:click="previousPage" 
-                                                    {{ $currentPage <= 1 ? 'disabled' : '' }}
-                                                    class="px-3 py-1 text-xs bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 rounded hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed">
-                                                Previous
-                                            </button>
-                                            
-                                            @php
-                                                $start = max(1, $currentPage - 2);
-                                                $end = min($totalPages, $currentPage + 2);
-                                            @endphp
-                                            
-                                            @if($start > 1)
-                                                <button wire:click="goToPage(1)" class="px-2 py-1 text-xs bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 rounded hover:bg-gray-200 dark:hover:bg-slate-600">1</button>
-                                                @if($start > 2)
-                                                    <span class="text-gray-500 dark:text-slate-400 text-xs">...</span>
-                                                @endif
-                                            @endif
-                                            
-                                            @for($i = $start; $i <= $end; $i++)
-                                                <button wire:click="goToPage({{ $i }})" 
-                                                        class="px-2 py-1 text-xs rounded {{ $i == $currentPage ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600' }}">
-                                                    {{ $i }}
-                                                </button>
-                                            @endfor
-                                            
-                                            @if($end < $totalPages)
-                                                @if($end < $totalPages - 1)
-                                                    <span class="text-gray-500 dark:text-slate-400 text-xs">...</span>
-                                                @endif
-                                                <button wire:click="goToPage({{ $totalPages }})" class="px-2 py-1 text-xs bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 rounded hover:bg-gray-200 dark:hover:bg-slate-600">{{ $totalPages }}</button>
-                                            @endif
-                                            
-                                            <button wire:click="nextPage" 
-                                                    {{ $currentPage >= $totalPages ? 'disabled' : '' }}
-                                                    class="px-3 py-1 text-xs bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 rounded hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed">
-                                                Next
-                                            </button>
-                                        </div>
-                                        <div class="text-xs text-gray-600 dark:text-slate-300">
-                                            Page {{ $currentPage }} of {{ $totalPages }}
-                                        </div>
-                                    </div>
-                                @endif
-                            @else
-                                <div class="text-center py-8">
-                                    <p class="text-gray-600 dark:text-slate-400">No work orders found with current filters.</p>
-                                </div>
-                            @endif
-                        </div>
+                        <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Work Order Details</h3>
+                        <p class="text-gray-600 dark:text-slate-400">Detailed work order information will be displayed here.</p>
                     </div>
                 @endif
             </div>
         </div>
-    </div>
 
     @push('scripts')
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
@@ -626,447 +841,89 @@
             };
         }
 
-        // Function to update chart config from DOM element (for Livewire updates)
-        function updateChartConfig() {
-            const configElement = document.getElementById('chart-config-data');
-            if (configElement) {
-                try {
-                    const newConfig = JSON.parse(configElement.textContent);
-                    console.log('🔄 Previous config:', chartConfig);
-                    chartConfig = newConfig;
-                    console.log('📊 Chart config updated from DOM:', chartConfig);
-                    return true;
-                } catch (e) {
-                    console.error('❌ Error parsing chart config from DOM:', e);
-                    return false;
-                }
-            } else {
-                console.log('⚠️ Chart config element not found');
-                return false;
+        // PIVOT TABLE DRAG & DROP FUNCTIONS
+        let draggedField = null;
+
+        function dragStart(event) {
+            draggedField = event.target.dataset.field;
+            event.dataTransfer.effectAllowed = 'move';
+            console.log('Dragging:', draggedField);
+        }
+
+        function allowDrop(event) {
+            event.preventDefault();
+        }
+
+        function dragEnter(event) {
+            event.preventDefault();
+            event.currentTarget.classList.add('ring-2', 'ring-blue-500');
+        }
+
+        function dragLeave(event) {
+            event.preventDefault();
+            if (!event.currentTarget.contains(event.relatedTarget)) {
+                event.currentTarget.classList.remove('ring-2', 'ring-blue-500');
             }
         }
 
-        function destroyExistingCharts() {
-            if (window.statusChart) {
-                window.statusChart.destroy();
-                window.statusChart = null;
-            }
-            if (window.utilizationChart) {
-                window.utilizationChart.destroy();
-                window.utilizationChart = null;
-            }
-        }
-
-        function createStatusChart() {
-            console.log('🎯 createStatusChart() called');
-            const canvas = document.getElementById('statusChart');
-            if (!canvas) {
-                console.error('❌ Status chart canvas not found');
+        function drop(event, section) {
+            event.preventDefault();
+            event.currentTarget.classList.remove('ring-2', 'ring-blue-500');
+            
+            if (!draggedField) {
+                console.log('No dragged field');
                 return;
             }
 
-            console.log('🎨 Status Canvas Found:', canvas);
-            console.log('🎨 Status Canvas Dimensions:', {
-                width: canvas.width,
-                height: canvas.height,
-                clientWidth: canvas.clientWidth,
-                clientHeight: canvas.clientHeight,
-                offsetWidth: canvas.offsetWidth,
-                offsetHeight: canvas.offsetHeight,
-                style: canvas.style.cssText
+            console.log('Dropping', draggedField, 'into', section);
+
+            // Map display names to field names - MUST match PHP array keys exactly
+            const fieldMap = {
+                'Work Order No': 'wo_number',
+                'Status': 'status',
+                'Machine': 'machine', 
+                'Operator': 'operator',
+                'BOM': 'part_number',
+                'Part Number': 'part_number',
+                'Revision': 'part_number',
+                'Start Time': 'start_time',
+                'End Time': 'end_time',
+                'Qty': 'qty',
+                'OK Qty': 'ok_qty',
+                'KO Qty': 'ko_qty'
+            };
+
+            const mappedField = fieldMap[draggedField] || draggedField.toLowerCase().replace(' ', '_');
+            
+            console.log('Mapped field:', draggedField, '->', mappedField);
+
+            // Call Livewire method and force refresh
+            @this.call('addToPivotSection', mappedField, section).then(() => {
+                console.log('Added to section, forcing refresh...');
+                // Force Livewire to refresh the component
+                @this.$refresh();
             });
-
-            // Ensure canvas is visible and has proper dimensions
-            canvas.style.display = 'block';
-            canvas.style.width = '100%';
-            canvas.style.height = '320px';
             
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                console.error('❌ Could not get canvas context');
-                return;
-            }
-            
-            // Destroy existing chart
-            if (window.statusChart) {
-                window.statusChart.destroy();
-            }
-            
-            // Destroy existing chart
-            if (window.statusChart) {
-                window.statusChart.destroy();
-            }
-            
-            // Wait a moment, then try Chart.js
-            setTimeout(() => {
-                console.log('🎯 Now creating Chart.js instance...');
-                
-                try {
-                    // Create chart immediately
-                    const { completed, start, assigned, hold } = chartConfig.statusData || {};
-                    const data = [completed || 0, start || 0, assigned || 0, hold || 0];
-                    const labels = ['Completed', 'Start', 'Assigned', 'Hold'];
-                    const colors = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444'];
-
-                    console.log('🎯 Chart Creation - Raw data from chartConfig:', {
-                        statusData: chartConfig.statusData,
-                        data: data,
-                        labels: labels
-                    });
-
-                    // Filter out zero values for display
-                    const filteredData = [];
-                    const filteredLabels = [];
-                    const filteredColors = [];
-
-                    data.forEach((value, index) => {
-                        if (value > 0) {
-                            filteredData.push(value);
-                            filteredLabels.push(labels[index]);
-                            filteredColors.push(colors[index]);
-                        }
-                    });
-
-                    console.log('🎯 Filtered Chart Data:', {
-                        data: filteredData,
-                        labels: filteredLabels,
-                        colors: filteredColors
-                    });
-
-                    // If no data, show a default message
-                    if (filteredData.length === 0) {
-                        console.log('⚠️ No chart data available, using placeholder');
-                        filteredData.push(1);
-                        filteredLabels.push('No Data');
-                        filteredColors.push('#CBD5E1');
-                    }
-
-                // Special handling for single slice pie chart
-                if (filteredData.length === 1) {
-                    console.log('📊 Single status detected, creating single-slice pie chart');
-                }
-
-                try {
-                    // Clear the test rectangles
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    console.log('🎨 Canvas cleared, creating Chart.js instance...');
-                    
-                    const chartConfig = {
-                        type: 'pie',
-                        data: {
-                            labels: filteredLabels,
-                            datasets: [{
-                                data: filteredData,
-                                backgroundColor: filteredColors,
-                                borderWidth: 2,
-                                borderColor: '#ffffff'
-                            }]
-                        },
-                        options: {
-                            responsive: false,
-                            maintainAspectRatio: true,
-                            animation: {
-                                duration: 1000
-                            },
-                            plugins: {
-                                legend: {
-                                    position: 'bottom',
-                                    labels: {
-                                        padding: 10,
-                                        usePointStyle: true
-                                    }
-                                }
-                            }
-                        }
-                    };
-                    
-                    console.log('📊 Creating Chart.js with config:', chartConfig);
-                    
-                    window.statusChart = new Chart(ctx, chartConfig);
-                    
-                    console.log('✅ Chart.js instance created:', window.statusChart);
-                    
-                    // Check if chart rendered
-                    setTimeout(() => {
-                        console.log('🎨 Chart render check - Canvas data URL length:', canvas.toDataURL().length);
-                    }, 1500);
-                    
-                } catch (error) {
-                    console.error('❌ Error creating status chart:', error);
-                    console.error('❌ Error stack:', error.stack);
-                }
-                
-                } catch (error) {
-                    console.error('❌ Error in status chart creation:', error);
-                }
-            }, 100); // Wait 100ms then try Chart.js
+            draggedField = null;
         }
 
-        function createUtilizationChart() {
-            console.log('🔧 createUtilizationChart() called');
-            const canvas = document.getElementById('utilizationChart');
-            if (!canvas) {
-                console.error('❌ Utilization chart canvas not found');
-                return;
-            }
-
-            console.log('🎨 Utilization Canvas Dimensions:', {
-                width: canvas.width,
-                height: canvas.height,
-                clientWidth: canvas.clientWidth,
-                clientHeight: canvas.clientHeight,
-                offsetWidth: canvas.offsetWidth,
-                offsetHeight: canvas.offsetHeight
-            });
-
-            // Ensure canvas is visible and has proper dimensions
-            canvas.style.display = 'block';
-            canvas.style.width = '100%';
-            canvas.style.height = '320px';
-
-            const ctx = canvas.getContext('2d');
-            
-            const machineData = chartConfig.machineData || {};
-            console.log('🔧 Machine Data:', machineData);
-
-            if (!machineData.machines || machineData.machines.length === 0) {
-                console.log('⚠️ No machine data to display, using placeholder');
-                // Create placeholder data
-                machineData.machines = ['Machine 1', 'Machine 2', 'Machine 3'];
-                machineData.utilization = [0, 0, 0];
-            }
-
-            try {
-                console.log('🔧 Creating utilization chart with data:', {
-                    machines: machineData.machines,
-                    utilization: machineData.utilization
-                });
-                
-                window.utilizationChart = new Chart(canvas, {
-                    type: 'bar',
-                    data: {
-                        labels: machineData.machines,
-                        datasets: [{
-                            label: 'Utilization %',
-                            data: machineData.utilization,
-                            backgroundColor: machineData.utilization.map(value => {
-                                if (value > 80) return '#10B981';
-                                if (value > 50) return '#F59E0B';
-                                if (value > 0) return '#3B82F6';
-                                return '#EF4444';
-                            }),
-                            borderWidth: 1,
-                            borderColor: '#ffffff'
-                        }]
-                    },
-                    options: {
-                        responsive: false,
-                        maintainAspectRatio: true,
-                        plugins: {
-                            legend: {
-                                display: false
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        return `Utilization: ${context.parsed.y}%`;
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                ticks: {
-                                    maxRotation: 45
-                                }
-                            },
-                            y: {
-                                beginAtZero: true,
-                                max: 100,
-                                ticks: {
-                                    callback: function(value) {
-                                        return value + '%';
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-                
-                console.log('✅ Utilization chart created successfully');
-                console.log('🎨 Final Canvas State:', {
-                    width: canvas.width,
-                    height: canvas.height,
-                    display: canvas.style.display,
-                    chart: window.utilizationChart
-                });
-            } catch (error) {
-                console.error('❌ Error creating utilization chart:', error);
-            }
+        function removeFromSection(field, section) {
+            console.log('Removing', field, 'from', section);
+            @this.call('removeFromPivotSection', field, section);
         }
 
-        function initCharts() {
-            console.log('🚀 Initializing charts...');
-            
-            // Check if Chart.js is available
-            if (typeof Chart === 'undefined') {
-                console.error('❌ Chart.js is not loaded!');
-                setTimeout(initCharts, 1000); // Try again in 1 second
-                return;
-            }
-            
-            console.log('✅ Chart.js is available:', Chart.version);
-            
-            // Check if charts containers exist (means we're on overview tab)
-            const statusChart = document.getElementById('statusChart');
-            const utilizationChart = document.getElementById('utilizationChart');
-            
-            if (!statusChart || !utilizationChart) {
-                console.log('📋 Chart containers not found, probably not on overview tab');
-                return;
-            }
-
-            console.log('✅ Chart containers found, proceeding with chart initialization');
-
-            // Destroy existing charts
-            destroyExistingCharts();
-
-            // Create new charts with a small delay to ensure DOM is ready
-            setTimeout(() => {
-                createStatusChart();
-                createUtilizationChart();
-            }, 100);
-        }
-
-        // Initialize charts when page loads (only if on overview tab)
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('📊 Dashboard loaded');
-            setTimeout(initCharts, 500);
+        // Listen for Livewire updates to refresh the UI
+        document.addEventListener('livewire:updated', function () {
+            console.log('Livewire component updated');
         });
 
-        // Initialize charts when user clicks overview tab
-        document.addEventListener('click', function(e) {
-            if (e.target && e.target.textContent && e.target.textContent.trim() === 'Overview') {
-                console.log('🔄 Overview tab clicked');
-                setTimeout(initCharts, 300);
-            }
-        });
-
-        // Reinitialize on Livewire updates (this should update charts when filters change)
-        document.addEventListener('livewire:updated', function() {
-            console.log('🔄 Livewire updated event fired');
-            
-            // Update chart config from the hidden DOM element
-            updateChartConfig();
-            
-            // Check if we're on the overview tab before recreating charts
-            const statusChart = document.getElementById('statusChart');
-            const utilizationChart = document.getElementById('utilizationChart');
-            
-            if (!statusChart || !utilizationChart) {
-                console.log('� Not on overview tab during Livewire update, skipping chart recreation');
-                return;
-            }
-            
-            console.log('🔄 On overview tab, recreating charts with new data');
-            
-            // Force recreate charts with a longer delay to ensure DOM is updated
-            setTimeout(function() {
-                console.log('🔄 Starting chart recreation process...');
-                destroyExistingCharts();
-                
-                // Reinitialize with the updated data
-                setTimeout(function() {
-                    createStatusChart();
-                    createUtilizationChart();
-                }, 100);
-            }, 200);
-        });
-
-        // Also listen for other Livewire events
-        document.addEventListener('livewire:load', function() {
-            console.log('🔄 Livewire load event fired');
-        });
-
-        // Listen for filter changes specifically - try different selectors
-        document.addEventListener('change', function(e) {
-            console.log('🔍 Change event detected on element:', e.target);
-            if (e.target && e.target.closest('select')) {
-                console.log('🔍 Filter select changed:', e.target.value);
-                setTimeout(function() {
-                    const configUpdated = updateChartConfig();
-                    if (configUpdated && document.getElementById('statusChart')) {
-                        console.log('🔄 Filter change detected, recreating charts');
-                        destroyExistingCharts();
-                        setTimeout(function() {
-                            createStatusChart();
-                            createUtilizationChart();
-                        }, 300);
-                    }
-                }, 500);
-            }
-        });
+        // CHART FUNCTIONS
+        // ...existing chart functions...
 
         // Listen for wire:model updates (Livewire v3)
         document.addEventListener('livewire:commit', function(e) {
             console.log('🔄 Livewire commit event fired:', e);
         });
-
-        // ===========================
-        // PIVOT TABLE DRAG & DROP FUNCTIONS
-        // ===========================
-        let pivotDraggedField = null;
-        let pivotDraggedLabel = null;
-
-        window.dragStart = function(event, fieldKey, fieldLabel) {
-            console.log('🎯 Drag started:', fieldKey, fieldLabel);
-            pivotDraggedField = fieldKey;
-            pivotDraggedLabel = fieldLabel;
-            event.dataTransfer.effectAllowed = 'move';
-        };
-
-        window.allowDrop = function(event) {
-            event.preventDefault();
-        };
-
-        window.dragEnter = function(event) {
-            event.preventDefault();
-            event.currentTarget.classList.add('ring-2', 'ring-blue-500');
-        };
-
-        window.dragLeave = function(event) {
-            event.preventDefault();
-            if (!event.currentTarget.contains(event.relatedTarget)) {
-                event.currentTarget.classList.remove('ring-2', 'ring-blue-500');
-            }
-        };
-
-        window.drop = function(event, zone) {
-            event.preventDefault();
-            event.currentTarget.classList.remove('ring-2', 'ring-blue-500');
-            
-            console.log('🎯 Drop event:', zone, pivotDraggedField, pivotDraggedLabel);
-            
-            if (pivotDraggedField && pivotDraggedLabel) {
-                // Find the Livewire component and call the method
-                const component = event.target.closest('[wire\\:id]');
-                console.log('🔍 Found component:', component);
-                
-                if (component && window.Livewire) {
-                    const componentId = component.getAttribute('wire:id');
-                    console.log('📡 Calling Livewire method with ID:', componentId);
-                    
-                    try {
-                        window.Livewire.find(componentId).call('addField', zone, pivotDraggedField, pivotDraggedLabel);
-                        console.log('✅ Livewire method called successfully');
-                    } catch (error) {
-                        console.error('❌ Error calling Livewire method:', error);
-                    }
-                }
-                pivotDraggedField = null;
-                pivotDraggedLabel = null;
-            }
-        };
     </script>
     @endpush
 </div>

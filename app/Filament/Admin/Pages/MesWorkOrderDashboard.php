@@ -59,6 +59,28 @@ class MesWorkOrderDashboard extends Page
     public $perPage = 25;
     public $totalPages = 1;
 
+    public array $pivotFilters = [
+        'workOrderNo' => false,
+        'machine' => false,
+        'operator' => false,
+        'status' => false,
+        'startTime' => false,
+    ];
+
+    public array $selectedFilterValues = [
+        'workOrderNo' => [],
+        'machine' => [],
+        'operator' => [],
+        'status' => [],
+        'startTime' => [],
+    ];
+
+    public array $pivotRows = [];
+    public array $pivotColumns = [];
+    public array $pivotValues = [];
+    public array $pivotData = [];
+    public bool $pivotGenerated = false;
+
     public function mount()
     {
         // Set default date range to last 6 months to ensure we get some data
@@ -502,6 +524,12 @@ class MesWorkOrderDashboard extends Page
             Log::info('Filtering to date: ' . $this->filterDateTo);
         }
 
+        // Apply pivot filters if active
+        if ($this->hasActiveFilters()) {
+            $query = $this->applyPivotFilters($query);
+            Log::info('Applied pivot filters', $this->selectedFilterValues);
+        }
+
         // Get total count for pagination first
         $totalQuery = clone $query;
         $totalCount = $totalQuery->count();
@@ -574,8 +602,8 @@ class MesWorkOrderDashboard extends Page
             }
 
             return [
-                'id' => $wo->id, // Add the database ID for linking
-                'factory_id' => $wo->factory_id, // Add factory ID for the URL
+                'id' => $wo->id,
+                'factory_id' => $wo->factory_id,
                 'wo_number' => $wo->unique_id ?? ('WO-' . $wo->id),
                 'number' => $wo->unique_id ?? $wo->id,
                 'part_number' => $partNumber,
@@ -586,6 +614,7 @@ class MesWorkOrderDashboard extends Page
                 'ok' => $wo->ok_qtys ?? 0,
                 'ko' => $wo->scrapped_qtys ?? 0,
                 'yield' => $yield,
+                'start_time' => $wo->start_time,
             ];
         })->toArray();
 
@@ -793,5 +822,498 @@ class MesWorkOrderDashboard extends Page
             'cross_factory_machines' => $crossFactoryMachines->count(),
             'cross_factory_operators' => $crossFactoryOperators->count()
         ];
+    }
+
+    public function updatedPivotFilters($value, $key)
+    {
+        // When a filter is activated, select all values by default
+        if ($value) {
+            $fieldMap = [
+                'workOrderNo' => 'wo_number',
+                'machine' => 'machine',
+                'operator' => 'operator',
+                'status' => 'status',
+                'startTime' => 'start_time',
+            ];
+
+            if (isset($fieldMap[$key])) {
+                $this->selectedFilterValues[$key] = $this->getUniqueFieldValues($fieldMap[$key]);
+            }
+        } else {
+            // When filter is deactivated, clear selected values
+            $this->selectedFilterValues[$key] = [];
+        }
+    }
+
+    public function hasActiveFilters(): bool
+    {
+        return collect($this->pivotFilters)->contains(true);
+    }
+
+    public function getUniqueFieldValues(string $field, bool $formatDate = false): array
+    {
+        // Always get values from the base filtered data (before pivot filters)
+        // This ensures all values remain visible regardless of pivot filter selections
+        $baseWorkOrders = $this->getBaseFilteredWorkOrders();
+
+        if (empty($baseWorkOrders)) {
+            return [];
+        }
+
+        $values = collect($baseWorkOrders)
+            ->pluck($field)
+            ->filter(function ($value) {
+                return $value !== null && $value !== '';
+            })
+            ->unique()
+            ->values()
+            ->toArray();
+
+        if ($formatDate && $field === 'start_time') {
+            $values = array_map(function ($value) {
+                return date('Y-m-d', strtotime($value));
+            }, $values);
+            $values = array_unique($values);
+            sort($values);
+        }
+
+        return $values;
+    }
+
+    private function getBaseFilteredWorkOrders()
+    {
+        // Get work orders with only the main filters (not pivot filters)
+        // This provides the base set for showing all available filter values
+        $query = WorkOrder::query()
+            ->with(['machine', 'operator.user', 'bom.purchaseOrder.partNumber'])
+            ->where('factory_id', Auth::user()->factory_id);
+
+        // Apply ONLY the main filters (date range, status, machine, operator)
+        // Do NOT apply pivot filters here
+        if ($this->filterStatus) {
+            $query->where('status', $this->filterStatus);
+        }
+        if ($this->filterMachine) {
+            $machine = Machine::where('name', $this->filterMachine)->where('factory_id', Auth::user()->factory_id)->first();
+            if ($machine) {
+                $query->where('machine_id', $machine->id);
+            }
+        }
+        if ($this->filterOperator) {
+            $query->where('operator_id', $this->filterOperator);
+        }
+        if ($this->filterDateFrom) {
+            $query->whereDate('created_at', '>=', $this->filterDateFrom);
+        }
+        if ($this->filterDateTo) {
+            $query->whereDate('created_at', '<=', $this->filterDateTo);
+        }
+
+        $workOrders = $query->get();
+
+        // Map to array format like in loadWorkOrders
+        return $workOrders->map(function ($wo) {
+            $partNumber = 'N/A';
+            if ($wo->bom && $wo->bom->purchaseOrder && $wo->bom->purchaseOrder->partNumber) {
+                $partNumber = $wo->bom->purchaseOrder->partNumber->partnumber .
+                    '_' . ($wo->bom->purchaseOrder->partNumber->revision ?? '');
+            }
+
+            $machineName = 'N/A';
+            if ($wo->machine && $wo->machine->factory_id == $wo->factory_id) {
+                $machineName = $wo->machine->name;
+            }
+
+            $operatorName = 'N/A';
+            if ($wo->operator && $wo->operator->factory_id == $wo->factory_id && $wo->operator->user) {
+                $operatorName = $wo->operator->user->getFilamentName();
+            }
+
+            return [
+                'wo_number' => $wo->unique_id ?? ('WO-' . $wo->id),
+                'machine' => $machineName,
+                'operator' => $operatorName,
+                'status' => $wo->status,
+                'start_time' => $wo->start_time ? $wo->start_time->format('Y-m-d') : null,
+                'part_number' => $partNumber,
+                'ok_qty' => $wo->ok_qtys ?? 0,
+                'ko_qty' => $wo->scrapped_qtys ?? 0,
+                'qty' => $wo->qty ?? 0,
+            ];
+        })->toArray();
+    }
+
+    public function toggleFilterValue(string $filterType, string $value)
+    {
+        if (!isset($this->selectedFilterValues[$filterType])) {
+            $this->selectedFilterValues[$filterType] = [];
+        }
+
+        $index = array_search($value, $this->selectedFilterValues[$filterType]);
+
+        if ($index !== false) {
+            // Remove value if already selected
+            unset($this->selectedFilterValues[$filterType][$index]);
+            $this->selectedFilterValues[$filterType] = array_values($this->selectedFilterValues[$filterType]);
+        } else {
+            // Add value if not selected
+            $this->selectedFilterValues[$filterType][] = $value;
+        }
+
+        // Reset pagination when filters change
+        $this->currentPage = 1;
+
+        // DON'T reload work orders here - this was causing the values to disappear
+        // $this->loadWorkOrders();
+        // $this->calculateStatusDistribution();
+        // $this->calculateKPIs();
+        // $this->updateRecordCounts();
+
+        // Only regenerate pivot table if it was already generated
+        if ($this->pivotGenerated) {
+            $this->generatePivotTable();
+        }
+    }
+
+    public function addToPivotSection($field, $section)
+    {
+        // Log the incoming field for debugging
+        Log::info("Adding field to pivot section", ['field' => $field, 'section' => $section]);
+
+        // Remove from other sections first
+        $this->removeFromAllPivotSections($field);
+
+        // Add to the specified section
+        switch ($section) {
+            case 'rows':
+                if (!in_array($field, $this->pivotRows)) {
+                    $this->pivotRows[] = $field;
+                }
+                break;
+            case 'columns':
+                if (!in_array($field, $this->pivotColumns)) {
+                    $this->pivotColumns[] = $field;
+                }
+                break;
+            case 'values':
+                if (!in_array($field, $this->pivotValues)) {
+                    $this->pivotValues[] = $field;
+                }
+                break;
+        }
+
+        Log::info("Pivot sections after adding field", [
+            'rows' => $this->pivotRows,
+            'columns' => $this->pivotColumns,
+            'values' => $this->pivotValues
+        ]);
+    }
+
+    public function removeFromPivotSection($field, $section)
+    {
+        switch ($section) {
+            case 'rows':
+                $this->pivotRows = array_values(array_filter($this->pivotRows, fn($item) => $item !== $field));
+                break;
+            case 'columns':
+                $this->pivotColumns = array_values(array_filter($this->pivotColumns, fn($item) => $item !== $field));
+                break;
+            case 'values':
+                $this->pivotValues = array_values(array_filter($this->pivotValues, fn($item) => $item !== $field));
+                break;
+        }
+    }
+
+    private function removeFromAllPivotSections($field)
+    {
+        $this->pivotRows = array_values(array_filter($this->pivotRows, fn($item) => $item !== $field));
+        $this->pivotColumns = array_values(array_filter($this->pivotColumns, fn($item) => $item !== $field));
+        $this->pivotValues = array_values(array_filter($this->pivotValues, fn($item) => $item !== $field));
+    }
+
+    public function generatePivotTable()
+    {
+        if (empty($this->pivotRows) && empty($this->pivotColumns)) {
+            $this->pivotGenerated = false;
+            $this->pivotData = [];
+            return;
+        }
+
+        Log::info('Generating pivot table', [
+            'rows' => $this->pivotRows,
+            'columns' => $this->pivotColumns,
+            'values' => $this->pivotValues
+        ]);
+
+        // Get work orders data based on current filters
+        $workOrdersData = $this->getFilteredWorkOrdersForPivot();
+
+        if (empty($workOrdersData)) {
+            $this->pivotGenerated = false;
+            $this->pivotData = [];
+            return;
+        }
+
+        $this->pivotData = $this->buildPivotTable($workOrdersData);
+        $this->pivotGenerated = true;
+    }
+
+    private function getFilteredWorkOrdersForPivot()
+    {
+        // Use the same query logic as loadWorkOrders but get all data (no pagination)
+        $query = WorkOrder::query()
+            ->with(['machine', 'operator.user', 'bom.purchaseOrder.partNumber'])
+            ->where('factory_id', Auth::user()->factory_id);
+
+        // Apply existing filters
+        if ($this->filterStatus) {
+            $query->where('status', $this->filterStatus);
+        }
+        if ($this->filterMachine) {
+            $machine = Machine::where('name', $this->filterMachine)->where('factory_id', Auth::user()->factory_id)->first();
+            if ($machine) {
+                $query->where('machine_id', $machine->id);
+            }
+        }
+        if ($this->filterOperator) {
+            $query->where('operator_id', $this->filterOperator);
+        }
+        if ($this->filterDateFrom) {
+            $query->whereDate('created_at', '>=', $this->filterDateFrom);
+        }
+        if ($this->filterDateTo) {
+            $query->whereDate('created_at', '<=', $this->filterDateTo);
+        }
+
+        // Apply pivot filters if active
+        if ($this->hasActiveFilters()) {
+            $query = $this->applyPivotFilters($query);
+        }
+
+        $workOrders = $query->get();
+
+        Log::info("Retrieved work orders for pivot", ['count' => $workOrders->count()]);
+        if ($workOrders->count() > 0) {
+            Log::info("First work order raw data", [
+                'status' => $workOrders->first()->status,
+                'machine_name' => $workOrders->first()->machine?->name,
+                'operator_name' => $workOrders->first()->operator?->user?->getFilamentName()
+            ]);
+        }
+
+        // Map to array format like in loadWorkOrders
+        $mappedData = $workOrders->map(function ($wo) {
+            $partNumber = 'N/A';
+            if ($wo->bom && $wo->bom->purchaseOrder && $wo->bom->purchaseOrder->partNumber) {
+                $partNumber = $wo->bom->purchaseOrder->partNumber->partnumber .
+                    '_' . ($wo->bom->purchaseOrder->partNumber->revision ?? '');
+            }
+
+            $machineName = 'N/A';
+            if ($wo->machine && $wo->machine->factory_id == $wo->factory_id) {
+                $machineName = $wo->machine->name;
+            }
+
+            $operatorName = 'N/A';
+            if ($wo->operator && $wo->operator->factory_id == $wo->factory_id && $wo->operator->user) {
+                $operatorName = $wo->operator->user->getFilamentName();
+            }
+
+            $mappedRow = [
+                'wo_number' => $wo->unique_id ?? ('WO-' . $wo->id),
+                'machine' => $machineName,
+                'operator' => $operatorName,
+                'status' => $wo->status, // Make sure this is correctly mapped
+                'start_time' => $wo->start_time ? $wo->start_time->format('Y-m-d') : null,
+                'part_number' => $partNumber,
+                'ok_qty' => $wo->ok_qtys ?? 0,
+                'ko_qty' => $wo->scrapped_qtys ?? 0,
+                'qty' => $wo->qty ?? 0,
+            ];
+
+            // Log the first mapped row for debugging
+            static $logged = false;
+            if (!$logged) {
+                Log::info("First mapped work order for pivot", $mappedRow);
+                $logged = true;
+            }
+
+            return $mappedRow;
+        })->toArray();
+
+        Log::info("Mapped work orders for pivot", ['count' => count($mappedData)]);
+
+        return $mappedData;
+    }
+
+    private function buildPivotTable($data)
+    {
+        $pivot = [];
+        $totals = [];
+
+        foreach ($data as $row) {
+            // Build row key
+            $rowKey = $this->buildKey($row, $this->pivotRows);
+
+            // Build column key
+            $columnKey = $this->buildKey($row, $this->pivotColumns);
+
+            // Initialize if not exists
+            if (!isset($pivot[$rowKey])) {
+                $pivot[$rowKey] = [];
+                $pivot[$rowKey]['_row_data'] = $this->extractKeyData($row, $this->pivotRows);
+            }
+
+            if (!isset($pivot[$rowKey][$columnKey])) {
+                $pivot[$rowKey][$columnKey] = [];
+                $pivot[$rowKey][$columnKey]['_column_data'] = $this->extractKeyData($row, $this->pivotColumns);
+            }
+
+            // Aggregate values
+            foreach ($this->pivotValues as $valueField) {
+                $value = $row[$valueField] ?? 0;
+
+                if (!isset($pivot[$rowKey][$columnKey][$valueField])) {
+                    $pivot[$rowKey][$columnKey][$valueField] = 0;
+                }
+
+                if (is_numeric($value)) {
+                    $pivot[$rowKey][$columnKey][$valueField] += $value;
+                } else {
+                    $pivot[$rowKey][$columnKey][$valueField] = $value; // For non-numeric values, just keep the latest
+                }
+
+                // Track totals
+                if (!isset($totals[$valueField])) {
+                    $totals[$valueField] = 0;
+                }
+                if (is_numeric($value)) {
+                    $totals[$valueField] += $value;
+                }
+            }
+        }
+
+        return [
+            'data' => $pivot,
+            'totals' => $totals,
+            'columns' => $this->getUniqueColumnKeys($data),
+            'rows' => array_keys($pivot)
+        ];
+    }
+
+    private function buildKey($row, $fields)
+    {
+        if (empty($fields)) {
+            return 'Total';
+        }
+
+        $parts = [];
+        foreach ($fields as $field) {
+            $value = $row[$field] ?? 'N/A';
+            $parts[] = $value;
+
+            // Log field access for debugging
+            Log::info("Building key for field", [
+                'field' => $field,
+                'value' => $value,
+                'available_keys' => array_keys($row)
+            ]);
+        }
+
+        $key = implode(' | ', $parts);
+        Log::info("Built key", ['fields' => $fields, 'key' => $key]);
+
+        return $key;
+    }
+
+    private function extractKeyData($row, $fields)
+    {
+        $data = [];
+        foreach ($fields as $field) {
+            $data[$field] = $row[$field] ?? 'N/A';
+        }
+        return $data;
+    }
+
+    private function getUniqueColumnKeys($data)
+    {
+        $columns = [];
+        foreach ($data as $row) {
+            $columnKey = $this->buildKey($row, $this->pivotColumns);
+            if (!in_array($columnKey, $columns)) {
+                $columns[] = $columnKey;
+            }
+        }
+        return $columns;
+    }
+
+    public function clearPivotTable()
+    {
+        $this->pivotRows = [];
+        $this->pivotColumns = [];
+        $this->pivotValues = [];
+        $this->pivotData = [];
+        $this->pivotGenerated = false;
+    }
+
+    public function isFilterValueSelected(string $filterType, string $value): bool
+    {
+        return in_array($value, $this->selectedFilterValues[$filterType] ?? []);
+    }
+
+    private function applyPivotFilters($query)
+    {
+        // Apply WorkOrderNo filter
+        if (!empty($this->selectedFilterValues['workOrderNo'])) {
+            $query->where(function ($q) {
+                foreach ($this->selectedFilterValues['workOrderNo'] as $woNumber) {
+                    $q->orWhere('unique_id', $woNumber)
+                        ->orWhere('id', str_replace('WO-', '', $woNumber));
+                }
+            });
+        }
+
+        // Apply Machine filter
+        if (!empty($this->selectedFilterValues['machine'])) {
+            $machineIds = Machine::whereIn('name', $this->selectedFilterValues['machine'])
+                ->where('factory_id', Auth::user()->factory_id)
+                ->pluck('id');
+            if ($machineIds->isNotEmpty()) {
+                $query->whereIn('machine_id', $machineIds);
+            }
+        }
+
+        // Apply Operator filter
+        if (!empty($this->selectedFilterValues['operator'])) {
+            $operatorIds = Operator::whereHas('user', function ($q) {
+                $q->where(function ($query) {
+                    foreach ($this->selectedFilterValues['operator'] as $operatorName) {
+                        $query->orWhere('first_name', 'LIKE', '%' . $operatorName . '%')
+                            ->orWhere('last_name', 'LIKE', '%' . $operatorName . '%')
+                            ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ['%' . $operatorName . '%']);
+                    }
+                });
+            })->where('factory_id', Auth::user()->factory_id)->pluck('id');
+
+            if ($operatorIds->isNotEmpty()) {
+                $query->whereIn('operator_id', $operatorIds);
+            }
+        }
+
+        // Apply Status filter
+        if (!empty($this->selectedFilterValues['status'])) {
+            $query->whereIn('status', $this->selectedFilterValues['status']);
+        }
+
+        // Apply StartTime filter
+        if (!empty($this->selectedFilterValues['startTime'])) {
+            $query->where(function ($q) {
+                foreach ($this->selectedFilterValues['startTime'] as $date) {
+                    $q->orWhereDate('start_time', $date);
+                }
+            });
+        }
+
+        return $query;
     }
 }

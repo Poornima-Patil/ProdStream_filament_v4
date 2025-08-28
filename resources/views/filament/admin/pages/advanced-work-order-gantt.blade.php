@@ -202,7 +202,11 @@
                                                             default => '#eab308'      // yellow-500
                                                         };
                                                         
-                                                        $displayText = $percent > 0 ? $percent . '%' : $wo->unique_id;
+                                                        // For "Start" status with no progress, show minimum 20% fill to make it visible
+                                                        $displayPercent = $percent;
+                                                        if ($currentStatus === 'start' && $percent === 0) {
+                                                            $displayPercent = 20; // Show 20% fill for visibility
+                                                        }
                                                     }
                                                 @endphp
             
@@ -219,20 +223,47 @@
                                                     </a>
                                                 @else
                                                     {{-- Actual bar (progress bar style) --}}
+                                                    @php
+                                                        // Get the current status for coloring
+                                                        $currentStatus = strtolower($wo->status);
+                                                        
+                                                        // Check if there's a more recent status from logs
+                                                        $latestLog = $wo->workOrderLogs->sortByDesc('changed_at')->first();
+                                                        if ($latestLog) {
+                                                            $currentStatus = strtolower($latestLog->status);
+                                                        }
+                                                        
+                                                        // Get status color for progress bar
+                                                        $statusColor = match($currentStatus) {
+                                                            'assigned' => '#6b7280',  // gray-500
+                                                            'start' => '#eab308',     // yellow-500
+                                                            'hold' => '#ef4444',      // red-500
+                                                            'completed' => '#22c55e', // green-500
+                                                            'closed' => '#a855f7',    // purple-500
+                                                            default => '#eab308'      // yellow-500
+                                                        };
+                                                        
+                                                        // For "Start" status with no progress, show minimum 20% fill to make it visible
+                                                        $displayPercent = $percent;
+                                                        if ($currentStatus === 'start' && $percent === 0) {
+                                                            $displayPercent = 20; // Show 20% fill for visibility
+                                                        }
+                                                    @endphp
+    
                                                     <a href="{{ url('admin/' . $factoryId . '/work-orders/' . $wo->id) }}"
                                                         class="absolute left-1 right-1 h-5 rounded flex items-center shadow hover:opacity-80 transition group bg-gray-200 dark:bg-gray-700 overflow-hidden"
                                                         style="top: {{ $barTop }}px; z-index: 10; text-decoration: none; {{ $isHidden ? 'display:none;' : '' }}"
                                                         data-bar="{{ $cellId }}_bar_{{ $barIdx }}"
-                                                        title="Actual: {{ $wo->unique_id }} ({{ ucfirst($currentStatus ?? $wo->status) }}) - {{ $percent }}% Complete">
+                                                        title="Actual: {{ $wo->unique_id }} ({{ ucfirst($currentStatus) }}) - {{ $percent > 0 ? $percent . '%' : 'Started' }} Complete">
                                                         
-                                                        {{-- Progress fill --}}
+                                                        {{-- Progress fill with status color --}}
                                                         <div class="absolute top-0 left-0 h-full transition-all duration-300"
-                                                             style="width: {{ $percent }}%; background-color: {{ $statusColor }}; z-index: 1;"></div>
+                                                             style="width: {{ $displayPercent }}%; background-color: {{ $statusColor }}; z-index: 1;"></div>
                                                         
                                                         {{-- Text overlay --}}
                                                         <span class="relative text-[10px] font-semibold px-2 truncate w-full z-10 mix-blend-difference text-white" 
                                                               style="line-height: 20px;">
-                                                            {{ $displayText }}
+                                                            {{ $currentStatus === 'start' && $percent === 0 ? 'STARTED' : $displayText }}
                                                         </span>
                                                     </a>
                                                 @endif
@@ -539,14 +570,15 @@
                   z-index: {{ 100 + $barIndex }}; 
                   text-decoration: none;
                   position: absolute;"
-           title="Actual: {{ $wo->unique_id }} ({{ ucfirst($currentStatus ?? $wo->status) }}) - {{ $percent }}% Complete">
+           title="Actual: {{ $wo->unique_id }} ({{ ucfirst($currentStatus) }}) - {{ $percent > 0 ? $percent . '%' : 'Started' }} Complete">
             
+            {{-- Progress fill with status color --}}
             <div class="absolute top-0 left-0 h-full transition-all duration-300"
-                 style="width: {{ $percent }}%; background-color: {{ $statusColor }}; z-index: 1;"></div>
+                 style="width: {{ $displayPercent }}%; background-color: {{ $statusColor }}; z-index: 1;"></div>
             
             <span class="relative text-[10px] font-semibold px-2 truncate w-full z-10 mix-blend-difference text-white" 
                   style="line-height: {{ $barHeight }}px;">
-                {{ $displayText }}
+                {{ $currentStatus === 'start' && $percent === 0 ? 'STARTED' : $displayText }}
             </span>
         </a>
     @endif
@@ -628,14 +660,15 @@
                   z-index: {{ 100 + $realIndex }}; 
                   text-decoration: none;
                   position: absolute;"
-           title="Actual: {{ $wo->unique_id }} ({{ ucfirst($currentStatus ?? $wo->status) }}) - {{ $percent }}% Complete">
+           title="Actual: {{ $wo->unique_id }} ({{ ucfirst($currentStatus) }}) - {{ $percent > 0 ? $percent . '%' : 'Started' }} Complete">
             
+            {{-- Progress fill with status color --}}
             <div class="absolute top-0 left-0 h-full transition-all duration-300"
-                 style="width: {{ $percent }}%; background-color: {{ $statusColor }}; z-index: 1;"></div>
+                 style="width: {{ $displayPercent }}%; background-color: {{ $statusColor }}; z-index: 1;"></div>
             
             <span class="relative text-[10px] font-semibold px-2 truncate w-full z-10 mix-blend-difference text-white" 
                   style="line-height: {{ $barHeight }}px;">
-                {{ $displayText }}
+                {{ $currentStatus === 'start' && $percent === 0 ? 'STARTED' : $displayText }}
             </span>
         </a>
     @endif

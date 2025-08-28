@@ -1,4 +1,5 @@
 <?php
+
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -16,9 +17,9 @@ class WorkOrdersTableSeeder extends Seeder
     public function run(): void
     {
         $factoryId = env('SEED_FACTORY_ID', 1);
- // Get Factory Admin user for this factory (Spatie hasRole)
+        // Get Factory Admin user for this factory (Spatie hasRole)
         $factoryAdminUser = User::where('factory_id', $factoryId)
-            ->whereHas('roles', function($q) {
+            ->whereHas('roles', function ($q) {
                 $q->where('name', 'Factory Admin');
             })
             ->first();
@@ -124,7 +125,7 @@ class WorkOrdersTableSeeder extends Seeder
                                 ->where(function ($q) use ($startTime, $woEnd) {
                                     $q->where(function ($query) use ($startTime, $woEnd) {
                                         $query->where('start_time', '<', $woEnd)
-                                              ->where('end_time', '>', $startTime);
+                                            ->where('end_time', '>', $startTime);
                                     });
                                 })->exists();
 
@@ -133,7 +134,7 @@ class WorkOrdersTableSeeder extends Seeder
                                 ->where(function ($q) use ($startTime, $woEnd) {
                                     $q->where(function ($query) use ($startTime, $woEnd) {
                                         $query->where('start_time', '<', $woEnd)
-                                              ->where('end_time', '>', $startTime);
+                                            ->where('end_time', '>', $startTime);
                                     });
                                 })->exists();
 
@@ -162,7 +163,7 @@ class WorkOrdersTableSeeder extends Seeder
                             $woSerial = str_pad($woSerialCounters[$monthYear], 4, '0', STR_PAD_LEFT);
                             $woDate = $startTime->format('mdy');
                             $woUniqueId = "W{$woSerial}_{$woDate}_{$bom->unique_id}";
-
+                            $WoCreatedAt = Carbon::parse($bom->created_at)->addDay();
                             WorkOrder::create([
                                 'bom_id' => $bom->id,
                                 'qty' => $qty,
@@ -175,6 +176,8 @@ class WorkOrdersTableSeeder extends Seeder
                                 'scrapped_qtys' => 0,
                                 'unique_id' => $woUniqueId,
                                 'factory_id' => $factoryId,
+                                'created_at' => $WoCreatedAt,
+                                'updated_at' => $WoCreatedAt,
                             ]);
 
                             $this->command->info("Created WO for BOM {$bom->id} with qty $qty, machine {$machine->id}, operator {$operator->id}, shift {$shift->id}, start $startTime, end $woEnd, using calc {$woCalcToggle}");
