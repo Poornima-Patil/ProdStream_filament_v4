@@ -11,7 +11,10 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-
+use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Enums\ActionsPosition;
 class ShiftResource extends Resource
 {
     protected static ?string $model = Shift::class;
@@ -57,11 +60,11 @@ class ShiftResource extends Resource
                 Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([
-                Tables\Actions\EditAction::make()
-                    ->label('Edit Shift'),
-                Tables\Actions\ViewAction::make()
-                    ->hiddenLabel(),
-            ])
+                ActionGroup::make([
+                    EditAction::make()->label('Edit'),
+                    ViewAction::make()->label('View'),
+                ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),

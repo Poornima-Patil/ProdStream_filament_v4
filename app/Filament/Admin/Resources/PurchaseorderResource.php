@@ -13,6 +13,10 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Enums\ActionsPosition;
 
 class PurchaseorderResource extends Resource
 {
@@ -126,11 +130,11 @@ class PurchaseorderResource extends Resource
                 Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([
-                Tables\Actions\EditAction::make()
-                    ->label('Edit Sales Order Line'),
-                Tables\Actions\ViewAction::make()
-                    ->hiddenLabel(),
-            ])
+                ActionGroup::make([
+                    EditAction::make()->label('Edit'),
+                    ViewAction::make()->label('View'),
+                ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),

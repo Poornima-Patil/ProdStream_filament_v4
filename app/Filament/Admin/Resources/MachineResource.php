@@ -12,7 +12,11 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-
+use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Actions\Action;
+use Filament\Tables\Enums\ActionsPosition;
 class MachineResource extends Resource
 {
     protected static ?string $model = Machine::class;
@@ -71,17 +75,19 @@ class MachineResource extends Resource
                 Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([
-                Tables\Actions\EditAction::make()
-                    ->label('Edit Machine'),
-                Tables\Actions\ViewAction::make()
-                    ->hiddenLabel(),
-                Tables\Actions\Action::make('calendar')
+                ActionGroup::make([
+                EditAction::make()
+                    ->label('Edit'),
+                ViewAction::make()
+                    ->label('View'),
+                Action::make('calendar')
                     ->label('View Schedule')
                     ->icon('heroicon-o-calendar-days')
                     ->color('info')
                     ->url(fn($record) => MachineResource::getUrl('view', ['record' => $record]) . '#machine-schedule-section')
                     ->openUrlInNewTab(false),
             ])
+            ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),

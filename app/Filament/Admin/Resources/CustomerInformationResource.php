@@ -11,7 +11,10 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-
+use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Enums\ActionsPosition;
 class CustomerInformationResource extends Resource
 {
     protected static ?string $model = CustomerInformation::class;
@@ -47,9 +50,17 @@ class CustomerInformationResource extends Resource
                 Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([
-                Tables\Actions\RestoreAction::make(),
-                Tables\Actions\ForceDeleteAction::make(),
+                ActionGroup::make([
+                    EditAction::make()->label('Edit'),
+                    ViewAction::make()->label('View'),
+                ])
+            ], position: ActionsPosition::BeforeColumns)
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make(),
+                ]),
             ]);
+        
     }
 
     public static function getRelations(): array
@@ -65,6 +76,7 @@ class CustomerInformationResource extends Resource
             'index' => Pages\ListCustomerInformation::route('/'),
             'create' => Pages\CreateCustomerInformation::route('/create'),
             'edit' => Pages\EditCustomerInformation::route('/{record}/edit'),
+            'view' => Pages\ViewCustomerInformation::route('/{record}/view'),
         ];
     }
 

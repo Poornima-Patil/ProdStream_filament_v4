@@ -241,8 +241,8 @@ Forms\Components\DatePicker::make('lead_time')
 
             ->actions([
             ActionGroup::make([
-                    EditAction::make()->label('Edit BOM'),
-                    ViewAction::make()->hiddenLabel(),
+                    EditAction::make()->label('Edit'),
+                    ViewAction::make()->label('View'),
             ]),
         ], position: ActionsPosition::BeforeColumns)
             ->bulkActions([
@@ -268,104 +268,6 @@ Forms\Components\DatePicker::make('lead_time')
             'view' => Pages\ViewBom::route(path: '/{record}/'),
 
         ];
-    }
-
-    public static function infoList(InfoList $infoList): InfoList
-    {
-        return $infoList
-            ->schema([
-
-                Section::make('Sales Order Infomation')
-                    ->collapsible()
-                    ->schema([
-                        TextEntry::make('unique_id')
-                            ->label('Unique ID'),
-                        TextEntry::make('purchaseorder.description')
-                            ->label('Sales Order'),
-                        TextEntry::make('purchaseorder.partnumber.partnumber')->label('Part Number'),
-                        TextEntry::make('purchaseorder.partnumber.revision')->label('Revision'),
-                        TextEntry::make('machineGroup.group_name')
-                            ->label('Machine Group'),
-
-                    ])->columns(),
-
-                Section::make('Operational Information')
-                    ->collapsible()
-                    ->schema([
-                        TextEntry::make('operatorproficiency.proficiency')
-                            ->label('Proficiency'),
-TextEntry::make('lead_time')
-    ->label('Target Completion time')
-    ->formatStateUsing(fn ($state) => $state ? \Carbon\Carbon::parse($state)->format('d M Y') : '-')
-    ->extraAttributes(function ($record) {
-        if (
-            $record->lead_time &&
-            $record->purchaseOrder &&
-            $record->purchaseOrder->delivery_target_date
-        ) {
-            $leadTime = \Carbon\Carbon::parse($record->lead_time);
-            $deliveryTarget = \Carbon\Carbon::parse($record->purchaseOrder->delivery_target_date)->endOfDay();
-            if ($leadTime->greaterThan($deliveryTarget)) {
-                return [
-                    'style' => 'background-color: #FCA5A5; cursor: pointer;',
-                ];
-            }
-        }
-        return [];
-    })
-    ->tooltip(function ($record) {
-        if (
-            $record->purchaseOrder &&
-            $record->purchaseOrder->delivery_target_date
-        ) {
-            return 'Sales Order Line Target Completion Date: ' .
-                \Carbon\Carbon::parse($record->purchaseOrder->delivery_target_date)->format('d M Y');
-        }
-        return null;
-    }),                        IconEntry::make('status')->label('Status'),
-
-                    ])->columns(),
-                Section::make('Documents')
-                    ->collapsible()
-                    ->schema([
-                        TextEntry::make('requirement_pkg')
-                            ->label('Download Requirement Package Files')
-                            ->state(function (Bom $record) {
-
-                                $mediaItems = $record->getMedia('requirement_pkg');
-                                if ($mediaItems->isEmpty()) {
-                                    return 'No Files';
-                                }
-
-                                return $mediaItems->map(function ($media) {
-                                    // Use target="_blank" to open in a new tab
-                                    return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>";
-                                })->implode('<br>'); // Concatenate links with line breaks
-
-                            })
-                            ->html(),
-
-                        TextEntry::make('process_flowchart')
-                            ->label('Download Process Flowchart Files')
-                            ->state(function (Bom $record) {
-
-                                $mediaItems = $record->getMedia('process_flowchart');
-                                if ($mediaItems->isEmpty()) {
-                                    return 'No Files';
-                                }
-
-                                return $mediaItems->map(function ($media) {
-                                    // Use target="_blank" to open in a new tab
-                                    return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>";
-                                })->implode('<br>'); // Concatenate links with line breaks
-
-                            })
-                            ->html(),
-
-                    ])
-                    ->columns(),
-
-            ]);
     }
 
     public static function getEloquentQuery(): Builder

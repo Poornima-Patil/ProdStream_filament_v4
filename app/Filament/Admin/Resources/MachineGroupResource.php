@@ -7,6 +7,10 @@ use App\Models\MachineGroup;
 use Filament\Forms;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Actions\EditAction;
+use Filament\Tables\Actions\ViewAction;
+use Filament\Tables\Enums\ActionsPosition;
 
 class MachineGroupResource extends Resource
 {
@@ -48,9 +52,16 @@ class MachineGroupResource extends Resource
             ->filters([
                 Tables\Filters\TrashedFilter::make(),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+          ->actions([
+                ActionGroup::make([
+                    EditAction::make()->label('Edit'),
+                    ViewAction::make()->label('View'),
+                ])
+            ], position: ActionsPosition::BeforeColumns)
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make(),
+                ]),
             ]);
     }
 
@@ -60,6 +71,7 @@ class MachineGroupResource extends Resource
             'index' => Pages\ListMachineGroups::route('/'),
             'create' => Pages\CreateMachineGroup::route('/create'),
             'edit' => Pages\EditMachineGroup::route('/{record}/edit'),
+            'view' => Pages\ViewMachineGroup::route('/{record}/view'),
         ];
     }
 }
