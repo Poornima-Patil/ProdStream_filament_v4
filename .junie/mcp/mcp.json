@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "laravel-boost": {
+            "command": "/Users/poornimapatil/Library/Application Support/Herd/bin/php84",
+            "args": [
+                "/Users/poornimapatil/Herd/ProdStream_v1.1/artisan",
+                "boost:mcp"
+            ]
+        }
+    }
+}

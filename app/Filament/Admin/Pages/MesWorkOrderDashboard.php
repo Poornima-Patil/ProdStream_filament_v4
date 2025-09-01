@@ -212,25 +212,33 @@ class MesWorkOrderDashboard extends Page
 
     private function calculateKPIs()
     {
-        // Apply same filters as other queries
+        // Apply same filters as other queries using unified filter variables
         $query = WorkOrder::query()->where('factory_id', Auth::user()->factory_id);
-        if ($this->filterDateFrom) {
-            $query->whereDate('created_at', '>=', $this->filterDateFrom);
+
+        // Use unified filter variables with fallback to legacy
+        $dateFromFilter = $this->startDate ?: $this->filterDateFrom;
+        $dateToFilter = $this->endDate ?: $this->filterDateTo;
+        $statusFilter = $this->selectedStatus ?: $this->filterStatus;
+        $machineFilter = $this->selectedMachine ?: $this->filterMachine;
+        $operatorFilter = $this->selectedOperator ?: $this->filterOperator;
+
+        if ($dateFromFilter) {
+            $query->whereDate('created_at', '>=', $dateFromFilter);
         }
-        if ($this->filterDateTo) {
-            $query->whereDate('created_at', '<=', $this->filterDateTo);
+        if ($dateToFilter) {
+            $query->whereDate('created_at', '<=', $dateToFilter);
         }
-        if ($this->filterStatus && $this->filterStatus != 'all') {
-            $query->where('status', $this->filterStatus);
+        if ($statusFilter && $statusFilter != 'all') {
+            $query->where('status', $statusFilter);
         }
-        if ($this->filterMachine && $this->filterMachine != 'all') {
-            $machine = Machine::where('name', $this->filterMachine)->where('factory_id', Auth::user()->factory_id)->first();
+        if ($machineFilter && $machineFilter != 'all') {
+            $machine = Machine::where('name', $machineFilter)->where('factory_id', Auth::user()->factory_id)->first();
             if ($machine) {
                 $query->where('machine_id', $machine->id);
             }
         }
-        if ($this->filterOperator && $this->filterOperator != 'all') {
-            $query->where('operator_id', $this->filterOperator);
+        if ($operatorFilter && $operatorFilter != 'all') {
+            $query->where('operator_id', $operatorFilter);
         }
 
         $workOrders = $query->get();
@@ -302,10 +310,11 @@ class MesWorkOrderDashboard extends Page
 
     private function calculateStatusDistribution()
     {
-        // Apply same filters as other queries
+        // For status distribution chart, we want to show all statuses but EXCLUDE the status filter
+        // This way the chart shows the overall status distribution for the other filters applied
         $query = WorkOrder::query()->where('factory_id', Auth::user()->factory_id);
 
-        // Apply filters in the same order as other methods
+        // Apply date filters
         if ($this->startDate || $this->filterDateFrom) {
             $dateFrom = $this->startDate ?: $this->filterDateFrom;
             $query->whereDate('created_at', '>=', $dateFrom);
@@ -317,16 +326,7 @@ class MesWorkOrderDashboard extends Page
             Log::info('Status distribution - filtering to date: ' . $dateTo);
         }
 
-        // Apply status filter - the chart should reflect the filtered results
-        if ($this->selectedStatus || $this->filterStatus) {
-            $statusFilter = $this->selectedStatus ?: $this->filterStatus;
-            if ($statusFilter && $statusFilter != 'all') {
-                $query->where('status', $statusFilter);
-                Log::info('Status distribution - filtering by status: ' . $statusFilter);
-            }
-        }
-
-        // Apply machine and operator filters
+        // Apply machine and operator filters but NOT status filter for the chart
         if ($this->selectedMachine || $this->filterMachine) {
             $machineName = $this->selectedMachine ?: $this->filterMachine;
             $machine = Machine::where('name', $machineName)->where('factory_id', Auth::user()->factory_id)->first();
@@ -342,27 +342,53 @@ class MesWorkOrderDashboard extends Page
             Log::info('Status distribution - filtering by operator: ' . $operatorId);
         }
 
-        $totalOrders = $query->count();
-        Log::info('Status distribution - total orders after filters: ' . $totalOrders);
+        // Check if there's an active status filter
+        $statusFilter = $this->selectedStatus ?: $this->filterStatus;
+        $hasStatusFilter = $statusFilter && $statusFilter != 'all';
 
-        if ($totalOrders > 0) {
-            $statusCounts = (clone $query)->selectRaw('status, COUNT(*) as count')
-                ->groupBy('status')
-                ->pluck('count', 'status')
-                ->toArray();
+        if ($hasStatusFilter) {
+            // When there's a status filter, show ONLY that filtered status in the pie chart
+            Log::info('Status distribution - status filter active: ' . $statusFilter);
 
-            Log::info('Status distribution - raw counts from database:', $statusCounts);
+            // Get the count for the filtered status by applying the status filter
+            $filteredQuery = clone $query;
+            $filteredQuery->where('status', $statusFilter);
+            $filteredCount = $filteredQuery->count();
 
             $this->statusDistribution = [];
-            foreach ($statusCounts as $status => $count) {
-                $this->statusDistribution[$status] = $count;
+            if ($filteredCount > 0) {
+                // Show only the filtered status - this makes the pie chart meaningful
+                $this->statusDistribution[$statusFilter] = $filteredCount;
+            } else {
+                // If no work orders match the filter, show empty state
+                $this->statusDistribution = [];
             }
 
-            Log::info('Status distribution - final distribution:', $this->statusDistribution);
+            Log::info('Status distribution with filter - final distribution:', $this->statusDistribution);
         } else {
-            // No data - empty distribution
-            $this->statusDistribution = [];
-            Log::info('Status distribution - no work orders found, using empty distribution');
+            // No status filter - show full distribution
+            $totalOrders = $query->count();
+            Log::info('Status distribution - total orders after filters: ' . $totalOrders);
+
+            if ($totalOrders > 0) {
+                $statusCounts = (clone $query)->selectRaw('status, COUNT(*) as count')
+                    ->groupBy('status')
+                    ->pluck('count', 'status')
+                    ->toArray();
+
+                Log::info('Status distribution - raw counts from database:', $statusCounts);
+
+                $this->statusDistribution = [];
+                foreach ($statusCounts as $status => $count) {
+                    $this->statusDistribution[$status] = $count;
+                }
+
+                Log::info('Status distribution - final distribution:', $this->statusDistribution);
+            } else {
+                // No data - empty distribution
+                $this->statusDistribution = [];
+                Log::info('Status distribution - no work orders found, using empty distribution');
+            }
         }
     }
 
@@ -500,28 +526,35 @@ class MesWorkOrderDashboard extends Page
 
         Log::info('Loading work orders for factory: ' . Auth::user()->factory_id);
 
-        if ($this->filterStatus) {
-            $query->where('status', $this->filterStatus);
-            Log::info('Filtering by status: ' . $this->filterStatus);
+        // Use the new filter variables (selectedStatus, etc.) with fallback to legacy variables
+        $statusFilter = $this->selectedStatus ?: $this->filterStatus;
+        $machineFilter = $this->selectedMachine ?: $this->filterMachine;
+        $operatorFilter = $this->selectedOperator ?: $this->filterOperator;
+        $dateFromFilter = $this->startDate ?: $this->filterDateFrom;
+        $dateToFilter = $this->endDate ?: $this->filterDateTo;
+
+        if ($statusFilter) {
+            $query->where('status', $statusFilter);
+            Log::info('Filtering by status: ' . $statusFilter);
         }
-        if ($this->filterMachine) {
-            $machine = Machine::where('name', $this->filterMachine)->where('factory_id', Auth::user()->factory_id)->first();
+        if ($machineFilter) {
+            $machine = Machine::where('name', $machineFilter)->where('factory_id', Auth::user()->factory_id)->first();
             if ($machine) {
                 $query->where('machine_id', $machine->id);
-                Log::info('Filtering by machine: ' . $this->filterMachine . ' (ID: ' . $machine->id . ')');
+                Log::info('Filtering by machine: ' . $machineFilter . ' (ID: ' . $machine->id . ')');
             }
         }
-        if ($this->filterOperator) {
-            $query->where('operator_id', $this->filterOperator);
-            Log::info('Filtering by operator: ' . $this->filterOperator);
+        if ($operatorFilter) {
+            $query->where('operator_id', $operatorFilter);
+            Log::info('Filtering by operator: ' . $operatorFilter);
         }
-        if ($this->filterDateFrom) {
-            $query->whereDate('created_at', '>=', $this->filterDateFrom);
-            Log::info('Filtering from date: ' . $this->filterDateFrom);
+        if ($dateFromFilter) {
+            $query->whereDate('created_at', '>=', $dateFromFilter);
+            Log::info('Filtering from date: ' . $dateFromFilter);
         }
-        if ($this->filterDateTo) {
-            $query->whereDate('created_at', '<=', $this->filterDateTo);
-            Log::info('Filtering to date: ' . $this->filterDateTo);
+        if ($dateToFilter) {
+            $query->whereDate('created_at', '<=', $dateToFilter);
+            Log::info('Filtering to date: ' . $dateToFilter);
         }
 
         // Apply pivot filters if active
@@ -767,13 +800,50 @@ class MesWorkOrderDashboard extends Page
     public function getChartConfig()
     {
         $this->calculateStatusDistribution();
+
+        // Create a flexible status data structure that handles both filtered and unfiltered states
+        $statusData = [];
+
+        if (!empty($this->statusDistribution)) {
+            // If we have status distribution data, use it directly
+            foreach ($this->statusDistribution as $status => $count) {
+                // Map status names to consistent keys for the frontend
+                switch ($status) {
+                    case 'Completed':
+                        $statusData['completed'] = $count;
+                        break;
+                    case 'Start':
+                    case 'In Progress':
+                        $statusData['start'] = ($statusData['start'] ?? 0) + $count;
+                        break;
+                    case 'Assigned':
+                        $statusData['assigned'] = $count;
+                        break;
+                    case 'Hold':
+                    case 'On Hold':
+                        $statusData['hold'] = ($statusData['hold'] ?? 0) + $count;
+                        break;
+                    case 'Other Statuses':
+                        $statusData['other'] = $count;
+                        break;
+                    default:
+                        // For any other specific status (when filtered), use the status name
+                        $statusData[strtolower($status)] = $count;
+                        break;
+                }
+            }
+        } else {
+            // No data available - return empty structure
+            $statusData = [
+                'completed' => 0,
+                'start' => 0,
+                'assigned' => 0,
+                'hold' => 0
+            ];
+        }
+
         return [
-            'statusData' => [
-                'completed' => $this->statusDistribution['Completed'] ?? 0,
-                'start' => $this->statusDistribution['Start'] ?? 0,
-                'assigned' => $this->statusDistribution['Assigned'] ?? 0,
-                'hold' => $this->statusDistribution['Hold'] ?? ($this->statusDistribution['On Hold'] ?? 0)
-            ],
+            'statusData' => $statusData,
             'machineData' => $this->getMachineUtilizationData()
         ];
     }

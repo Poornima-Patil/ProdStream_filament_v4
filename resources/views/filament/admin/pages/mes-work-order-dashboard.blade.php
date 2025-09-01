@@ -191,7 +191,7 @@
                 <button wire:click="setActiveTab('real-time')" class="@if($activeTab === 'real-time') bg-blue-600 text-white @else text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700 @endif px-4 py-2 rounded-md text-sm font-medium transition-all">
                     Real-time
                 </button>
-                <button wire:click="setActiveTab('overview')" class="@if($activeTab === 'overview') bg-blue-600 text-white @else text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700 @endif px-4 py-2 rounded-md text-sm font-medium transition-all">
+                <button wire:click="setActiveTab('overview')" onclick="setTimeout(() => checkAndInitializeCharts(), 300)" class="@if($activeTab === 'overview') bg-blue-600 text-white @else text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700 @endif px-4 py-2 rounded-md text-sm font-medium transition-all">
                     Overview
                 </button>
                 <button wire:click="setActiveTab('pivot')" class="@if($activeTab === 'pivot') bg-blue-600 text-white @else text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-700 @endif px-4 py-2 rounded-md text-sm font-medium transition-all">
@@ -383,26 +383,40 @@
                 @endif
 
                 @if($activeTab === 'overview')
-                    <!-- Hidden element containing chart config for JavaScript -->
-                    <script type="application/json" id="chart-config-data">@json($this->getChartConfig())</script>
-                    
                     <div class="space-y-6">
-                        <!-- Debug Info (remove in production) -->
-                        <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-4 text-xs">
-                            <h4 class="font-semibold text-yellow-800 dark:text-yellow-300 mb-2">Debug Info:</h4>
-                            <div class="grid grid-cols-2 gap-4 text-yellow-700 dark:text-yellow-400">
-                                <div>
-                                    <strong>Status Distribution:</strong><br>
-                                    Completed: {{ $statusDistribution['Completed'] ?? 0 }}<br>
-                                    Start: {{ $statusDistribution['Start'] ?? 0 }}<br>
-                                    Assigned: {{ $statusDistribution['Assigned'] ?? 0 }}<br>
-                                    Hold: {{ $statusDistribution['Hold'] ?? ($statusDistribution['On Hold'] ?? 0) }}
+                        <!-- Overview Header -->
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Production Overview</h3>
+                            <div class="flex items-center gap-2">
+                                <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                                <span class="text-sm text-gray-600 dark:text-slate-400">Live Data</span>
+                            </div>
+                        </div>
+
+                        <!-- Quick Stats Row -->
+                        <div class="grid grid-cols-4 gap-4">
+                            <div class="bg-white dark:bg-slate-800 rounded-lg p-4 border border-gray-200 dark:border-slate-700">
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold text-blue-600">{{ $totalWorkOrders ?? 0 }}</div>
+                                    <div class="text-sm text-gray-500 dark:text-slate-400">Total Orders</div>
                                 </div>
-                                <div>
-                                    <strong>Machine Data:</strong><br>
-                                    @php $machineData = $this->getMachineUtilizationData(); @endphp
-                                    Machines: {{ count($machineData['machines'] ?? []) }}<br>
-                                    {{ implode(', ', array_slice($machineData['machines'] ?? [], 0, 3)) }}{{ count($machineData['machines'] ?? []) > 3 ? '...' : '' }}
+                            </div>
+                            <div class="bg-white dark:bg-slate-800 rounded-lg p-4 border border-gray-200 dark:border-slate-700">
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold text-green-600">{{ $completedOrders ?? 0 }}</div>
+                                    <div class="text-sm text-gray-500 dark:text-slate-400">Completed</div>
+                                </div>
+                            </div>
+                            <div class="bg-white dark:bg-slate-800 rounded-lg p-4 border border-gray-200 dark:border-slate-700">
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold text-blue-600">{{ $activeOrders ?? 0 }}</div>
+                                    <div class="text-sm text-gray-500 dark:text-slate-400">Active</div>
+                                </div>
+                            </div>
+                            <div class="bg-white dark:bg-slate-800 rounded-lg p-4 border border-gray-200 dark:border-slate-700">
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold text-orange-600">{{ $pendingOrders ?? 0 }}</div>
+                                    <div class="text-sm text-gray-500 dark:text-slate-400">Pending</div>
                                 </div>
                             </div>
                         </div>
@@ -410,18 +424,113 @@
                         <!-- Charts Row -->
                         <div class="grid grid-cols-2 gap-6">
                             <!-- Status Distribution Chart -->
-                            <div class="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6" style="min-height: 400px;">
+                            <div class="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6">
                                 <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Status Distribution</h3>
-                                <div style="width: 100%; height: 320px; position: relative; border: 1px solid #ccc; background: #f0f0f0;">
-                                    <canvas id="statusChart" width="400" height="320" style="width: 100%; height: 100%; display: block; background: rgba(255,0,0,0.1);"></canvas>
+                                <div class="relative" style="height: 320px;">
+                                    <canvas id="statusChart"></canvas>
+                                </div>
+                                <!-- Legend -->
+                                <div class="flex flex-wrap justify-center gap-4 mt-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-3 h-3 bg-green-500 rounded-full"></div>
+                                        <span class="text-sm text-gray-600 dark:text-slate-400">Completed ({{ $statusDistribution['Completed'] ?? 0 }})</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+                                        <span class="text-sm text-gray-600 dark:text-slate-400">Started ({{ $statusDistribution['Start'] ?? 0 }})</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                                        <span class="text-sm text-gray-600 dark:text-slate-400">Assigned ({{ $statusDistribution['Assigned'] ?? 0 }})</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-3 h-3 bg-red-500 rounded-full"></div>
+                                        <span class="text-sm text-gray-600 dark:text-slate-400">Hold ({{ ($statusDistribution['Hold'] ?? 0) + ($statusDistribution['On Hold'] ?? 0) }})</span>
+                                    </div>
                                 </div>
                             </div>
 
                             <!-- Machine Utilization Chart -->
-                            <div class="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6" style="min-height: 400px;">
+                            <div class="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6">
                                 <h3 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Machine Utilization</h3>
-                                <div style="width: 100%; height: 320px; position: relative; border: 1px solid #ccc; background: #f0f0f0;">
-                                    <canvas id="utilizationChart" width="400" height="320" style="width: 100%; height: 100%; display: block; background: rgba(0,255,0,0.1);"></div>
+                                <div class="relative" style="height: 320px;">
+                                    <canvas id="utilizationChart"></canvas>
+                                </div>
+                                <!-- Average Utilization -->
+                                <div class="text-center mt-4">
+                                    <div class="text-sm text-gray-600 dark:text-slate-400">Average Utilization</div>
+                                    <div class="text-xl font-bold text-purple-600">{{ $avgUtilization ?? '0%' }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Performance Metrics -->
+                        <div class="grid grid-cols-3 gap-6">
+                            <div class="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6">
+                                <h4 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Production Quality</h4>
+                                <div class="space-y-3">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm text-gray-600 dark:text-slate-400">Overall Yield</span>
+                                        <span class="font-medium text-green-600">{{ $overallYield ?? '0%' }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm text-gray-600 dark:text-slate-400">Defect Rate</span>
+                                        <span class="font-medium text-red-600">{{ $defectRate ?? '0%' }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm text-gray-600 dark:text-slate-400">OK Quantity</span>
+                                        <span class="font-medium text-gray-900 dark:text-white">{{ number_format($totalOkQty ?? 0) }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm text-gray-600 dark:text-slate-400">NG Quantity</span>
+                                        <span class="font-medium text-gray-900 dark:text-white">{{ number_format($totalKoQty ?? 0) }}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6">
+                                <h4 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Production Progress</h4>
+                                <div class="space-y-3">
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm text-gray-600 dark:text-slate-400">Completion Rate</span>
+                                        <span class="font-medium text-blue-600">{{ $completionRate ?? '0%' }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm text-gray-600 dark:text-slate-400">Planned Quantity</span>
+                                        <span class="font-medium text-gray-900 dark:text-white">{{ number_format($totalPlannedQty ?? 0) }}</span>
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <span class="text-sm text-gray-600 dark:text-slate-400">Completed Today</span>
+                                        <span class="font-medium text-green-600">{{ $completedToday ?? 0 }}</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 dark:bg-slate-600 rounded-full h-2 mt-3">
+                                        <div class="bg-blue-600 h-2 rounded-full" style="width: {{ str_replace('%', '', $completionRate ?? '0%') }}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg p-6">
+                                <h4 class="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Active Machines</h4>
+                                <div class="space-y-2">
+                                    @if(!empty($machineStatuses))
+                                        @foreach(array_slice($machineStatuses, 0, 5) as $machine)
+                                            <div class="flex justify-between items-center">
+                                                <span class="text-sm text-gray-600 dark:text-slate-400">{{ $machine['name'] }}</span>
+                                                <div class="flex items-center gap-2">
+                                                    @if($machine['status'] === 'RUNNING')
+                                                        <div class="w-2 h-2 bg-green-400 rounded-full"></div>
+                                                    @elseif($machine['status'] === 'MAINTENANCE')
+                                                        <div class="w-2 h-2 bg-red-400 rounded-full"></div>
+                                                    @else
+                                                        <div class="w-2 h-2 bg-orange-400 rounded-full"></div>
+                                                    @endif
+                                                    <span class="text-xs text-gray-500 dark:text-slate-400">{{ $machine['utilization'] ?? 0 }}%</span>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    @else
+                                        <p class="text-sm text-gray-500 dark:text-slate-400">No machine data available</p>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -803,10 +912,150 @@
                 @endif
 
                 @if($activeTab === 'details')
-                    <!-- Work Order Details tab content goes here -->
+                    <!-- Work Order Details Table -->
                     <div class="space-y-6">
-                        <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Work Order Details</h3>
-                        <p class="text-gray-600 dark:text-slate-400">Detailed work order information will be displayed here.</p>
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Work Order Details</h3>
+                            <div class="flex items-center gap-4">
+                                <span class="text-sm text-gray-600 dark:text-slate-400">
+                                    Showing {{ count($workOrders) }} of {{ $filteredCount ?? 0 }} records
+                                </span>
+                                <select wire:model.live="perPage" class="rounded-md bg-white dark:bg-slate-700 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-white text-sm">
+                                    <option value="10">10 per page</option>
+                                    <option value="25">25 per page</option>
+                                    <option value="50">50 per page</option>
+                                    <option value="100">100 per page</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Work Orders Table -->
+                        <div class="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200 dark:divide-slate-600">
+                                    <thead class="bg-gray-50 dark:bg-slate-700">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">WO Number</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">Part Number</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">Machine</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">Operator</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">Status</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">Progress</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">OK Qty</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">NG Qty</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">Yield</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-slate-300 uppercase tracking-wider">Start Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-600">
+                                        @if(empty($workOrders))
+                                            <tr>
+                                                <td colspan="10" class="px-4 py-8 text-center text-gray-500 dark:text-slate-400">
+                                                    <div class="flex flex-col items-center">
+                                                        <svg class="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                                        </svg>
+                                                        <p class="text-lg font-medium">No work orders found</p>
+                                                        <p class="text-sm">Try adjusting your filters or date range.</p>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @else
+                                            @foreach($workOrders as $wo)
+                                                <tr class="hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors">
+                                                    <td class="px-4 py-4 whitespace-nowrap">
+                                                        <div class="text-sm font-medium text-gray-900 dark:text-white">{{ $wo['wo_number'] }}</div>
+                                                        <div class="text-xs text-gray-500 dark:text-slate-400">ID: {{ $wo['id'] }}</div>
+                                                    </td>
+                                                    <td class="px-4 py-4 whitespace-nowrap">
+                                                        <div class="text-sm text-gray-900 dark:text-white">{{ $wo['part_number'] }}</div>
+                                                    </td>
+                                                    <td class="px-4 py-4 whitespace-nowrap">
+                                                        <div class="text-sm text-gray-900 dark:text-white">{{ $wo['machine'] }}</div>
+                                                    </td>
+                                                    <td class="px-4 py-4 whitespace-nowrap">
+                                                        <div class="text-sm text-gray-900 dark:text-white">{{ $wo['operator'] }}</div>
+                                                    </td>
+                                                    <td class="px-4 py-4 whitespace-nowrap">
+                                                        @php
+                                                            $statusColors = [
+                                                                'Completed' => 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300',
+                                                                'Start' => 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300',
+                                                                'In Progress' => 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300',
+                                                                'Assigned' => 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-300',
+                                                                'Hold' => 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-300',
+                                                                'On Hold' => 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-300',
+                                                            ];
+                                                            $statusClass = $statusColors[$wo['status']] ?? 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-300';
+                                                        @endphp
+                                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $statusClass }}">
+                                                            {{ $wo['status'] }}
+                                                        </span>
+                                                    </td>
+                                                    <td class="px-4 py-4 whitespace-nowrap">
+                                                        <div class="flex items-center">
+                                                            <div class="flex-1">
+                                                                <div class="text-sm text-gray-900 dark:text-white">{{ $wo['progress'] }}%</div>
+                                                                <div class="w-full bg-gray-200 dark:bg-slate-600 rounded-full h-2 mt-1">
+                                                                    <div class="bg-blue-600 h-2 rounded-full" style="width: {{ $wo['progress'] }}%"></div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td class="px-4 py-4 whitespace-nowrap">
+                                                        <div class="text-sm font-medium text-green-600 dark:text-green-400">{{ number_format($wo['ok'] ?? 0) }}</div>
+                                                    </td>
+                                                    <td class="px-4 py-4 whitespace-nowrap">
+                                                        <div class="text-sm font-medium text-red-600 dark:text-red-400">{{ number_format($wo['ko'] ?? 0) }}</div>
+                                                    </td>
+                                                    <td class="px-4 py-4 whitespace-nowrap">
+                                                        <div class="text-sm font-medium text-gray-900 dark:text-white">{{ $wo['yield'] }}%</div>
+                                                    </td>
+                                                    <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-slate-400">
+                                                        {{ $wo['start_time'] ? \Carbon\Carbon::parse($wo['start_time'])->format('M d, Y H:i') : 'Not started' }}
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        @endif
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Pagination -->
+                        @if(!empty($workOrders) && $totalPages > 1)
+                        <div class="flex items-center justify-between bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-4 py-3">
+                            <div class="flex items-center text-sm text-gray-700 dark:text-slate-300">
+                                <span>Page {{ $currentPage }} of {{ $totalPages }}</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button wire:click="previousPage" 
+                                        @if($currentPage <= 1) disabled @endif
+                                        class="px-3 py-1 text-sm bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 rounded hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                    Previous
+                                </button>
+                                
+                                <!-- Page numbers -->
+                                @for($i = max(1, $currentPage - 2); $i <= min($totalPages, $currentPage + 2); $i++)
+                                    <button wire:click="goToPage({{ $i }})"
+                                            class="px-3 py-1 text-sm rounded transition-colors
+                                            @if($i == $currentPage)
+                                                bg-blue-600 text-white
+                                            @else
+                                                bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-600
+                                            @endif">
+                                        {{ $i }}
+                                    </button>
+                                @endfor
+                                
+                                <button wire:click="nextPage"
+                                        @if($currentPage >= $totalPages) disabled @endif
+                                        class="px-3 py-1 text-sm bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-300 rounded hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                                    Next
+                                </button>
+                            </div>
+                        </div>
+                        @endif
                     </div>
                 @endif
             </div>
@@ -918,7 +1167,218 @@
         });
 
         // CHART FUNCTIONS
-        // ...existing chart functions...
+        function initializeCharts() {
+            // Initialize Status Distribution Chart (Doughnut)
+            const statusCtx = document.getElementById('statusChart');
+            if (statusCtx && chartConfig.statusData) {
+                // Destroy existing chart if it exists
+                if (window.statusChart) {
+                    window.statusChart.destroy();
+                }
+
+                const statusData = chartConfig.statusData;
+                const statusLabels = [];
+                const statusValues = [];
+                const statusColors = [];
+
+                // Define colors for different status types
+                const statusColorMap = {
+                    'completed': '#10B981', // green
+                    'start': '#3B82F6',     // blue
+                    'assigned': '#F59E0B',  // yellow/orange
+                    'hold': '#EF4444',      // red
+                    'other': '#8B5CF6',     // purple for "Other Statuses"
+                    // Dynamic colors for any specific status names
+                    'Start': '#3B82F6',
+                    'Completed': '#10B981',
+                    'Assigned': '#F59E0B',
+                    'Hold': '#EF4444',
+                    'On Hold': '#EF4444',
+                    'In Progress': '#3B82F6',
+                };
+
+                // Dynamically iterate through all status data instead of hardcoding
+                for (const [statusKey, statusCount] of Object.entries(statusData)) {
+                    if (statusCount > 0) {
+                        // Convert key to proper label format
+                        let label = statusKey;
+                        if (statusKey === 'start') label = 'Started';
+                        else if (statusKey === 'hold') label = 'Hold';
+                        else if (statusKey === 'completed') label = 'Completed';
+                        else if (statusKey === 'assigned') label = 'Assigned';
+                        else if (statusKey === 'other') label = 'Other Statuses';
+                        else label = statusKey; // Use the status name as-is for filtered statuses
+
+                        statusLabels.push(label);
+                        statusValues.push(statusCount);
+                        
+                        // Get color from map or use a default
+                        let color = statusColorMap[statusKey] || statusColorMap[label] || '#6B7280'; // Default gray
+                        statusColors.push(color);
+                    }
+                }
+
+                // If no data, show placeholder
+                if (statusValues.length === 0) {
+                    statusLabels.push('No Data');
+                    statusValues.push(1);
+                    statusColors.push('#9CA3AF'); // gray
+                }
+
+                window.statusChart = new Chart(statusCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: statusLabels,
+                        datasets: [{
+                            data: statusValues,
+                            backgroundColor: statusColors,
+                            borderWidth: 2,
+                            borderColor: '#fff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false // We have custom legend below
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const label = context.label || '';
+                                        const value = context.parsed;
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = ((value / total) * 100).toFixed(1);
+                                        return label + ': ' + value + ' (' + percentage + '%)';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Initialize Machine Utilization Chart (Bar)
+            const utilizationCtx = document.getElementById('utilizationChart');
+            if (utilizationCtx && chartConfig.machineData) {
+                // Destroy existing chart if it exists
+                if (window.utilizationChart) {
+                    window.utilizationChart.destroy();
+                }
+
+                const machineData = chartConfig.machineData;
+                const machines = machineData.machines || ['No Machines'];
+                const utilization = machineData.utilization || [0];
+
+                window.utilizationChart = new Chart(utilizationCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: machines,
+                        datasets: [{
+                            label: 'Utilization %',
+                            data: utilization,
+                            backgroundColor: utilization.map(value => {
+                                if (value >= 80) return '#10B981'; // green for high utilization
+                                if (value >= 60) return '#F59E0B'; // yellow for medium
+                                if (value >= 40) return '#3B82F6'; // blue for low-medium
+                                return '#EF4444'; // red for low utilization
+                            }),
+                            borderRadius: 4,
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.dataset.label + ': ' + context.parsed.y + '%';
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                grid: {
+                                    color: 'rgba(156, 163, 175, 0.1)'
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return value + '%';
+                                    },
+                                    color: '#9CA3AF'
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    color: '#9CA3AF',
+                                    maxRotation: 45
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Initialize charts when the overview tab is active
+        function checkAndInitializeCharts() {
+            console.log('🔍 Checking if charts should be initialized');
+            
+            // Check if we're on the overview tab by looking for the canvas elements
+            const statusCanvas = document.getElementById('statusChart');
+            const utilizationCanvas = document.getElementById('utilizationChart');
+            
+            // Only initialize if both canvas elements are visible (meaning overview tab is active)
+            if (statusCanvas && utilizationCanvas && 
+                statusCanvas.offsetParent !== null && utilizationCanvas.offsetParent !== null) {
+                console.log('✅ Overview tab is active, initializing charts');
+                setTimeout(() => {
+                    initializeCharts();
+                }, 100); // Small delay to ensure DOM is ready
+            } else {
+                console.log('❌ Overview tab not active or charts not visible');
+            }
+        }
+
+        // Initialize charts on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 DOM loaded, checking for charts');
+            setTimeout(checkAndInitializeCharts, 500); // Give more time for initial load
+        });
+
+        // Re-initialize charts when Livewire updates (tab changes, data updates)
+        document.addEventListener('livewire:navigated', function() {
+            console.log('🔄 Livewire navigated');
+            setTimeout(checkAndInitializeCharts, 200);
+        });
+
+        document.addEventListener('livewire:updated', function() {
+            console.log('🔄 Livewire updated - checking charts');
+            // Update chart config with fresh data
+            try {
+                const newChartConfig = @json($this->getChartConfig());
+                if (newChartConfig && (JSON.stringify(newChartConfig) !== JSON.stringify(chartConfig))) {
+                    console.log('📊 Chart config updated:', newChartConfig);
+                    chartConfig = newChartConfig;
+                }
+                setTimeout(checkAndInitializeCharts, 200);
+            } catch (e) {
+                console.error('❌ Error updating chart config:', e);
+                setTimeout(checkAndInitializeCharts, 200);
+            }
+        });
 
         // Listen for wire:model updates (Livewire v3)
         document.addEventListener('livewire:commit', function(e) {

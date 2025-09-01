@@ -15,6 +15,12 @@
       "env": {
         "PERPLEXITY_API_KEY": "${input:perplexity-key}"
       }
+    },
+    "Laravel Boost": {
+      "type": "stdio",
+      "command": "php",
+      "args": ["artisan", "boost:mcp"],
+      "cwd": "${workspaceFolder}"
     }
   }
 }

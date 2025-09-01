@@ -26,6 +26,7 @@ class WorkOrderTemplateExport
         }
 
         $factoryId = $this->factory->id;
+
         Log::info('Factory ID: ', ['factory_id' => $factoryId]);
 
         $records = WorkOrder::with([
