@@ -4,13 +4,11 @@ namespace App\Filament\Admin\Resources\PurchaseorderResource\Pages;
 
 use App\Filament\Admin\Resources\PurchaseorderResource;
 use App\Models\PurchaseOrder;
-use Filament\Infolists\Components\Progress;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
 use App\Enums\BomStatus;
-
 
 class ViewPurchaseorder extends ViewRecord
 {
@@ -24,58 +22,55 @@ class ViewPurchaseorder extends ViewRecord
     public function infolist(Infolist $infolist): Infolist
     {
         return $infolist->schema([
-            Section::make('Sale Order Details')
+
+            /*
+             * =========================
+             * SALES ORDER DETAILS
+             * =========================
+             */
+            Section::make('Sales Order Details')
+                ->collapsible()
                 ->schema([
-                    TextEntry::make('po_details_table')
+                    TextEntry::make('so_details')
                         ->label('')
                         ->getStateUsing(function ($record) {
-                            $completedQty = $record->boms
-                                ? $record->boms->flatMap->workOrders->sum('ok_qtys')
-                                : 0;
-
-                            $scrappedQty = $record->boms
-                                ? $record->boms->flatMap->workOrders->sum('scrapped_qtys')
-                                : 0;
-
+                            $completedQty = $record->boms?->flatMap->workOrders->sum('ok_qtys') ?? 0;
+                            $scrappedQty = $record->boms?->flatMap->workOrders->sum('scrapped_qtys') ?? 0;
                             $requestedQty = $record->QTY ?? 0;
                             $progressPercent = $requestedQty > 0 ? round(($completedQty / $requestedQty) * 100) : 0;
 
-                            // Determine progress bar color
                             $progressColor = $progressPercent >= 50 ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-amber-500 dark:bg-amber-400';
                             $textColor = 'text-white dark:text-gray-900';
 
                             return new \Illuminate\Support\HtmlString('
-                                <div class="overflow-x-auto rounded-lg shadow">
-                                    <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900">
-                                        <thead class="bg-primary-500 dark:bg-primary-700 text-white">
+                                <!-- Desktop Table -->
+                                <div class="hidden lg:block lg:overflow-x-auto shadow rounded-lg">
+                                    <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
+                                        <thead class="bg-primary-500 dark:bg-primary-700">
                                             <tr>
-                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">SO Number</th>
-                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Customer</th>
-                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Part Number</th>
-                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Target Completion Date</th>
-                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Requested Quantity</th>
-                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Completed Quantity</th>
-                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Scrapped Quantity</th>
-                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Progress</th>
-                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Status</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">SO Number</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">Customer</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">Part Number</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">Target Completion Date</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">Requested Qty</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">Completed Qty</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">Scrapped Qty</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">Progress</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">Status</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr class="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">
                                                 <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($record->unique_id).'</td>
-                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($record->customer->name ?? '-').'</td>
-                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($record->partNumber->partnumber ?? '-').'</td>
-                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">
-                                                    '.htmlspecialchars($record->delivery_target_date ? \Carbon\Carbon::parse($record->delivery_target_date)->format('Y-m-d') : '-').'
-                                                </td>
-                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($requestedQty).'</td>
-                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($completedQty).'</td>
-                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($scrappedQty).'</td>
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($record->customer->name ?? "-").'</td>
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($record->partNumber->partnumber ?? "-").'</td>
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.($record->delivery_target_date ? \Carbon\Carbon::parse($record->delivery_target_date)->format("Y-m-d") : "-").'</td>
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.$requestedQty.'</td>
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.$completedQty.'</td>
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.$scrappedQty.'</td>
                                                 <td class="p-2 border border-gray-300 dark:border-gray-700">
                                                     <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
-                                                        <div class="h-4 '.$progressColor.' '.$textColor.' rounded-full text-xs font-medium flex items-center justify-center transition-all duration-300" style="width:'.$progressPercent.'%; min-width: 2rem;">
-                                                            '.$progressPercent.'%
-                                                        </div>
+                                                        <div class="h-4 '.$progressColor.' '.$textColor.' rounded-full text-xs font-medium flex items-center justify-center transition-all duration-300" style="width:'.$progressPercent.'%; min-width:2rem;">'.$progressPercent.'%</div>
                                                     </div>
                                                 </td>
                                                 <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($record->status).'</td>
@@ -83,11 +78,35 @@ class ViewPurchaseorder extends ViewRecord
                                         </tbody>
                                     </table>
                                 </div>
+
+                                <!-- Mobile Card -->
+                                <div class="block lg:hidden bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-300 dark:border-gray-700 mt-4">
+                                    <div class="bg-primary-500 text-white px-4 py-2 rounded-t-lg">
+                                        Sales Order Details
+                                    </div>
+                                    <div class="p-4 space-y-3">
+                                        <div><span class="font-bold text-black dark:text-white">SO Number: </span><span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($record->unique_id).'</span></div>
+                                        <div><span class="font-bold text-black dark:text-white">Customer: </span><span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($record->customer->name ?? "-").'</span></div>
+                                        <div><span class="font-bold text-black dark:text-white">Part Number: </span><span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($record->partNumber->partnumber ?? "-").'</span></div>
+                                        <div><span class="font-bold text-black dark:text-white">Target Completion: </span><span class="text-gray-900 dark:text-gray-100">'.($record->delivery_target_date ? \Carbon\Carbon::parse($record->delivery_target_date)->format("Y-m-d") : "-").'</span></div>
+                                        <div><span class="font-bold text-black dark:text-white">Requested Qty: </span><span class="text-gray-900 dark:text-gray-100">'.$requestedQty.'</span></div>
+                                        <div><span class="font-bold text-black dark:text-white">Completed Qty: </span><span class="text-gray-900 dark:text-gray-100">'.$completedQty.'</span></div>
+                                        <div><span class="font-bold text-black dark:text-white">Scrapped Qty: </span><span class="text-gray-900 dark:text-gray-100">'.$scrappedQty.'</span></div>
+                                        <div><span class="font-bold text-black dark:text-white">Progress: </span><span class="text-gray-900 dark:text-gray-100">'.$progressPercent.'%</span></div>
+                                        <div><span class="font-bold text-black dark:text-white">Status: </span><span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($record->status).'</span></div>
+                                    </div>
+                                </div>
                             ');
-                        }),
+                        })->html(),
                 ]),
 
+            /*
+             * =========================
+             * BILLS OF MATERIALS
+             * =========================
+             */
             Section::make('Bills of Materials')
+                ->collapsible()
                 ->schema([
                     TextEntry::make('boms_table')
                         ->label('')
@@ -97,13 +116,14 @@ class ViewPurchaseorder extends ViewRecord
                             }
 
                             $table = '
-                                <div class="overflow-x-auto rounded-lg shadow-md">
-                                    <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900">
-                                        <thead class="bg-primary-500 dark:bg-primary-700 text-white">
+                                <!-- Desktop Table -->
+                                <div class="hidden lg:block lg:overflow-x-auto shadow rounded-lg">
+                                    <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
+                                        <thead class="bg-primary-500 dark:bg-primary-700">
                                             <tr>
-                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">BOM Number</th>
-                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Description</th>
-                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Status</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">BOM Number</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">Description</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">Status</th>
                                             </tr>
                                         </thead>
                                         <tbody>';
@@ -115,7 +135,6 @@ class ViewPurchaseorder extends ViewRecord
                                     'Hold' => 'text-red-600 dark:text-red-400',
                                     default => 'text-gray-600 dark:text-gray-400',
                                 };
-
                                 $statusLabel = BomStatus::tryFrom($bom->status)?->label() ?? $bom->status;
 
                                 $table .= '
@@ -128,112 +147,111 @@ class ViewPurchaseorder extends ViewRecord
 
                             $table .= '</tbody></table></div>';
 
-                            return $table;
+                            // Mobile Cards
+                            $cards = '<div class="block lg:hidden space-y-4 mt-4">';
+                            foreach ($record->boms as $bom) {
+                                $statusLabel = BomStatus::tryFrom($bom->status)?->label() ?? $bom->status;
+                                $cards .= '
+                                    <div class="bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-300 dark:border-gray-700">
+                                        <div class="bg-primary-500 text-white px-4 py-2 rounded-t-lg">
+                                            BOM Details
+                                        </div>
+                                        <div class="p-4 space-y-3">
+                                            <div><span class="font-bold text-black dark:text-white">BOM Number: </span><span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($bom->unique_id).'</span></div>
+                                            <div><span class="font-bold text-black dark:text-white">Description: </span><span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($record->partnumber->description).'</span></div>
+                                            <div><span class="font-bold text-black dark:text-white">Status: </span><span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($statusLabel).'</span></div>
+                                        </div>
+                                    </div>';
+                            }
+                            $cards .= '</div>';
+
+                            return $table.$cards;
                         })->html(),
                 ]),
 
+            /*
+             * =========================
+             * WORK ORDERS
+             * =========================
+             */
             Section::make('Work Orders')
+                ->collapsible()
                 ->schema([
                     TextEntry::make('workOrders')
-                        ->hiddenLabel()
+                        ->label('')
                         ->getStateUsing(function ($record) {
                             if (! $record->workOrders || $record->workOrders->isEmpty()) {
-                                return '<div class="text-gray-500 dark:text-gray-400">No work orders found.</div>';
+                                return '<div class="text-gray-500 dark:text-gray-400">No Work Orders found.</div>';
                             }
 
+                            // Desktop Table
                             $table = '
-                                <div class="overflow-x-auto rounded-lg shadow-md">
-                                    <div class="hidden md:block">
-                                        <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900">
-                                            <thead class="bg-primary-500 dark:bg-primary-700 text-white">
-                                                <tr>
-                                                    <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">WO Number</th>
-                                                    <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">BOM Number</th>
-                                                    <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Qty</th>
-                                                    <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Machine ID</th>
-                                                    <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Start Time</th>
-                                                    <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">End Time</th>
-                                                    <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Status</th>
-                                                    <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">OK Qty</th>
-                                                    <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Scrapped Qty</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>';
+                                <div class="hidden lg:block lg:overflow-x-auto shadow rounded-lg">
+                                    <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
+                                        <thead class="bg-primary-500 dark:bg-primary-700">
+                                            <tr>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">WO Number</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">BOM Number</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">Qty</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">Machine ID</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">Start Time</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">End Time</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">Status</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">OK Qty</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">Scrapped Qty</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>';
 
-                            foreach ($record->workOrders as $workOrder) {
-                                $statusClass = match ($workOrder->status) {
-                                    'Completed' => 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300',
-                                    'Start' => 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-300',
-                                    'Hold' => 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-300',
-                                    'Assigned' => 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300',
-                                    default => 'bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-300',
-                                };
-
-                                $startTime = $workOrder->start_time ? \Carbon\Carbon::parse($workOrder->start_time)->format('Y-m-d H:i') : '-';
-                                $endTime = $workOrder->end_time ? \Carbon\Carbon::parse($workOrder->end_time)->format('Y-m-d H:i') : '-';
+                            foreach ($record->workOrders as $wo) {
+                                $startTime = $wo->start_time ? \Carbon\Carbon::parse($wo->start_time)->format("Y-m-d H:i") : "-";
+                                $endTime = $wo->end_time ? \Carbon\Carbon::parse($wo->end_time)->format("Y-m-d H:i") : "-";
 
                                 $table .= '
                                     <tr class="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">
-                                        <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($workOrder->unique_id).'</td>
-                                        <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">BOM-'.htmlspecialchars($workOrder->bom_id).'</td>
-                                        <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($workOrder->qty).'</td>
-                                        <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($workOrder->machine_id).'</td>
-                                        <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($startTime).'</td>
-                                        <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($endTime).'</td>
-                                        <td class="p-2 border border-gray-300 dark:border-gray-700"><span class="px-2 py-1 text-xs font-semibold rounded-full '.$statusClass.'">'.htmlspecialchars($workOrder->status).'</span></td>
-                                        <td class="p-2 border border-gray-300 dark:border-gray-700 text-green-600 dark:text-green-400">'.htmlspecialchars($workOrder->ok_qtys).'</td>
-                                        <td class="p-2 border border-gray-300 dark:border-gray-700 text-red-600 dark:text-red-400">'.htmlspecialchars($workOrder->scrapped_qtys).'</td>
+                                        <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($wo->unique_id).'</td>
+                                        <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">BOM-'.htmlspecialchars($wo->bom_id).'</td>
+                                        <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($wo->qty).'</td>
+                                        <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($wo->machine_id).'</td>
+                                        <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.$startTime.'</td>
+                                        <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.$endTime.'</td>
+                                        <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($wo->status).'</td>
+                                        <td class="p-2 border border-gray-300 dark:border-gray-700 text-green-600 dark:text-green-400">'.htmlspecialchars($wo->ok_qtys).'</td>
+                                        <td class="p-2 border border-gray-300 dark:border-gray-700 text-red-600 dark:text-red-400">'.htmlspecialchars($wo->scrapped_qtys).'</td>
                                     </tr>';
                             }
 
-                            $table .= '</tbody></table></div></div>';
+                            $table .= '</tbody></table></div>';
 
-                            return $table;
+                            // Mobile Cards
+                            $cards = '<div class="block lg:hidden space-y-4 mt-4">';
+                            foreach ($record->workOrders as $wo) {
+                                $startTime = $wo->start_time ? \Carbon\Carbon::parse($wo->start_time)->format("Y-m-d H:i") : "-";
+                                $endTime = $wo->end_time ? \Carbon\Carbon::parse($wo->end_time)->format("Y-m-d H:i") : "-";
+
+                                $cards .= '
+                                    <div class="bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-300 dark:border-gray-700">
+                                        <div class="bg-primary-500 text-white px-4 py-2 rounded-t-lg">
+                                            Work Order Details
+                                        </div>
+                                        <div class="p-4 space-y-3">
+                                            <div><span class="font-bold text-black dark:text-white">WO Number: </span><span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($wo->unique_id).'</span></div>
+                                            <div><span class="font-bold text-black dark:text-white">BOM Number: </span><span class="text-gray-900 dark:text-gray-100">BOM-'.htmlspecialchars($wo->bom_id).'</span></div>
+                                            <div><span class="font-bold text-black dark:text-white">Qty: </span><span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($wo->qty).'</span></div>
+                                            <div><span class="font-bold text-black dark:text-white">Machine ID: </span><span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($wo->machine_id).'</span></div>
+                                            <div><span class="font-bold text-black dark:text-white">Start Time: </span><span class="text-gray-900 dark:text-gray-100">'.$startTime.'</span></div>
+                                            <div><span class="font-bold text-black dark:text-white">End Time: </span><span class="text-gray-900 dark:text-gray-100">'.$endTime.'</span></div>
+                                            <div><span class="font-bold text-black dark:text-white">Status: </span><span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($wo->status).'</span></div>
+                                            <div><span class="font-bold text-black dark:text-white">OK Qty: </span><span class="text-green-600 dark:text-green-400">'.htmlspecialchars($wo->ok_qtys).'</span></div>
+                                            <div><span class="font-bold text-black dark:text-white">Scrapped Qty: </span><span class="text-red-600 dark:text-red-400">'.htmlspecialchars($wo->scrapped_qtys).'</span></div>
+                                        </div>
+                                    </div>';
+                            }
+                            $cards .= '</div>';
+
+                            return $table.$cards;
                         })->html(),
                 ]),
-        ]);
-    }
-
-    protected function mutateFormDataBeforeFill(array $data): array
-    {
-        \Log::info('Initial Purchase Order Data:', [
-            'po_id' => $data['id'],
-            'has_boms' => isset($data['boms']),
-            'boms_count' => isset($data['boms']) ? count($data['boms']) : 0,
-        ]);
-
-        $purchaseOrder = PurchaseOrder::with([
-            'boms.workOrders.operator.user',
-            'boms.workOrders.machine',
-            'boms.workOrders.quantities',
-            'partNumber',
-            'factory',
-            'customer',
-        ])->find($data['id']);
-
-        $data['workOrders'] = $purchaseOrder->workOrders->toArray();
-
-        return $data;
-    }
-
-    protected function afterMount(): void
-    {
-        parent::afterMount();
-
-        $purchaseOrder = PurchaseOrder::with([
-            'boms.workOrders.operator.user',
-            'boms.workOrders.machine',
-            'boms.workOrders.quantities',
-            'partNumber',
-            'factory',
-            'customer',
-        ])->find($this->record->id);
-
-        \Log::info('Purchase Order loaded in afterMount:', [
-            'po_id' => $purchaseOrder->id,
-            'po_unique_id' => $purchaseOrder->unique_id,
-            'work_orders_count' => $purchaseOrder->workOrders->count(),
-            'boms_count' => $purchaseOrder->boms->count(),
         ]);
     }
 }

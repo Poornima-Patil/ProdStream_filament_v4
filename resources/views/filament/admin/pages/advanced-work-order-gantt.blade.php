@@ -537,6 +537,7 @@
             };
             
             $displayText = $percent > 0 ? $percent . '%' : $wo->unique_id;
+            $displayPercent = $percent;
         }
         
         $barWidthPercentage = $spanSlots * 100;
@@ -626,7 +627,8 @@
                 default => '#eab308'
             };
             
-            $displayText = $percent > 0 ? $percent . '%' : $wo->unique_id;
+            $displayText = $percent > 0 ?   $percent . '%' : $wo->unique_id;
+            $displayPercent = $percent;
         }
         
         $barWidthPercentage = $spanSlots * 100;

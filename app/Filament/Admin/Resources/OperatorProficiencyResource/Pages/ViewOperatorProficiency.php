@@ -3,8 +3,6 @@
 namespace App\Filament\Admin\Resources\OperatorProficiencyResource\Pages;
 
 use App\Filament\Admin\Resources\OperatorProficiencyResource;
-use App\Models\OperatorProficiency;
-use Filament\Infolists\Components\Progress;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
@@ -30,18 +28,20 @@ class ViewOperatorProficiency extends ViewRecord
                         ->label('')
                         ->getStateUsing(function ($record) {
                             if (!$record) {
-                                return '<div class="text-gray-500 dark:text-gray-400">NO Operator Proficiencies found</div>';
+                                return '<div class="text-gray-500 dark:text-gray-400">No Operator Proficiencies Found</div>';
                             }
-                            $Proficiency = $record->proficiency;
-                            $Description = $record->description;
+
+                            $Proficiency = $record->proficiency ?? '';
+                            $Description = $record->description ?? '';
 
                             return new \Illuminate\Support\HtmlString('
-                                <div class="overflow-x-auto rounded-lg shadow">
-                                    <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900">
-                                        <thead class="bg-primary-500 dark:bg-primary-700 text-white">
+                                <!-- Desktop Table -->
+                                <div class="hidden lg:block overflow-x-auto shadow rounded-lg">
+                                    <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
+                                        <thead class="bg-primary-500 dark:bg-primary-700">
                                             <tr>
-                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Proficiency</th>
-                                                <th class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">Description</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">Proficiency</th>
+                                                <th class="p-2 border border-gray-300 dark:border-gray-700 font-bold text-black dark:text-white">Description</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -52,10 +52,26 @@ class ViewOperatorProficiency extends ViewRecord
                                         </tbody>
                                     </table>
                                 </div>
+
+                                <!-- Mobile Card -->
+                                <div class="block lg:hidden bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-300 dark:border-gray-700 mt-4">
+                                    <div class="bg-primary-500 text-white px-4 py-2 rounded-t-lg">
+                                         Operator Proficiency Details
+                                    </div>
+                                    <div class="p-4 space-y-3">
+                                        <div>
+                                            <span class="font-bold text-black dark:text-white">Proficiency: </span>
+                                            <span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($Proficiency).'</span>
+                                        </div>
+                                        <div>
+                                            <span class="font-bold text-black dark:text-white">Description: </span>
+                                            <span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($Description).'</span>
+                                        </div>
+                                    </div>
+                                </div>
                             ');
                         })->html(),
                 ]),
         ]);
     }
 }
-
