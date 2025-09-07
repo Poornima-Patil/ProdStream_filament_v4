@@ -106,7 +106,7 @@ class WorkOrder extends Model
 
         // Handle seeding context where Auth::id() might be null
         $userId = Auth::id();
-        if (!$userId && app()->runningInConsole()) {
+        if (! $userId && app()->runningInConsole()) {
             // During seeding, try to find a Factory Admin for this specific factory
             if ($this->factory_id) {
                 $factoryAdmin = \App\Models\User::where('factory_id', $this->factory_id)
@@ -117,13 +117,13 @@ class WorkOrder extends Model
             }
 
             // Fallback to any super admin
-            if (!$userId) {
+            if (! $userId) {
                 $superAdmin = \App\Models\User::role('Super Admin')->first();
                 $userId = $superAdmin?->id;
             }
 
             // Final fallback to first user or default ID
-            if (!$userId) {
+            if (! $userId) {
                 $userId = \App\Models\User::first()?->id ?? 1;
             }
         }
@@ -215,12 +215,12 @@ class WorkOrder extends Model
 
     /**
      * Check for scheduling conflicts when planning a new Work Order
-     * 
-     * @param int $machineId
-     * @param \Carbon\Carbon $newStartTime
-     * @param \Carbon\Carbon $newEndTime
-     * @param int $factoryId - Factory ID for multi-tenancy
-     * @param int|null $excludeWorkOrderId - Exclude current WO when updating
+     *
+     * @param  int  $machineId
+     * @param  \Carbon\Carbon  $newStartTime
+     * @param  \Carbon\Carbon  $newEndTime
+     * @param  int  $factoryId  - Factory ID for multi-tenancy
+     * @param  int|null  $excludeWorkOrderId  - Exclude current WO when updating
      * @return array
      */
     public static function checkSchedulingConflicts($machineId, $newStartTime, $newEndTime, $factoryId, $excludeWorkOrderId = null)
@@ -330,9 +330,9 @@ class WorkOrder extends Model
 
     /**
      * Check if a machine is currently occupied (has WO in "Start" status)
-     * 
-     * @param int $machineId
-     * @param int $factoryId - Factory ID for multi-tenancy
+     *
+     * @param  int  $machineId
+     * @param  int  $factoryId  - Factory ID for multi-tenancy
      * @return bool
      */
     public static function isMachineCurrentlyOccupied($machineId, $factoryId)
@@ -345,9 +345,9 @@ class WorkOrder extends Model
 
     /**
      * Get current running Work Order for a machine
-     * 
-     * @param int $machineId
-     * @param int $factoryId - Factory ID for multi-tenancy
+     *
+     * @param  int  $machineId
+     * @param  int  $factoryId  - Factory ID for multi-tenancy
      * @return WorkOrder|null
      */
     public static function getCurrentRunningWorkOrder($machineId, $factoryId)
@@ -362,10 +362,10 @@ class WorkOrder extends Model
      * Validate if a Work Order can transition to 'Start' status
      * Ensures only one WO can be in 'Start' status per machine at any time
      * Also checks if starting would conflict with planned schedules
-     * 
-     * @param int $machineId
-     * @param int $factoryId - Factory ID for multi-tenancy
-     * @param int|null $excludeWorkOrderId - Exclude current WO when updating
+     *
+     * @param  int  $machineId
+     * @param  int  $factoryId  - Factory ID for multi-tenancy
+     * @param  int|null  $excludeWorkOrderId  - Exclude current WO when updating
      * @return array
      */
     public static function validateStartStatusTransition($machineId, $factoryId, $excludeWorkOrderId = null)
@@ -373,7 +373,7 @@ class WorkOrder extends Model
         $validation = [
             'can_start' => true,
             'conflicting_work_order' => null,
-            'message' => null
+            'message' => null,
         ];
 
         // Check if another WO is already in 'Start' status on this machine
@@ -448,13 +448,14 @@ class WorkOrder extends Model
     /**
      * Validate scheduling for a new Work Order
      * Returns validation result with conflicts and recommendations
-     * 
-     * @param array $workOrderData
+     *
+     * @param  array  $workOrderData
      * @return array
      */
     public static function validateScheduling($workOrderData)
     {
         $machineId = $workOrderData['machine_id'];
+        $operatorId = $workOrderData['operator_id'] ?? null;
         $factoryId = $workOrderData['factory_id']; // Multi-tenancy: get factory ID
         $startTime = \Carbon\Carbon::parse($workOrderData['start_time']);
         $endTime = \Carbon\Carbon::parse($workOrderData['end_time']);
@@ -466,7 +467,9 @@ class WorkOrder extends Model
             'conflicts' => [],
             'warnings' => [],
             'recommendations' => [],
-            'start_validation' => null
+            'start_validation' => null,
+            'operator_conflicts' => [],
+            'shift_conflicts' => [],
         ];
 
         // Check if trying to transition to 'Start' status
@@ -474,7 +477,7 @@ class WorkOrder extends Model
             $startValidation = self::validateStartStatusTransition($machineId, $factoryId, $excludeId);
             $validation['start_validation'] = $startValidation;
 
-            if (!$startValidation['can_start']) {
+            if (! $startValidation['can_start']) {
                 $validation['is_valid'] = false;
             }
         }
@@ -482,25 +485,87 @@ class WorkOrder extends Model
         // Check if machine is currently occupied within the same factory (for scheduling purposes)
         if (self::isMachineCurrentlyOccupied($machineId, $factoryId)) {
             $currentWO = self::getCurrentRunningWorkOrder($machineId, $factoryId);
-            if (!$excludeId || $currentWO->id !== $excludeId) {
+            if (! $excludeId || $currentWO->id !== $excludeId) {
                 $validation['warnings'][] = [
                     'type' => 'machine_currently_occupied',
                     'message' => "Machine is currently running Work Order: {$currentWO->unique_id}",
                     'current_work_order' => $currentWO->unique_id,
-                    'estimated_completion' => $currentWO->end_time
+                    'estimated_completion' => $currentWO->end_time,
                 ];
             }
         }
 
-        // Check for scheduling conflicts within the same factory
-        $conflicts = self::checkSchedulingConflicts($machineId, $startTime, $endTime, $factoryId, $excludeId);
+        // Check for machine scheduling conflicts within the same factory
+        $machineConflicts = self::checkSchedulingConflicts($machineId, $startTime, $endTime, $factoryId, $excludeId);
 
-        if (!empty($conflicts)) {
+        if (! empty($machineConflicts)) {
             $validation['is_valid'] = false;
-            $validation['conflicts'] = $conflicts;
+            $validation['conflicts'] = $machineConflicts;
 
             // Add recommendations based on conflicts
-            $validation['recommendations'] = self::generateSchedulingRecommendations($machineId, $startTime, $endTime, $conflicts);
+            $validation['recommendations'] = self::generateSchedulingRecommendations($machineId, $startTime, $endTime, $machineConflicts);
+        }
+
+        // Check operator scheduling conflicts and shift validation
+        if ($operatorId) {
+            $operator = \App\Models\Operator::find($operatorId);
+            if ($operator) {
+                // Check operator scheduling conflicts
+                $operatorConflicts = $operator->checkSchedulingConflicts($startTime, $endTime, $factoryId, $excludeId);
+
+                if (! empty($operatorConflicts)) {
+                    $validation['operator_conflicts'] = $operatorConflicts;
+
+                    // Check for shift conflicts specifically
+                    $shiftConflicts = array_filter($operatorConflicts, function ($conflict) {
+                        return $conflict['type'] === 'shift_conflict';
+                    });
+
+                    if (! empty($shiftConflicts)) {
+                        $validation['shift_conflicts'] = $shiftConflicts;
+                        $validation['warnings'][] = [
+                            'type' => 'operator_shift_conflict',
+                            'message' => "Work order time conflicts with operator's shift schedule",
+                            'operator_name' => $operator->user?->getFilamentName() ?? 'Unknown',
+                            'shift_details' => $operator->shift ? [
+                                'name' => $operator->shift->name,
+                                'start_time' => $operator->shift->start_time,
+                                'end_time' => $operator->shift->end_time,
+                            ] : null,
+                        ];
+                    }
+
+                    // Check for work order conflicts
+                    $workOrderConflicts = array_filter($operatorConflicts, function ($conflict) {
+                        return $conflict['type'] === 'work_order_conflict';
+                    });
+
+                    if (! empty($workOrderConflicts)) {
+                        $validation['is_valid'] = false;
+                        $validation['warnings'][] = [
+                            'type' => 'operator_availability_conflict',
+                            'message' => 'Operator is already assigned to other work orders during this time',
+                            'operator_name' => $operator->user?->getFilamentName() ?? 'Unknown',
+                            'conflicting_work_orders' => array_map(function ($conflict) {
+                                return [
+                                    'work_order_id' => $conflict['work_order_unique_id'],
+                                    'start' => $conflict['planned_start'],
+                                    'end' => $conflict['planned_end'],
+                                    'status' => $conflict['status'],
+                                ];
+                            }, $workOrderConflicts),
+                        ];
+                    }
+                }
+
+                // Add operator-specific recommendations
+                if (! empty($operatorConflicts)) {
+                    $validation['recommendations'] = array_merge(
+                        $validation['recommendations'] ?? [],
+                        self::generateOperatorSchedulingRecommendations($operator, $startTime, $endTime, $operatorConflicts)
+                    );
+                }
+            }
         }
 
         return $validation;
@@ -518,7 +583,7 @@ class WorkOrder extends Model
         $latestConflictEnd = null;
         foreach ($conflicts as $conflict) {
             $conflictEnd = \Carbon\Carbon::parse($conflict['planned_end']);
-            if (!$latestConflictEnd || $conflictEnd > $latestConflictEnd) {
+            if (! $latestConflictEnd || $conflictEnd > $latestConflictEnd) {
                 $latestConflictEnd = $conflictEnd;
             }
         }
@@ -531,15 +596,110 @@ class WorkOrder extends Model
                 'type' => 'reschedule_after_conflicts',
                 'suggested_start_time' => $recommendedStart,
                 'suggested_end_time' => $recommendedEnd,
-                'message' => "Reschedule to start at {$recommendedStart->format('Y-m-d H:i')} (after conflicting work orders)"
+                'message' => "Reschedule to start at {$recommendedStart->format('Y-m-d H:i')} (after conflicting work orders)",
             ];
         }
 
         // Suggest alternative machines (if needed, this would require machine compatibility logic)
         $recommendations[] = [
             'type' => 'consider_alternative_machine',
-            'message' => 'Consider using an alternative machine if available and compatible'
+            'message' => 'Consider using an alternative machine if available and compatible',
         ];
+
+        return $recommendations;
+    }
+
+    /**
+     * Generate operator-specific scheduling recommendations
+     */
+    private static function generateOperatorSchedulingRecommendations($operator, $startTime, $endTime, $operatorConflicts)
+    {
+        $recommendations = [];
+        $duration = $startTime->diffInMinutes($endTime);
+
+        foreach ($operatorConflicts as $conflict) {
+            if ($conflict['type'] === 'shift_conflict') {
+                // Recommend scheduling within shift hours
+                if ($operator->shift) {
+                    $shift = $operator->shift;
+
+                    // Find next shift occurrence
+                    $nextShiftStart = $startTime->copy()->setTimeFromTimeString($shift->start_time);
+                    $nextShiftEnd = $startTime->copy()->setTimeFromTimeString($shift->end_time);
+
+                    // Handle overnight shifts
+                    if ($nextShiftEnd < $nextShiftStart) {
+                        if ($startTime->hour < 12) {
+                            $nextShiftStart->subDay();
+                        } else {
+                            $nextShiftEnd->addDay();
+                        }
+                    }
+
+                    // If the suggested time is before the shift starts, recommend shift start time
+                    if ($nextShiftStart > $startTime) {
+                        $recommendedEnd = $nextShiftStart->copy()->addMinutes($duration);
+
+                        // Check if it fits within shift
+                        if ($recommendedEnd <= $nextShiftEnd) {
+                            $recommendations[] = [
+                                'type' => 'reschedule_within_shift',
+                                'suggested_start_time' => $nextShiftStart,
+                                'suggested_end_time' => $recommendedEnd,
+                                'message' => "Reschedule to start at {$nextShiftStart->format('Y-m-d H:i')} (during {$shift->name} shift)",
+                            ];
+                        }
+                    }
+                }
+
+                $recommendations[] = [
+                    'type' => 'consider_alternative_operator',
+                    'message' => 'Consider assigning a different operator who is available during this time',
+                ];
+
+            } elseif ($conflict['type'] === 'work_order_conflict') {
+                // Find the latest end time of conflicting work orders
+                $latestConflictEnd = \Carbon\Carbon::parse($conflict['planned_end']);
+                $recommendedStart = $latestConflictEnd->copy();
+                $recommendedEnd = $recommendedStart->copy()->addMinutes($duration);
+
+                // Check if recommended time is within operator's shift
+                if ($operator->shift) {
+                    $shiftStart = $recommendedStart->copy()->setTimeFromTimeString($operator->shift->start_time);
+                    $shiftEnd = $recommendedStart->copy()->setTimeFromTimeString($operator->shift->end_time);
+
+                    // Handle overnight shifts
+                    if ($shiftEnd < $shiftStart) {
+                        if ($recommendedStart->hour < 12) {
+                            $shiftStart->subDay();
+                        } else {
+                            $shiftEnd->addDay();
+                        }
+                    }
+
+                    if ($recommendedStart >= $shiftStart && $recommendedEnd <= $shiftEnd) {
+                        $recommendations[] = [
+                            'type' => 'reschedule_after_operator_conflicts',
+                            'suggested_start_time' => $recommendedStart,
+                            'suggested_end_time' => $recommendedEnd,
+                            'message' => "Reschedule to start at {$recommendedStart->format('Y-m-d H:i')} (after operator's conflicting work orders)",
+                        ];
+                    } else {
+                        $recommendations[] = [
+                            'type' => 'operator_availability_issue',
+                            'message' => 'Operator has conflicting work orders and recommended time falls outside shift hours',
+                        ];
+                    }
+                } else {
+                    $recommendations[] = [
+                        'type' => 'reschedule_after_operator_conflicts',
+                        'suggested_start_time' => $recommendedStart,
+                        'suggested_end_time' => $recommendedEnd,
+                        'message' => "Reschedule to start at {$recommendedStart->format('Y-m-d H:i')} (after operator's conflicting work orders)",
+                    ];
+                }
+            }
+        }
 
         return $recommendations;
     }

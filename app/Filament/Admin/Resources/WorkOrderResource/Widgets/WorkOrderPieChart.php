@@ -7,7 +7,9 @@ use Filament\Widgets\ChartWidget;
 use Filament\Widgets\Concerns\InteractsWithPageTable;
 use Filament\Facades\Filament;
 
-class WorkOrderPieChart extends ChartWidget
+class
+
+WorkOrderPieChart extends ChartWidget
 {
     use InteractsWithPageTable;
 

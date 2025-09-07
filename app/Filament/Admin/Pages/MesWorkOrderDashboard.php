@@ -2,61 +2,94 @@
 
 namespace App\Filament\Admin\Pages;
 
-use Filament\Pages\Page;
-use Illuminate\Support\Facades\Auth;
-
-use App\Models\WorkOrder;
 use App\Models\Machine;
 use App\Models\Operator;
+use App\Models\WorkOrder;
+use Filament\Pages\Page;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class MesWorkOrderDashboard extends Page
 {
     protected static string $view = 'filament.admin.pages.mes-work-order-dashboard';
+
     protected static ?string $navigationGroup = 'Work Order Reports';
+
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
+
     protected static ?string $navigationLabel = 'MES Work Order Dashboard';
 
     public $activeOrders = 0;
+
     public $pendingOrders = 0;
+
     public $completedToday = 0;
+
     public $avgUtilization = '0%';
+
     public $machines = [];
+
     public $machineStatuses = [];
+
     public $workOrders = [];
+
     public $operators = [];
+
     public $overallYield = '0%';
+
     public $completionRate = '0%';
+
     public $defectRate = '0%';
+
     public $totalWorkOrders = 0;
+
     public $completedOrders = 0;
+
     public $inProgressOrders = 0;
+
     public $onHold = 0;
+
     public $totalOkQty = 0;
+
     public $totalKoQty = 0;
+
     public $totalPlannedQty = 0;
+
     public $statusDistribution = [];
 
     public $filterStatus = '';
+
     public $filterMachine = '';
+
     public $filterOperator = '';
+
     public $filterDateFrom = '';
+
     public $filterDateTo = '';
+
     public $activeTab = 'real-time';
 
     // Date range properties
     public $startDate = '';
+
     public $endDate = '';
+
     public $selectedStatus = '';
+
     public $selectedMachine = '';
+
     public $selectedOperator = '';
+
     public $filteredCount = 0;
+
     public $totalRecords = 0;
 
     // Pagination properties
     public $currentPage = 1;
+
     public $perPage = 25;
+
     public $totalPages = 1;
 
     public array $pivotFilters = [
@@ -76,9 +109,13 @@ class MesWorkOrderDashboard extends Page
     ];
 
     public array $pivotRows = [];
+
     public array $pivotColumns = [];
+
     public array $pivotValues = [];
+
     public array $pivotData = [];
+
     public bool $pivotGenerated = false;
 
     public function mount()
@@ -91,28 +128,28 @@ class MesWorkOrderDashboard extends Page
         $this->filterDateFrom = $this->startDate;
         $this->filterDateTo = $this->endDate;
 
-        Log::info('Dashboard mounting with date range: ' . $this->startDate . ' to ' . $this->endDate);
-        Log::info('User factory ID: ' . (Auth::user()->factory_id ?? 'not set'));
+        Log::info('Dashboard mounting with date range: '.$this->startDate.' to '.$this->endDate);
+        Log::info('User factory ID: '.(Auth::user()->factory_id ?? 'not set'));
 
         $this->loadData();
         $this->updateRecordCounts();
 
         // Debug: Check if we have any work orders at all for this factory
         $totalWOsInFactory = WorkOrder::where('factory_id', Auth::user()->factory_id)->count();
-        Log::info('Total work orders in factory ' . Auth::user()->factory_id . ': ' . $totalWOsInFactory);
+        Log::info('Total work orders in factory '.Auth::user()->factory_id.': '.$totalWOsInFactory);
 
         if ($totalWOsInFactory == 0) {
-            Log::warning('No work orders found for factory ' . Auth::user()->factory_id);
+            Log::warning('No work orders found for factory '.Auth::user()->factory_id);
         }
     }
 
     public function updated($property)
     {
-        Log::info('Dashboard property updated: ' . $property);
+        Log::info('Dashboard property updated: '.$property);
 
         // Handle new date range properties
         if (in_array($property, ['selectedStatus', 'selectedMachine', 'selectedOperator', 'startDate', 'endDate'])) {
-            Log::info('Filter updated - Status: ' . $this->selectedStatus . ', Machine: ' . $this->selectedMachine . ', Operator: ' . $this->selectedOperator);
+            Log::info('Filter updated - Status: '.$this->selectedStatus.', Machine: '.$this->selectedMachine.', Operator: '.$this->selectedOperator);
 
             // Update legacy filter properties for backward compatibility
             $this->filterStatus = $this->selectedStatus;
@@ -188,7 +225,7 @@ class MesWorkOrderDashboard extends Page
                 'name' => $machine->name,
                 'status' => $status,
                 'utilization' => $utilization,
-                'current_wo' => $currentWorkOrder ? ($currentWorkOrder->unique_id ?: 'WO-' . $currentWorkOrder->id) : null,
+                'current_wo' => $currentWorkOrder ? ($currentWorkOrder->unique_id ?: 'WO-'.$currentWorkOrder->id) : null,
             ];
         })->toArray();
 
@@ -266,7 +303,7 @@ class MesWorkOrderDashboard extends Page
         if ($totalOrders > 0) {
             // Calculate completion rate (Completed orders / Total orders)
             $completionRate = round(($completedOrders / $totalOrders) * 100, 2);
-            $this->completionRate = $completionRate . '%';
+            $this->completionRate = $completionRate.'%';
 
             // Calculate overall yield and quantities from REAL data
             $totalProduced = $workOrders->sum('produced_qty') ?: ($workOrders->sum('ok_qtys') + $workOrders->sum('scrapped_qtys'));
@@ -279,11 +316,11 @@ class MesWorkOrderDashboard extends Page
 
             if ($totalProduced > 0) {
                 $overallYield = round(($totalOkQty / $totalProduced) * 100, 2);
-                $this->overallYield = $overallYield . '%';
+                $this->overallYield = $overallYield.'%';
 
                 // Calculate defect rate (1 - Yield)
                 $defectRate = round(((1 - ($totalOkQty / $totalProduced)) * 100), 2);
-                $this->defectRate = $defectRate . '%';
+                $this->defectRate = $defectRate.'%';
             } else {
                 $this->overallYield = '0%';
                 $this->defectRate = '0%';
@@ -310,85 +347,68 @@ class MesWorkOrderDashboard extends Page
 
     private function calculateStatusDistribution()
     {
-        // For status distribution chart, we want to show all statuses but EXCLUDE the status filter
-        // This way the chart shows the overall status distribution for the other filters applied
+        // Apply ALL current filters including status filter for consistent chart display
         $query = WorkOrder::query()->where('factory_id', Auth::user()->factory_id);
 
-        // Apply date filters
-        if ($this->startDate || $this->filterDateFrom) {
-            $dateFrom = $this->startDate ?: $this->filterDateFrom;
-            $query->whereDate('created_at', '>=', $dateFrom);
-            Log::info('Status distribution - filtering from date: ' . $dateFrom);
-        }
-        if ($this->endDate || $this->filterDateTo) {
-            $dateTo = $this->endDate ?: $this->filterDateTo;
-            $query->whereDate('created_at', '<=', $dateTo);
-            Log::info('Status distribution - filtering to date: ' . $dateTo);
-        }
+        // Use unified filter variables with fallback to legacy
+        $dateFromFilter = $this->startDate ?: $this->filterDateFrom;
+        $dateToFilter = $this->endDate ?: $this->filterDateTo;
+        $statusFilter = $this->selectedStatus ?: $this->filterStatus;
+        $machineFilter = $this->selectedMachine ?: $this->filterMachine;
+        $operatorFilter = $this->selectedOperator ?: $this->filterOperator;
 
-        // Apply machine and operator filters but NOT status filter for the chart
-        if ($this->selectedMachine || $this->filterMachine) {
-            $machineName = $this->selectedMachine ?: $this->filterMachine;
-            $machine = Machine::where('name', $machineName)->where('factory_id', Auth::user()->factory_id)->first();
+        // Apply ALL filters including status filter
+        if ($dateFromFilter) {
+            $query->whereDate('created_at', '>=', $dateFromFilter);
+            Log::info('Status distribution - filtering from date: '.$dateFromFilter);
+        }
+        if ($dateToFilter) {
+            $query->whereDate('created_at', '<=', $dateToFilter);
+            Log::info('Status distribution - filtering to date: '.$dateToFilter);
+        }
+        if ($statusFilter && $statusFilter != 'all') {
+            $query->where('status', $statusFilter);
+            Log::info('Status distribution - filtering by status: '.$statusFilter);
+        }
+        if ($machineFilter && $machineFilter != 'all') {
+            $machine = Machine::where('name', $machineFilter)->where('factory_id', Auth::user()->factory_id)->first();
             if ($machine) {
                 $query->where('machine_id', $machine->id);
-                Log::info('Status distribution - filtering by machine: ' . $machineName . ' (ID: ' . $machine->id . ')');
+                Log::info('Status distribution - filtering by machine: '.$machineFilter.' (ID: '.$machine->id.')');
             }
         }
-
-        if ($this->selectedOperator || $this->filterOperator) {
-            $operatorId = $this->selectedOperator ?: $this->filterOperator;
-            $query->where('operator_id', $operatorId);
-            Log::info('Status distribution - filtering by operator: ' . $operatorId);
+        if ($operatorFilter && $operatorFilter != 'all') {
+            $query->where('operator_id', $operatorFilter);
+            Log::info('Status distribution - filtering by operator: '.$operatorFilter);
         }
 
-        // Check if there's an active status filter
-        $statusFilter = $this->selectedStatus ?: $this->filterStatus;
-        $hasStatusFilter = $statusFilter && $statusFilter != 'all';
+        // Apply pivot filters if active
+        if ($this->hasActiveFilters()) {
+            $query = $this->applyPivotFilters($query);
+            Log::info('Applied pivot filters to status distribution');
+        }
 
-        if ($hasStatusFilter) {
-            // When there's a status filter, show ONLY that filtered status in the pie chart
-            Log::info('Status distribution - status filter active: ' . $statusFilter);
+        $totalOrders = $query->count();
+        Log::info('Status distribution - total orders after ALL filters: '.$totalOrders);
 
-            // Get the count for the filtered status by applying the status filter
-            $filteredQuery = clone $query;
-            $filteredQuery->where('status', $statusFilter);
-            $filteredCount = $filteredQuery->count();
+        if ($totalOrders > 0) {
+            $statusCounts = (clone $query)->selectRaw('status, COUNT(*) as count')
+                ->groupBy('status')
+                ->pluck('count', 'status')
+                ->toArray();
+
+            Log::info('Status distribution - raw counts from database:', $statusCounts);
 
             $this->statusDistribution = [];
-            if ($filteredCount > 0) {
-                // Show only the filtered status - this makes the pie chart meaningful
-                $this->statusDistribution[$statusFilter] = $filteredCount;
-            } else {
-                // If no work orders match the filter, show empty state
-                $this->statusDistribution = [];
+            foreach ($statusCounts as $status => $count) {
+                $this->statusDistribution[$status] = $count;
             }
 
-            Log::info('Status distribution with filter - final distribution:', $this->statusDistribution);
+            Log::info('Status distribution - final distribution:', $this->statusDistribution);
         } else {
-            // No status filter - show full distribution
-            $totalOrders = $query->count();
-            Log::info('Status distribution - total orders after filters: ' . $totalOrders);
-
-            if ($totalOrders > 0) {
-                $statusCounts = (clone $query)->selectRaw('status, COUNT(*) as count')
-                    ->groupBy('status')
-                    ->pluck('count', 'status')
-                    ->toArray();
-
-                Log::info('Status distribution - raw counts from database:', $statusCounts);
-
-                $this->statusDistribution = [];
-                foreach ($statusCounts as $status => $count) {
-                    $this->statusDistribution[$status] = $count;
-                }
-
-                Log::info('Status distribution - final distribution:', $this->statusDistribution);
-            } else {
-                // No data - empty distribution
-                $this->statusDistribution = [];
-                Log::info('Status distribution - no work orders found, using empty distribution');
-            }
+            // No data - empty distribution
+            $this->statusDistribution = [];
+            Log::info('Status distribution - no work orders found, using empty distribution');
         }
     }
 
@@ -426,38 +446,51 @@ class MesWorkOrderDashboard extends Page
 
         // Calculate average utilization
         $avgUtilization = $machineCount > 0 ? round($totalUtilization / $machineCount) : 0;
-        $this->avgUtilization = $avgUtilization . '%';
+        $this->avgUtilization = $avgUtilization.'%';
     }
 
     public function getStatusDistributionData()
     {
         $this->calculateStatusDistribution();
+
         return $this->statusDistribution;
     }
 
     public function getMachineUtilizationData()
     {
-        // Build the base query with current filters (same as used for work orders)
+        // Build the base query with ALL current filters applied
         $query = WorkOrder::query()->where('work_orders.factory_id', Auth::user()->factory_id);
 
+        // Use unified filter variables with fallback to legacy
+        $dateFromFilter = $this->startDate ?: $this->filterDateFrom;
+        $dateToFilter = $this->endDate ?: $this->filterDateTo;
+        $statusFilter = $this->selectedStatus ?: $this->filterStatus;
+        $machineFilter = $this->selectedMachine ?: $this->filterMachine;
+        $operatorFilter = $this->selectedOperator ?: $this->filterOperator;
+
         // Apply ALL current filters
-        if ($this->filterDateFrom) {
-            $query->whereDate('work_orders.created_at', '>=', $this->filterDateFrom);
+        if ($dateFromFilter) {
+            $query->whereDate('work_orders.created_at', '>=', $dateFromFilter);
         }
-        if ($this->filterDateTo) {
-            $query->whereDate('work_orders.created_at', '<=', $this->filterDateTo);
+        if ($dateToFilter) {
+            $query->whereDate('work_orders.created_at', '<=', $dateToFilter);
         }
-        if ($this->filterStatus) {
-            $query->where('work_orders.status', $this->filterStatus);
+        if ($statusFilter && $statusFilter != 'all') {
+            $query->where('work_orders.status', $statusFilter);
         }
-        if ($this->filterMachine) {
-            $machine = Machine::where('name', $this->filterMachine)->where('factory_id', Auth::user()->factory_id)->first();
+        if ($machineFilter && $machineFilter != 'all') {
+            $machine = Machine::where('name', $machineFilter)->where('factory_id', Auth::user()->factory_id)->first();
             if ($machine) {
                 $query->where('work_orders.machine_id', $machine->id);
             }
         }
-        if ($this->filterOperator) {
-            $query->where('work_orders.operator_id', $this->filterOperator);
+        if ($operatorFilter && $operatorFilter != 'all') {
+            $query->where('work_orders.operator_id', $operatorFilter);
+        }
+
+        // Apply pivot filters if active
+        if ($this->hasActiveFilters()) {
+            $query = $this->applyPivotFilters($query);
         }
 
         // Get machines that have work orders matching the filters
@@ -491,9 +524,14 @@ class MesWorkOrderDashboard extends Page
 
         // If no machines found (no work orders match filters), show placeholder
         if (empty($machineData)) {
-            $machineData = ['No Machines'];
+            $machineData = ['No Data Available'];
             $utilizationData = [0];
         }
+
+        Log::info('Machine utilization data with filters applied:', [
+            'machines' => $machineData,
+            'utilization' => $utilizationData,
+        ]);
 
         return [
             'machines' => $machineData,
@@ -524,7 +562,7 @@ class MesWorkOrderDashboard extends Page
                 });
         });
 
-        Log::info('Loading work orders for factory: ' . Auth::user()->factory_id);
+        Log::info('Loading work orders for factory: '.Auth::user()->factory_id);
 
         // Use the new filter variables (selectedStatus, etc.) with fallback to legacy variables
         $statusFilter = $this->selectedStatus ?: $this->filterStatus;
@@ -535,26 +573,26 @@ class MesWorkOrderDashboard extends Page
 
         if ($statusFilter) {
             $query->where('status', $statusFilter);
-            Log::info('Filtering by status: ' . $statusFilter);
+            Log::info('Filtering by status: '.$statusFilter);
         }
         if ($machineFilter) {
             $machine = Machine::where('name', $machineFilter)->where('factory_id', Auth::user()->factory_id)->first();
             if ($machine) {
                 $query->where('machine_id', $machine->id);
-                Log::info('Filtering by machine: ' . $machineFilter . ' (ID: ' . $machine->id . ')');
+                Log::info('Filtering by machine: '.$machineFilter.' (ID: '.$machine->id.')');
             }
         }
         if ($operatorFilter) {
             $query->where('operator_id', $operatorFilter);
-            Log::info('Filtering by operator: ' . $operatorFilter);
+            Log::info('Filtering by operator: '.$operatorFilter);
         }
         if ($dateFromFilter) {
             $query->whereDate('created_at', '>=', $dateFromFilter);
-            Log::info('Filtering from date: ' . $dateFromFilter);
+            Log::info('Filtering from date: '.$dateFromFilter);
         }
         if ($dateToFilter) {
             $query->whereDate('created_at', '<=', $dateToFilter);
-            Log::info('Filtering to date: ' . $dateToFilter);
+            Log::info('Filtering to date: '.$dateToFilter);
         }
 
         // Apply pivot filters if active
@@ -577,23 +615,23 @@ class MesWorkOrderDashboard extends Page
         }
 
         // Get the SQL query for debugging
-        Log::info('Work order query SQL: ' . $query->toSql());
+        Log::info('Work order query SQL: '.$query->toSql());
         Log::info('Work order query bindings: ', $query->getBindings());
-        Log::info('Total work orders found: ' . $totalCount . ', Page: ' . $this->currentPage . '/' . $this->totalPages);
+        Log::info('Total work orders found: '.$totalCount.', Page: '.$this->currentPage.'/'.$this->totalPages);
 
         // Apply pagination
         $offset = ($this->currentPage - 1) * $this->perPage;
         $workOrders = $query->offset($offset)->limit($this->perPage)->get();
 
-        Log::info('Loaded ' . $workOrders->count() . ' work orders for page ' . $this->currentPage);
+        Log::info('Loaded '.$workOrders->count().' work orders for page '.$this->currentPage);
 
         // Debug: Check for cross-factory references
         foreach ($workOrders as $wo) {
             if ($wo->machine && $wo->machine->factory_id != $wo->factory_id) {
-                Log::warning('Cross-factory machine detected - WO: ' . $wo->id . ' (factory: ' . $wo->factory_id . '), Machine: ' . $wo->machine->id . ' (factory: ' . $wo->machine->factory_id . ')');
+                Log::warning('Cross-factory machine detected - WO: '.$wo->id.' (factory: '.$wo->factory_id.'), Machine: '.$wo->machine->id.' (factory: '.$wo->machine->factory_id.')');
             }
             if ($wo->operator && $wo->operator->factory_id != $wo->factory_id) {
-                Log::warning('Cross-factory operator detected - WO: ' . $wo->id . ' (factory: ' . $wo->factory_id . '), Operator: ' . $wo->operator->id . ' (factory: ' . $wo->operator->factory_id . ')');
+                Log::warning('Cross-factory operator detected - WO: '.$wo->id.' (factory: '.$wo->factory_id.'), Operator: '.$wo->operator->id.' (factory: '.$wo->operator->factory_id.')');
             }
         }
 
@@ -601,8 +639,8 @@ class MesWorkOrderDashboard extends Page
             // Get part number and revision through the relationship chain
             $partNumber = 'N/A';
             if ($wo->bom && $wo->bom->purchaseOrder && $wo->bom->purchaseOrder->partNumber) {
-                $partNumber = $wo->bom->purchaseOrder->partNumber->partnumber .
-                    '_' . ($wo->bom->purchaseOrder->partNumber->revision ?? '');
+                $partNumber = $wo->bom->purchaseOrder->partNumber->partnumber.
+                    '_'.($wo->bom->purchaseOrder->partNumber->revision ?? '');
             }
 
             // Calculate real progress based on produced quantities vs total quantity
@@ -619,7 +657,7 @@ class MesWorkOrderDashboard extends Page
                 $machineName = $wo->machine->name;
             } elseif ($wo->machine) {
                 // Log a warning if machine belongs to different factory
-                Log::warning('Work Order ' . $wo->id . ' has machine from different factory. WO Factory: ' . $wo->factory_id . ', Machine Factory: ' . $wo->machine->factory_id);
+                Log::warning('Work Order '.$wo->id.' has machine from different factory. WO Factory: '.$wo->factory_id.', Machine Factory: '.$wo->machine->factory_id);
                 $machineName = 'Cross-Factory Machine';
             }
 
@@ -628,16 +666,16 @@ class MesWorkOrderDashboard extends Page
                 $operatorName = $wo->operator->user->getFilamentName();
             } elseif ($wo->operator && $wo->operator->factory_id != $wo->factory_id) {
                 // Log a warning if operator belongs to different factory
-                Log::warning('Work Order ' . $wo->id . ' has operator from different factory. WO Factory: ' . $wo->factory_id . ', Operator Factory: ' . $wo->operator->factory_id);
+                Log::warning('Work Order '.$wo->id.' has operator from different factory. WO Factory: '.$wo->factory_id.', Operator Factory: '.$wo->operator->factory_id);
                 $operatorName = 'Cross-Factory Operator';
-            } elseif ($wo->operator && !$wo->operator->user) {
+            } elseif ($wo->operator && ! $wo->operator->user) {
                 $operatorName = 'Unassigned';
             }
 
             return [
                 'id' => $wo->id,
                 'factory_id' => $wo->factory_id,
-                'wo_number' => $wo->unique_id ?? ('WO-' . $wo->id),
+                'wo_number' => $wo->unique_id ?? ('WO-'.$wo->id),
                 'number' => $wo->unique_id ?? $wo->id,
                 'part_number' => $partNumber,
                 'machine' => $machineName,
@@ -651,7 +689,7 @@ class MesWorkOrderDashboard extends Page
             ];
         })->toArray();
 
-        Log::info('Mapped work orders count: ' . count($this->workOrders));
+        Log::info('Mapped work orders count: '.count($this->workOrders));
         if (count($this->workOrders) > 0) {
             Log::info('First work order: ', $this->workOrders[0]);
         }
@@ -799,52 +837,47 @@ class MesWorkOrderDashboard extends Page
 
     public function getChartConfig()
     {
+        // Always recalculate with current filters
         $this->calculateStatusDistribution();
 
-        // Create a flexible status data structure that handles both filtered and unfiltered states
+        // Create a flexible status data structure that handles filtered states
         $statusData = [];
 
-        if (!empty($this->statusDistribution)) {
+        if (! empty($this->statusDistribution)) {
             // If we have status distribution data, use it directly
             foreach ($this->statusDistribution as $status => $count) {
                 // Map status names to consistent keys for the frontend
                 switch ($status) {
                     case 'Completed':
-                        $statusData['completed'] = $count;
+                        $statusData['Completed'] = $count;
                         break;
                     case 'Start':
                     case 'In Progress':
-                        $statusData['start'] = ($statusData['start'] ?? 0) + $count;
+                        $statusData['Start'] = ($statusData['Start'] ?? 0) + $count;
                         break;
                     case 'Assigned':
-                        $statusData['assigned'] = $count;
+                        $statusData['Assigned'] = $count;
                         break;
                     case 'Hold':
                     case 'On Hold':
-                        $statusData['hold'] = ($statusData['hold'] ?? 0) + $count;
-                        break;
-                    case 'Other Statuses':
-                        $statusData['other'] = $count;
+                        $statusData['Hold'] = ($statusData['Hold'] ?? 0) + $count;
                         break;
                     default:
-                        // For any other specific status (when filtered), use the status name
-                        $statusData[strtolower($status)] = $count;
+                        // For any specific status (when filtered), preserve the exact name
+                        $statusData[$status] = $count;
                         break;
                 }
             }
         } else {
             // No data available - return empty structure
-            $statusData = [
-                'completed' => 0,
-                'start' => 0,
-                'assigned' => 0,
-                'hold' => 0
-            ];
+            $statusData = [];
         }
+
+        Log::info('Chart config status data:', $statusData);
 
         return [
             'statusData' => $statusData,
-            'machineData' => $this->getMachineUtilizationData()
+            'machineData' => $this->getMachineUtilizationData(),
         ];
     }
 
@@ -855,7 +888,7 @@ class MesWorkOrderDashboard extends Page
     public function checkDataIntegrity()
     {
         $userFactoryId = Auth::user()->factory_id;
-        Log::info('Checking data integrity for factory: ' . $userFactoryId);
+        Log::info('Checking data integrity for factory: '.$userFactoryId);
 
         // Check work orders with cross-factory machine references
         $crossFactoryMachines = WorkOrder::where('factory_id', $userFactoryId)
@@ -866,9 +899,9 @@ class MesWorkOrderDashboard extends Page
             ->get();
 
         if ($crossFactoryMachines->count() > 0) {
-            Log::warning('Found ' . $crossFactoryMachines->count() . ' work orders with cross-factory machine references');
+            Log::warning('Found '.$crossFactoryMachines->count().' work orders with cross-factory machine references');
             foreach ($crossFactoryMachines as $wo) {
-                Log::warning('WO ID: ' . $wo->id . ', WO Factory: ' . $wo->factory_id . ', Machine: ' . $wo->machine->name . ', Machine Factory: ' . $wo->machine->factory_id);
+                Log::warning('WO ID: '.$wo->id.', WO Factory: '.$wo->factory_id.', Machine: '.$wo->machine->name.', Machine Factory: '.$wo->machine->factory_id);
             }
         }
 
@@ -881,16 +914,16 @@ class MesWorkOrderDashboard extends Page
             ->get();
 
         if ($crossFactoryOperators->count() > 0) {
-            Log::warning('Found ' . $crossFactoryOperators->count() . ' work orders with cross-factory operator references');
+            Log::warning('Found '.$crossFactoryOperators->count().' work orders with cross-factory operator references');
             foreach ($crossFactoryOperators as $wo) {
                 $operatorName = $wo->operator->user ? $wo->operator->user->getFilamentName() : 'Unknown';
-                Log::warning('WO ID: ' . $wo->id . ', WO Factory: ' . $wo->factory_id . ', Operator: ' . $operatorName . ', Operator Factory: ' . $wo->operator->factory_id);
+                Log::warning('WO ID: '.$wo->id.', WO Factory: '.$wo->factory_id.', Operator: '.$operatorName.', Operator Factory: '.$wo->operator->factory_id);
             }
         }
 
         return [
             'cross_factory_machines' => $crossFactoryMachines->count(),
-            'cross_factory_operators' => $crossFactoryOperators->count()
+            'cross_factory_operators' => $crossFactoryOperators->count(),
         ];
     }
 
@@ -985,8 +1018,8 @@ class MesWorkOrderDashboard extends Page
         return $workOrders->map(function ($wo) {
             $partNumber = 'N/A';
             if ($wo->bom && $wo->bom->purchaseOrder && $wo->bom->purchaseOrder->partNumber) {
-                $partNumber = $wo->bom->purchaseOrder->partNumber->partnumber .
-                    '_' . ($wo->bom->purchaseOrder->partNumber->revision ?? '');
+                $partNumber = $wo->bom->purchaseOrder->partNumber->partnumber.
+                    '_'.($wo->bom->purchaseOrder->partNumber->revision ?? '');
             }
 
             $machineName = 'N/A';
@@ -1000,7 +1033,7 @@ class MesWorkOrderDashboard extends Page
             }
 
             return [
-                'wo_number' => $wo->unique_id ?? ('WO-' . $wo->id),
+                'wo_number' => $wo->unique_id ?? ('WO-'.$wo->id),
                 'machine' => $machineName,
                 'operator' => $operatorName,
                 'status' => $wo->status,
@@ -1015,7 +1048,7 @@ class MesWorkOrderDashboard extends Page
 
     public function toggleFilterValue(string $filterType, string $value)
     {
-        if (!isset($this->selectedFilterValues[$filterType])) {
+        if (! isset($this->selectedFilterValues[$filterType])) {
             $this->selectedFilterValues[$filterType] = [];
         }
 
@@ -1048,7 +1081,7 @@ class MesWorkOrderDashboard extends Page
     public function addToPivotSection($field, $section)
     {
         // Log the incoming field for debugging
-        Log::info("Adding field to pivot section", ['field' => $field, 'section' => $section]);
+        Log::info('Adding field to pivot section', ['field' => $field, 'section' => $section]);
 
         // Remove from other sections first
         $this->removeFromAllPivotSections($field);
@@ -1056,26 +1089,26 @@ class MesWorkOrderDashboard extends Page
         // Add to the specified section
         switch ($section) {
             case 'rows':
-                if (!in_array($field, $this->pivotRows)) {
+                if (! in_array($field, $this->pivotRows)) {
                     $this->pivotRows[] = $field;
                 }
                 break;
             case 'columns':
-                if (!in_array($field, $this->pivotColumns)) {
+                if (! in_array($field, $this->pivotColumns)) {
                     $this->pivotColumns[] = $field;
                 }
                 break;
             case 'values':
-                if (!in_array($field, $this->pivotValues)) {
+                if (! in_array($field, $this->pivotValues)) {
                     $this->pivotValues[] = $field;
                 }
                 break;
         }
 
-        Log::info("Pivot sections after adding field", [
+        Log::info('Pivot sections after adding field', [
             'rows' => $this->pivotRows,
             'columns' => $this->pivotColumns,
-            'values' => $this->pivotValues
+            'values' => $this->pivotValues,
         ]);
     }
 
@@ -1083,22 +1116,22 @@ class MesWorkOrderDashboard extends Page
     {
         switch ($section) {
             case 'rows':
-                $this->pivotRows = array_values(array_filter($this->pivotRows, fn($item) => $item !== $field));
+                $this->pivotRows = array_values(array_filter($this->pivotRows, fn ($item) => $item !== $field));
                 break;
             case 'columns':
-                $this->pivotColumns = array_values(array_filter($this->pivotColumns, fn($item) => $item !== $field));
+                $this->pivotColumns = array_values(array_filter($this->pivotColumns, fn ($item) => $item !== $field));
                 break;
             case 'values':
-                $this->pivotValues = array_values(array_filter($this->pivotValues, fn($item) => $item !== $field));
+                $this->pivotValues = array_values(array_filter($this->pivotValues, fn ($item) => $item !== $field));
                 break;
         }
     }
 
     private function removeFromAllPivotSections($field)
     {
-        $this->pivotRows = array_values(array_filter($this->pivotRows, fn($item) => $item !== $field));
-        $this->pivotColumns = array_values(array_filter($this->pivotColumns, fn($item) => $item !== $field));
-        $this->pivotValues = array_values(array_filter($this->pivotValues, fn($item) => $item !== $field));
+        $this->pivotRows = array_values(array_filter($this->pivotRows, fn ($item) => $item !== $field));
+        $this->pivotColumns = array_values(array_filter($this->pivotColumns, fn ($item) => $item !== $field));
+        $this->pivotValues = array_values(array_filter($this->pivotValues, fn ($item) => $item !== $field));
     }
 
     public function generatePivotTable()
@@ -1106,13 +1139,14 @@ class MesWorkOrderDashboard extends Page
         if (empty($this->pivotRows) && empty($this->pivotColumns)) {
             $this->pivotGenerated = false;
             $this->pivotData = [];
+
             return;
         }
 
         Log::info('Generating pivot table', [
             'rows' => $this->pivotRows,
             'columns' => $this->pivotColumns,
-            'values' => $this->pivotValues
+            'values' => $this->pivotValues,
         ]);
 
         // Get work orders data based on current filters
@@ -1121,6 +1155,7 @@ class MesWorkOrderDashboard extends Page
         if (empty($workOrdersData)) {
             $this->pivotGenerated = false;
             $this->pivotData = [];
+
             return;
         }
 
@@ -1162,12 +1197,12 @@ class MesWorkOrderDashboard extends Page
 
         $workOrders = $query->get();
 
-        Log::info("Retrieved work orders for pivot", ['count' => $workOrders->count()]);
+        Log::info('Retrieved work orders for pivot', ['count' => $workOrders->count()]);
         if ($workOrders->count() > 0) {
-            Log::info("First work order raw data", [
+            Log::info('First work order raw data', [
                 'status' => $workOrders->first()->status,
                 'machine_name' => $workOrders->first()->machine?->name,
-                'operator_name' => $workOrders->first()->operator?->user?->getFilamentName()
+                'operator_name' => $workOrders->first()->operator?->user?->getFilamentName(),
             ]);
         }
 
@@ -1175,8 +1210,8 @@ class MesWorkOrderDashboard extends Page
         $mappedData = $workOrders->map(function ($wo) {
             $partNumber = 'N/A';
             if ($wo->bom && $wo->bom->purchaseOrder && $wo->bom->purchaseOrder->partNumber) {
-                $partNumber = $wo->bom->purchaseOrder->partNumber->partnumber .
-                    '_' . ($wo->bom->purchaseOrder->partNumber->revision ?? '');
+                $partNumber = $wo->bom->purchaseOrder->partNumber->partnumber.
+                    '_'.($wo->bom->purchaseOrder->partNumber->revision ?? '');
             }
 
             $machineName = 'N/A';
@@ -1190,7 +1225,7 @@ class MesWorkOrderDashboard extends Page
             }
 
             $mappedRow = [
-                'wo_number' => $wo->unique_id ?? ('WO-' . $wo->id),
+                'wo_number' => $wo->unique_id ?? ('WO-'.$wo->id),
                 'machine' => $machineName,
                 'operator' => $operatorName,
                 'status' => $wo->status, // Make sure this is correctly mapped
@@ -1203,15 +1238,15 @@ class MesWorkOrderDashboard extends Page
 
             // Log the first mapped row for debugging
             static $logged = false;
-            if (!$logged) {
-                Log::info("First mapped work order for pivot", $mappedRow);
+            if (! $logged) {
+                Log::info('First mapped work order for pivot', $mappedRow);
                 $logged = true;
             }
 
             return $mappedRow;
         })->toArray();
 
-        Log::info("Mapped work orders for pivot", ['count' => count($mappedData)]);
+        Log::info('Mapped work orders for pivot', ['count' => count($mappedData)]);
 
         return $mappedData;
     }
@@ -1229,12 +1264,12 @@ class MesWorkOrderDashboard extends Page
             $columnKey = $this->buildKey($row, $this->pivotColumns);
 
             // Initialize if not exists
-            if (!isset($pivot[$rowKey])) {
+            if (! isset($pivot[$rowKey])) {
                 $pivot[$rowKey] = [];
                 $pivot[$rowKey]['_row_data'] = $this->extractKeyData($row, $this->pivotRows);
             }
 
-            if (!isset($pivot[$rowKey][$columnKey])) {
+            if (! isset($pivot[$rowKey][$columnKey])) {
                 $pivot[$rowKey][$columnKey] = [];
                 $pivot[$rowKey][$columnKey]['_column_data'] = $this->extractKeyData($row, $this->pivotColumns);
             }
@@ -1243,7 +1278,7 @@ class MesWorkOrderDashboard extends Page
             foreach ($this->pivotValues as $valueField) {
                 $value = $row[$valueField] ?? 0;
 
-                if (!isset($pivot[$rowKey][$columnKey][$valueField])) {
+                if (! isset($pivot[$rowKey][$columnKey][$valueField])) {
                     $pivot[$rowKey][$columnKey][$valueField] = 0;
                 }
 
@@ -1254,7 +1289,7 @@ class MesWorkOrderDashboard extends Page
                 }
 
                 // Track totals
-                if (!isset($totals[$valueField])) {
+                if (! isset($totals[$valueField])) {
                     $totals[$valueField] = 0;
                 }
                 if (is_numeric($value)) {
@@ -1267,7 +1302,7 @@ class MesWorkOrderDashboard extends Page
             'data' => $pivot,
             'totals' => $totals,
             'columns' => $this->getUniqueColumnKeys($data),
-            'rows' => array_keys($pivot)
+            'rows' => array_keys($pivot),
         ];
     }
 
@@ -1283,15 +1318,15 @@ class MesWorkOrderDashboard extends Page
             $parts[] = $value;
 
             // Log field access for debugging
-            Log::info("Building key for field", [
+            Log::info('Building key for field', [
                 'field' => $field,
                 'value' => $value,
-                'available_keys' => array_keys($row)
+                'available_keys' => array_keys($row),
             ]);
         }
 
         $key = implode(' | ', $parts);
-        Log::info("Built key", ['fields' => $fields, 'key' => $key]);
+        Log::info('Built key', ['fields' => $fields, 'key' => $key]);
 
         return $key;
     }
@@ -1302,6 +1337,7 @@ class MesWorkOrderDashboard extends Page
         foreach ($fields as $field) {
             $data[$field] = $row[$field] ?? 'N/A';
         }
+
         return $data;
     }
 
@@ -1310,10 +1346,11 @@ class MesWorkOrderDashboard extends Page
         $columns = [];
         foreach ($data as $row) {
             $columnKey = $this->buildKey($row, $this->pivotColumns);
-            if (!in_array($columnKey, $columns)) {
+            if (! in_array($columnKey, $columns)) {
                 $columns[] = $columnKey;
             }
         }
+
         return $columns;
     }
 
@@ -1334,7 +1371,7 @@ class MesWorkOrderDashboard extends Page
     private function applyPivotFilters($query)
     {
         // Apply WorkOrderNo filter
-        if (!empty($this->selectedFilterValues['workOrderNo'])) {
+        if (! empty($this->selectedFilterValues['workOrderNo'])) {
             $query->where(function ($q) {
                 foreach ($this->selectedFilterValues['workOrderNo'] as $woNumber) {
                     $q->orWhere('unique_id', $woNumber)
@@ -1344,7 +1381,7 @@ class MesWorkOrderDashboard extends Page
         }
 
         // Apply Machine filter
-        if (!empty($this->selectedFilterValues['machine'])) {
+        if (! empty($this->selectedFilterValues['machine'])) {
             $machineIds = Machine::whereIn('name', $this->selectedFilterValues['machine'])
                 ->where('factory_id', Auth::user()->factory_id)
                 ->pluck('id');
@@ -1354,13 +1391,13 @@ class MesWorkOrderDashboard extends Page
         }
 
         // Apply Operator filter
-        if (!empty($this->selectedFilterValues['operator'])) {
+        if (! empty($this->selectedFilterValues['operator'])) {
             $operatorIds = Operator::whereHas('user', function ($q) {
                 $q->where(function ($query) {
                     foreach ($this->selectedFilterValues['operator'] as $operatorName) {
-                        $query->orWhere('first_name', 'LIKE', '%' . $operatorName . '%')
-                            ->orWhere('last_name', 'LIKE', '%' . $operatorName . '%')
-                            ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ['%' . $operatorName . '%']);
+                        $query->orWhere('first_name', 'LIKE', '%'.$operatorName.'%')
+                            ->orWhere('last_name', 'LIKE', '%'.$operatorName.'%')
+                            ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ['%'.$operatorName.'%']);
                     }
                 });
             })->where('factory_id', Auth::user()->factory_id)->pluck('id');
@@ -1371,12 +1408,12 @@ class MesWorkOrderDashboard extends Page
         }
 
         // Apply Status filter
-        if (!empty($this->selectedFilterValues['status'])) {
+        if (! empty($this->selectedFilterValues['status'])) {
             $query->whereIn('status', $this->selectedFilterValues['status']);
         }
 
         // Apply StartTime filter
-        if (!empty($this->selectedFilterValues['startTime'])) {
+        if (! empty($this->selectedFilterValues['startTime'])) {
             $query->where(function ($q) {
                 foreach ($this->selectedFilterValues['startTime'] as $date) {
                     $q->orWhereDate('start_time', $date);

@@ -12,6 +12,11 @@ class WorkOrderQtyTrendChart extends ChartWidget
     public ?WorkOrder $workOrder = null;
 
     protected static ?string $heading = 'Work Order Qty Trend';
+    
+    protected int | string | array $columnSpan = [
+        'md' => 1,
+        'xl' => 1,
+    ];
 
     protected function getData(): array
     {

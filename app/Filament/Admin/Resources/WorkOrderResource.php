@@ -51,11 +51,10 @@ class WorkOrderResource extends Resource
                             ->get()
                             ->mapWithKeys(function ($partNumber) {
                                 return [
-                                    $partNumber->id => $partNumber->partnumber . ' - ' . $partNumber->revision,
+                                    $partNumber->id => $partNumber->partnumber.' - '.$partNumber->revision,
                                 ];
                             });
                     })
-                    ->required()
                     ->searchable()
                     ->reactive()
                     ->preload()
@@ -111,7 +110,7 @@ class WorkOrderResource extends Resource
                             ->where('factory_id', \Illuminate\Support\Facades\Auth::user()->factory_id)
                             ->active()
                             ->get()
-                            ->mapWithKeys(fn($machine) => [
+                            ->mapWithKeys(fn ($machine) => [
                                 (int) $machine->id => "Asset ID: {$machine->assetId} - Name: {$machine->name}",
                             ])
                             ->toArray();
@@ -132,7 +131,7 @@ class WorkOrderResource extends Resource
                                     }
                                 }
                             };
-                        }
+                        },
                     ])
                     ->afterStateUpdated(function (callable $get, callable $set, $state) {
                         // Only validate if all required fields are filled and this is not the initial load
@@ -211,14 +210,73 @@ class WorkOrderResource extends Resource
 
                         return Operator::where('factory_id', $factoryId)
                             ->where('operator_proficiency_id', $operatorProficiencyId) // Filter by proficiency
-                            ->with('user') // Get the associated user (operator)
+                            ->with(['user', 'shift']) // Get the associated user and shift
                             ->get()
                             ->mapWithKeys(function ($operator) {
-                                return [$operator->id => $operator->user->first_name . ' ' . $operator->user->last_name];
+                                $shiftInfo = $operator->shift
+                                    ? " ({$operator->shift->name}: {$operator->shift->start_time}-{$operator->shift->end_time})"
+                                    : '';
+
+                                return [$operator->id => $operator->user->first_name.' '.$operator->user->last_name.$shiftInfo];
                             });
                     })
                     ->searchable()
-                    ->required(),
+                    ->required()
+                    ->reactive()
+                    ->helperText(function (callable $get) {
+                        $operatorId = $get('operator_id');
+                        $startTime = $get('start_time');
+                        $endTime = $get('end_time');
+                        $factoryId = Auth::user()->factory_id ?? null;
+
+                        if (! $operatorId || ! $startTime || ! $endTime || ! $factoryId) {
+                            return null;
+                        }
+
+                        try {
+                            $validation = WorkOrder::validateScheduling([
+                                'machine_id' => $get('machine_id'),
+                                'operator_id' => $operatorId,
+                                'factory_id' => $factoryId,
+                                'start_time' => $startTime,
+                                'end_time' => $endTime,
+                                'status' => $get('status'),
+                                'id' => $get('id'),
+                            ]);
+
+                            // Check for shift conflicts and show prominent warning
+                            if (! empty($validation['shift_conflicts'])) {
+                                $shiftConflict = $validation['shift_conflicts'][0];
+
+                                return '⚠️ SHIFT CONFLICT: '.$shiftConflict['message'];
+                            }
+                        } catch (\Exception $e) {
+                            return null;
+                        }
+
+                        return null;
+                    })
+                    ->rules([
+                        function (callable $get) {
+                            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                $startTime = $get('start_time');
+                                $endTime = $get('end_time');
+
+                                if ($value && $startTime && $endTime) {
+                                    $errorMessage = self::getOperatorSchedulingValidationError($get, $value, $startTime, $endTime);
+                                    if ($errorMessage) {
+                                        $fail($errorMessage);
+                                    }
+                                }
+                            };
+                        },
+                    ])
+                    ->afterStateUpdated(function (callable $get, callable $set, $state) {
+                        // Only validate if all required fields are filled and this is not the initial load
+                        if ($state && $get('start_time') && $get('end_time')) {
+                            self::validateOperatorScheduling($get, $set);
+                        }
+                    }),
 
                 Forms\Components\TextInput::make('time_to_complete')
                     ->label('Approx time required')
@@ -287,7 +345,7 @@ class WorkOrderResource extends Resource
                                     }
                                 }
                             };
-                        }
+                        },
                     ])
                     ->afterStateUpdated(function (callable $get, callable $set, $state) {
                         // Only validate if all required fields are filled
@@ -317,7 +375,7 @@ class WorkOrderResource extends Resource
                                     }
                                 }
                             };
-                        }
+                        },
                     ])
                     ->afterStateUpdated(function (callable $get, callable $set, $state) {
                         // Only validate if all required fields are filled
@@ -327,13 +385,14 @@ class WorkOrderResource extends Resource
                     })
                     ->helperText(function (callable $get) {
                         $bomId = $get('bom_id');
-                        if (!$bomId) {
+                        if (! $bomId) {
                             return null;
                         }
                         $bom = \App\Models\Bom::find($bomId);
                         if ($bom && $bom->lead_time) {
-                            return 'BOM Target Completion Time: ' . \Carbon\Carbon::parse($bom->lead_time)->format('d M Y');
+                            return 'BOM Target Completion Time: '.\Carbon\Carbon::parse($bom->lead_time)->format('d M Y');
                         }
+
                         return null;
                     })
                     ->reactive(),
@@ -350,7 +409,7 @@ class WorkOrderResource extends Resource
                                 $status = $get('status');
                                 $factoryId = Auth::user()->factory_id ?? null;
 
-                                if (!$machineId || !$factoryId) {
+                                if (! $machineId || ! $factoryId) {
                                     return new \Illuminate\Support\HtmlString('<div class="text-gray-500 italic">Select a machine to see status</div>');
                                 }
 
@@ -360,7 +419,7 @@ class WorkOrderResource extends Resource
                                         ->where('factory_id', $factoryId)
                                         ->first();
 
-                                    if (!$machine) {
+                                    if (! $machine) {
                                         return new \Illuminate\Support\HtmlString('<div class="text-red-600">⚠️ Machine not found or belongs to different factory</div>');
                                     }
 
@@ -369,7 +428,7 @@ class WorkOrderResource extends Resource
                                     // Check if user is trying to start this work order
                                     if ($status === 'Start') {
                                         $startValidation = WorkOrder::validateStartStatusTransition($machineId, $factoryId, $get('id'));
-                                        if (!$startValidation['can_start']) {
+                                        if (! $startValidation['can_start']) {
                                             $conflictingWO = $startValidation['conflicting_work_order'];
                                             $operatorName = $conflictingWO->operator?->user
                                                 ? "{$conflictingWO->operator->user->first_name} {$conflictingWO->operator->user->last_name}"
@@ -385,17 +444,17 @@ class WorkOrderResource extends Resource
                                             if ($conflictingWO->status === 'Start') {
                                                 // Work order is actually running
                                                 return new \Illuminate\Support\HtmlString(
-                                                    '<div class="bg-red-50 border border-red-200 rounded-lg p-3">' .
-                                                        '<div class="flex items-center text-red-800 font-semibold mb-2">' .
-                                                        '<span class="text-lg mr-2">🔴</span>' .
-                                                        '<span>CANNOT START ' . htmlspecialchars($machineName) . '</span>' .
-                                                        '</div>' .
-                                                        '<div class="text-red-700 text-sm">' .
-                                                        'Already running <a href="' . $woLink . '" class="font-medium text-red-600 underline hover:text-red-800" target="_blank">WO #' . htmlspecialchars($conflictingWO->unique_id) . '</a><br>' .
-                                                        '<span class="text-gray-600">Operator:</span> ' . htmlspecialchars($operatorName) . '<br>' .
-                                                        '<span class="text-gray-600">Est. completion:</span> ' . htmlspecialchars($estimatedCompletion) . '<br>' .
-                                                        '<span class="text-gray-600 italic">Complete or hold the running work order first.</span>' .
-                                                        '</div>' .
+                                                    '<div class="bg-red-50 border border-red-200 rounded-lg p-3">'.
+                                                        '<div class="flex items-center text-red-800 font-semibold mb-2">'.
+                                                        '<span class="text-lg mr-2">🔴</span>'.
+                                                        '<span>CANNOT START '.htmlspecialchars($machineName).'</span>'.
+                                                        '</div>'.
+                                                        '<div class="text-red-700 text-sm">'.
+                                                        'Already running <a href="'.$woLink.'" class="font-medium text-red-600 underline hover:text-red-800" target="_blank">WO #'.htmlspecialchars($conflictingWO->unique_id).'</a><br>'.
+                                                        '<span class="text-gray-600">Operator:</span> '.htmlspecialchars($operatorName).'<br>'.
+                                                        '<span class="text-gray-600">Est. completion:</span> '.htmlspecialchars($estimatedCompletion).'<br>'.
+                                                        '<span class="text-gray-600 italic">Complete or hold the running work order first.</span>'.
+                                                        '</div>'.
                                                         '</div>'
                                                 );
                                             } else {
@@ -404,17 +463,17 @@ class WorkOrderResource extends Resource
                                                 $scheduledEnd = \Carbon\Carbon::parse($conflictingWO->end_time)->format('M d, H:i');
 
                                                 return new \Illuminate\Support\HtmlString(
-                                                    '<div class="bg-orange-50 border border-orange-200 rounded-lg p-3">' .
-                                                        '<div class="flex items-center text-orange-800 font-semibold mb-2">' .
-                                                        '<span class="text-lg mr-2">⏰</span>' .
-                                                        '<span>SCHEDULED CONFLICT ' . htmlspecialchars($machineName) . '</span>' .
-                                                        '</div>' .
-                                                        '<div class="text-orange-700 text-sm">' .
-                                                        'Conflicts with planned <a href="' . $woLink . '" class="font-medium text-orange-600 underline hover:text-orange-800" target="_blank">WO #' . htmlspecialchars($conflictingWO->unique_id) . '</a><br>' .
-                                                        '<span class="text-gray-600">Operator:</span> ' . htmlspecialchars($operatorName) . '<br>' .
-                                                        '<span class="text-gray-600">Planned:</span> ' . htmlspecialchars($scheduledStart) . ' - ' . htmlspecialchars($scheduledEnd) . '<br>' .
-                                                        '<span class="text-gray-600 italic">This work order is scheduled to run during this time slot.</span>' .
-                                                        '</div>' .
+                                                    '<div class="bg-orange-50 border border-orange-200 rounded-lg p-3">'.
+                                                        '<div class="flex items-center text-orange-800 font-semibold mb-2">'.
+                                                        '<span class="text-lg mr-2">⏰</span>'.
+                                                        '<span>SCHEDULED CONFLICT '.htmlspecialchars($machineName).'</span>'.
+                                                        '</div>'.
+                                                        '<div class="text-orange-700 text-sm">'.
+                                                        'Conflicts with planned <a href="'.$woLink.'" class="font-medium text-orange-600 underline hover:text-orange-800" target="_blank">WO #'.htmlspecialchars($conflictingWO->unique_id).'</a><br>'.
+                                                        '<span class="text-gray-600">Operator:</span> '.htmlspecialchars($operatorName).'<br>'.
+                                                        '<span class="text-gray-600">Planned:</span> '.htmlspecialchars($scheduledStart).' - '.htmlspecialchars($scheduledEnd).'<br>'.
+                                                        '<span class="text-gray-600 italic">This work order is scheduled to run during this time slot.</span>'.
+                                                        '</div>'.
                                                         '</div>'
                                                 );
                                             }
@@ -425,20 +484,20 @@ class WorkOrderResource extends Resource
                                     if (WorkOrder::isMachineCurrentlyOccupied($machineId, $factoryId)) {
                                         $currentWO = WorkOrder::getCurrentRunningWorkOrder($machineId, $factoryId);
                                         // Don't show as occupied if it's the current work order being edited
-                                        if (!$get('id') || $currentWO->id !== $get('id')) {
+                                        if (! $get('id') || $currentWO->id !== $get('id')) {
                                             $woLink = url("/admin/{$factoryId}/work-orders/{$currentWO->id}");
                                             $estimatedCompletion = \Carbon\Carbon::parse($currentWO->end_time)->format('M d, H:i');
 
                                             return new \Illuminate\Support\HtmlString(
-                                                '<div class="bg-red-50 border border-red-200 rounded-lg p-3">' .
-                                                    '<div class="flex items-center text-red-800 font-semibold mb-2">' .
-                                                    '<span class="text-lg mr-2">🔴</span>' .
-                                                    '<span>OCCUPIED ' . htmlspecialchars($machineName) . '</span>' .
-                                                    '</div>' .
-                                                    '<div class="text-red-700 text-sm">' .
-                                                    'Running <a href="' . $woLink . '" class="font-medium text-red-600 underline hover:text-red-800" target="_blank">WO #' . htmlspecialchars($currentWO->unique_id) . '</a><br>' .
-                                                    '<span class="text-gray-600">Est. completion:</span> ' . htmlspecialchars($estimatedCompletion) .
-                                                    '</div>' .
+                                                '<div class="bg-red-50 border border-red-200 rounded-lg p-3">'.
+                                                    '<div class="flex items-center text-red-800 font-semibold mb-2">'.
+                                                    '<span class="text-lg mr-2">🔴</span>'.
+                                                    '<span>OCCUPIED '.htmlspecialchars($machineName).'</span>'.
+                                                    '</div>'.
+                                                    '<div class="text-red-700 text-sm">'.
+                                                    'Running <a href="'.$woLink.'" class="font-medium text-red-600 underline hover:text-red-800" target="_blank">WO #'.htmlspecialchars($currentWO->unique_id).'</a><br>'.
+                                                    '<span class="text-gray-600">Est. completion:</span> '.htmlspecialchars($estimatedCompletion).
+                                                    '</div>'.
                                                     '</div>'
                                             );
                                         }
@@ -452,48 +511,49 @@ class WorkOrderResource extends Resource
                                             'start_time' => $startTime,
                                             'end_time' => $endTime,
                                             'status' => $status,
-                                            'id' => $get('id') // For edit mode
+                                            'id' => $get('id'), // For edit mode
                                         ]);
 
-                                        if (!$validation['is_valid']) {
+                                        if (! $validation['is_valid']) {
                                             $conflictCount = count($validation['conflicts']);
+
                                             return new \Illuminate\Support\HtmlString(
-                                                '<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">' .
-                                                    '<div class="flex items-center text-yellow-800 font-semibold">' .
-                                                    '<span class="text-lg mr-2">⚠️</span>' .
-                                                    '<span>CONFLICTS DETECTED ' . htmlspecialchars($machineName) . '</span>' .
-                                                    '</div>' .
-                                                    '<div class="text-yellow-700 text-sm mt-1">' .
-                                                    htmlspecialchars($conflictCount) . ' scheduling conflict(s) found' .
-                                                    '</div>' .
+                                                '<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">'.
+                                                    '<div class="flex items-center text-yellow-800 font-semibold">'.
+                                                    '<span class="text-lg mr-2">⚠️</span>'.
+                                                    '<span>CONFLICTS DETECTED '.htmlspecialchars($machineName).'</span>'.
+                                                    '</div>'.
+                                                    '<div class="text-yellow-700 text-sm mt-1">'.
+                                                    htmlspecialchars($conflictCount).' scheduling conflict(s) found'.
+                                                    '</div>'.
                                                     '</div>'
                                             );
                                         }
                                     }
 
                                     return new \Illuminate\Support\HtmlString(
-                                        '<div class="bg-green-50 border border-green-200 rounded-lg p-3">' .
-                                            '<div class="flex items-center text-green-800 font-semibold">' .
-                                            '<span class="text-lg mr-2">🟢</span>' .
-                                            '<span>AVAILABLE ' . htmlspecialchars($machineName) . '</span>' .
-                                            '</div>' .
-                                            '<div class="text-green-700 text-sm mt-1">' .
-                                            'Machine is ready for scheduling' .
-                                            '</div>' .
+                                        '<div class="bg-green-50 border border-green-200 rounded-lg p-3">'.
+                                            '<div class="flex items-center text-green-800 font-semibold">'.
+                                            '<span class="text-lg mr-2">🟢</span>'.
+                                            '<span>AVAILABLE '.htmlspecialchars($machineName).'</span>'.
+                                            '</div>'.
+                                            '<div class="text-green-700 text-sm mt-1">'.
+                                            'Machine is ready for scheduling'.
+                                            '</div>'.
                                             '</div>'
                                     );
                                 } catch (\Exception $e) {
                                     // Log the actual error for debugging
-                                    \Illuminate\Support\Facades\Log::error('Machine status check failed: ' . $e->getMessage(), [
+                                    \Illuminate\Support\Facades\Log::error('Machine status check failed: '.$e->getMessage(), [
                                         'exception' => $e,
                                         'machine_id' => $machineId,
                                         'factory_id' => $factoryId,
-                                        'status' => $status
+                                        'status' => $status,
                                     ]);
 
                                     return new \Illuminate\Support\HtmlString(
-                                        '<div class="text-red-500 italic">Unable to check machine status<br>' .
-                                            '<small>Error: ' . htmlspecialchars($e->getMessage()) . '</small></div>'
+                                        '<div class="text-red-500 italic">Unable to check machine status<br>'.
+                                            '<small>Error: '.htmlspecialchars($e->getMessage()).'</small></div>'
                                     );
                                 }
                             })
@@ -506,7 +566,7 @@ class WorkOrderResource extends Resource
                                 $endTime = $get('end_time');
                                 $factoryId = Auth::user()->factory_id ?? null;
 
-                                if (!$machineId || !$factoryId) {
+                                if (! $machineId || ! $factoryId) {
                                     return new \Illuminate\Support\HtmlString('<div class="text-gray-500 italic">Select a machine to see relevant schedule</div>');
                                 }
 
@@ -530,25 +590,25 @@ class WorkOrderResource extends Resource
                                             $woEnd = \Carbon\Carbon::parse($wo->end_time);
 
                                             $includeInList = false;
-                                            $icon = "📅";
-                                            $status = "";
-                                            $bgColor = "bg-blue-50 border-blue-200";
-                                            $textColor = "text-blue-800";
+                                            $icon = '📅';
+                                            $status = '';
+                                            $bgColor = 'bg-blue-50 border-blue-200';
+                                            $textColor = 'text-blue-800';
 
                                             // Check if this WO conflicts (overlaps) with the new scheduling
                                             if ($newStart < $woEnd && $newEnd > $woStart) {
-                                                $icon = "⚠️";
-                                                $status = "CONFLICT";
-                                                $bgColor = "bg-red-50 border-red-200";
-                                                $textColor = "text-red-800";
+                                                $icon = '⚠️';
+                                                $status = 'CONFLICT';
+                                                $bgColor = 'bg-red-50 border-red-200';
+                                                $textColor = 'text-red-800';
                                                 $includeInList = true;
                                             }
                                             // Check if it's on the same date but doesn't conflict
-                                            else if ($woStart->isSameDay($newStart)) {
-                                                $icon = "📍";
-                                                $status = "Same Day";
-                                                $bgColor = "bg-yellow-50 border-yellow-200";
-                                                $textColor = "text-yellow-800";
+                                            elseif ($woStart->isSameDay($newStart)) {
+                                                $icon = '📍';
+                                                $status = 'Same Day';
+                                                $bgColor = 'bg-yellow-50 border-yellow-200';
+                                                $textColor = 'text-yellow-800';
                                                 $includeInList = true;
                                             }
 
@@ -563,7 +623,7 @@ class WorkOrderResource extends Resource
                                                     'bg_color' => $bgColor,
                                                     'text_color' => $textColor,
                                                     'start_formatted' => $woStart->format('M d, H:i'),
-                                                    'end_formatted' => $woEnd->format('H:i')
+                                                    'end_formatted' => $woEnd->format('H:i'),
                                                 ];
                                             }
                                         }
@@ -587,7 +647,7 @@ class WorkOrderResource extends Resource
                                                 'bg_color' => 'bg-blue-50 border-blue-200',
                                                 'text_color' => 'text-blue-800',
                                                 'start_formatted' => \Carbon\Carbon::parse($wo->start_time)->format('M d, H:i'),
-                                                'end_formatted' => \Carbon\Carbon::parse($wo->end_time)->format('H:i')
+                                                'end_formatted' => \Carbon\Carbon::parse($wo->end_time)->format('H:i'),
                                             ];
                                         }
                                     }
@@ -596,12 +656,13 @@ class WorkOrderResource extends Resource
                                         $message = $startTime && $endTime ?
                                             'No conflicting or same-day work orders found' :
                                             'No upcoming scheduled work orders';
+
                                         return new \Illuminate\Support\HtmlString(
-                                            '<div class="bg-green-50 border border-green-200 rounded-lg p-3">' .
-                                                '<div class="flex items-center text-green-800">' .
-                                                '<span class="text-lg mr-2">✅</span>' .
-                                                '<span>' . htmlspecialchars($message) . '</span>' .
-                                                '</div>' .
+                                            '<div class="bg-green-50 border border-green-200 rounded-lg p-3">'.
+                                                '<div class="flex items-center text-green-800">'.
+                                                '<span class="text-lg mr-2">✅</span>'.
+                                                '<span>'.htmlspecialchars($message).'</span>'.
+                                                '</div>'.
                                                 '</div>'
                                         );
                                     }
@@ -613,20 +674,20 @@ class WorkOrderResource extends Resource
                                             ? "{$item['work_order']->operator->user->first_name} {$item['work_order']->operator->user->last_name}"
                                             : 'Unassigned';
 
-                                        $content .= '<div class="' . $item['bg_color'] . ' border rounded-lg p-3">' .
-                                            '<div class="flex items-center justify-between mb-2">' .
-                                            '<div class="flex items-center">' .
-                                            '<span class="text-lg mr-2">' . $item['icon'] . '</span>' .
-                                            '<a href="' . $item['link'] . '" class="font-medium ' . $item['text_color'] . ' underline hover:opacity-80" target="_blank">' .
-                                            'WO #' . htmlspecialchars($item['work_order']->unique_id) . '</a>' .
-                                            '</div>' .
-                                            '<span class="px-2 py-1 text-xs rounded-full bg-white ' . $item['text_color'] . ' font-medium">' .
-                                            htmlspecialchars($item['status']) . '</span>' .
-                                            '</div>' .
-                                            '<div class="text-sm ' . $item['text_color'] . '">' .
-                                            '<div><span class="font-medium">Time:</span> ' . htmlspecialchars($item['start_formatted']) . ' - ' . htmlspecialchars($item['end_formatted']) . '</div>' .
-                                            '<div><span class="font-medium">Operator:</span> ' . htmlspecialchars($operatorName) . '</div>' .
-                                            '</div>' .
+                                        $content .= '<div class="'.$item['bg_color'].' border rounded-lg p-3">'.
+                                            '<div class="flex items-center justify-between mb-2">'.
+                                            '<div class="flex items-center">'.
+                                            '<span class="text-lg mr-2">'.$item['icon'].'</span>'.
+                                            '<a href="'.$item['link'].'" class="font-medium '.$item['text_color'].' underline hover:opacity-80" target="_blank">'.
+                                            'WO #'.htmlspecialchars($item['work_order']->unique_id).'</a>'.
+                                            '</div>'.
+                                            '<span class="px-2 py-1 text-xs rounded-full bg-white '.$item['text_color'].' font-medium">'.
+                                            htmlspecialchars($item['status']).'</span>'.
+                                            '</div>'.
+                                            '<div class="text-sm '.$item['text_color'].'">'.
+                                            '<div><span class="font-medium">Time:</span> '.htmlspecialchars($item['start_formatted']).' - '.htmlspecialchars($item['end_formatted']).'</div>'.
+                                            '<div><span class="font-medium">Operator:</span> '.htmlspecialchars($operatorName).'</div>'.
+                                            '</div>'.
                                             '</div>';
                                     }
                                     $content .= '</div>';
@@ -634,17 +695,17 @@ class WorkOrderResource extends Resource
                                     return new \Illuminate\Support\HtmlString($content);
                                 } catch (\Exception $e) {
                                     // Log the actual error for debugging
-                                    \Illuminate\Support\Facades\Log::error('Schedule information failed: ' . $e->getMessage(), [
+                                    \Illuminate\Support\Facades\Log::error('Schedule information failed: '.$e->getMessage(), [
                                         'exception' => $e,
                                         'machine_id' => $machineId,
                                         'factory_id' => $factoryId,
                                         'start_time' => $startTime,
-                                        'end_time' => $endTime
+                                        'end_time' => $endTime,
                                     ]);
 
                                     return new \Illuminate\Support\HtmlString(
-                                        '<div class="text-red-500 italic">Unable to load schedule information<br>' .
-                                            '<small>Error: ' . htmlspecialchars($e->getMessage()) . '</small></div>'
+                                        '<div class="text-red-500 italic">Unable to load schedule information<br>'.
+                                            '<small>Error: '.htmlspecialchars($e->getMessage()).'</small></div>'
                                     );
                                 }
                             })
@@ -652,6 +713,151 @@ class WorkOrderResource extends Resource
                     ])
                     ->visible(function (callable $get) {
                         return $get('machine_id') && Auth::user()->factory_id ?? false;
+                    })
+                    ->collapsible()
+                    ->collapsed(),
+
+                // Operator Scheduling Information Section
+                Forms\Components\Section::make('Operator Scheduling Information')
+                    ->schema([
+                        Forms\Components\Placeholder::make('operator_status')
+                            ->label('Current Operator Status')
+                            ->content(function (callable $get) {
+                                $operatorId = $get('operator_id');
+                                $startTime = $get('start_time');
+                                $endTime = $get('end_time');
+                                $status = $get('status');
+                                $factoryId = Auth::user()->factory_id ?? null;
+
+                                if (! $operatorId || ! $factoryId) {
+                                    return new \Illuminate\Support\HtmlString('<div class="text-gray-500 italic">Select an operator to see status</div>');
+                                }
+
+                                try {
+                                    // Get operator details and ensure it belongs to the same factory
+                                    $operator = \App\Models\Operator::where('id', $operatorId)
+                                        ->where('factory_id', $factoryId)
+                                        ->with(['user', 'shift'])
+                                        ->first();
+
+                                    if (! $operator) {
+                                        return new \Illuminate\Support\HtmlString('<div class="text-red-600">⚠️ Operator not found or belongs to different factory</div>');
+                                    }
+
+                                    $operatorName = "({$operator->user->first_name} {$operator->user->last_name})";
+                                    $shiftInfo = $operator->shift
+                                        ? " - Shift: {$operator->shift->name} ({$operator->shift->start_time} - {$operator->shift->end_time})"
+                                        : ' - No shift assigned';
+
+                                    // Check if operator is currently occupied
+                                    if ($operator->isCurrentlyOccupied($factoryId)) {
+                                        $currentWO = $operator->getCurrentRunningWorkOrder($factoryId);
+                                        // Don't show as occupied if it's the current work order being edited
+                                        if (! $get('id') || $currentWO->id !== $get('id')) {
+                                            $woLink = url("/admin/{$factoryId}/work-orders/{$currentWO->id}");
+                                            $estimatedCompletion = \Carbon\Carbon::parse($currentWO->end_time)->format('M d, H:i');
+
+                                            return new \Illuminate\Support\HtmlString(
+                                                '<div class="bg-red-50 border border-red-200 rounded-lg p-3">'.
+                                                    '<div class="flex items-center text-red-800 font-semibold mb-2">'.
+                                                    '<span class="text-lg mr-2">🔴</span>'.
+                                                    '<span>OCCUPIED '.htmlspecialchars($operatorName).'</span>'.
+                                                    '</div>'.
+                                                    '<div class="text-red-700 text-sm">'.
+                                                    'Working on <a href="'.$woLink.'" class="font-medium text-red-600 underline hover:text-red-800" target="_blank">WO #'.htmlspecialchars($currentWO->unique_id).'</a><br>'.
+                                                    '<span class="text-gray-600">Est. completion:</span> '.htmlspecialchars($estimatedCompletion).'<br>'.
+                                                    '<span class="text-gray-600">'.htmlspecialchars($shiftInfo).'</span>'.
+                                                    '</div>'.
+                                                    '</div>'
+                                            );
+                                        }
+                                    }
+
+                                    // If start and end times are provided, check for scheduling conflicts
+                                    if ($startTime && $endTime) {
+                                        $validation = WorkOrder::validateScheduling([
+                                            'machine_id' => $get('machine_id'),
+                                            'operator_id' => $operatorId,
+                                            'factory_id' => $factoryId,
+                                            'start_time' => $startTime,
+                                            'end_time' => $endTime,
+                                            'status' => $status,
+                                            'id' => $get('id'), // For edit mode
+                                        ]);
+
+                                        // Check for shift conflicts (warnings, not blocking)
+                                        if (! empty($validation['shift_conflicts'])) {
+                                            $shiftConflict = $validation['shift_conflicts'][0];
+
+                                            return new \Illuminate\Support\HtmlString(
+                                                '<div class="bg-orange-50 border border-orange-200 rounded-lg p-3">'.
+                                                    '<div class="flex items-center text-orange-800 font-semibold mb-2">'.
+                                                    '<span class="text-lg mr-2">⚠️</span>'.
+                                                    '<span>SHIFT CONFLICT '.htmlspecialchars($operatorName).'</span>'.
+                                                    '</div>'.
+                                                    '<div class="text-orange-700 text-sm">'.
+                                                    htmlspecialchars($shiftConflict['message']).'<br>'.
+                                                    '<span class="text-gray-600">'.htmlspecialchars($shiftInfo).'</span><br>'.
+                                                    '<span class="text-gray-600 italic">Work order is scheduled outside operator\'s shift hours.</span>'.
+                                                    '</div>'.
+                                                    '</div>'
+                                            );
+                                        }
+
+                                        // Check for operator availability conflicts (blocking)
+                                        if (! empty($validation['operator_conflicts'])) {
+                                            $operatorConflictCount = count(array_filter($validation['operator_conflicts'],
+                                                fn ($c) => $c['type'] === 'work_order_conflict'));
+
+                                            if ($operatorConflictCount > 0) {
+                                                return new \Illuminate\Support\HtmlString(
+                                                    '<div class="bg-red-50 border border-red-200 rounded-lg p-3">'.
+                                                        '<div class="flex items-center text-red-800 font-semibold mb-2">'.
+                                                        '<span class="text-lg mr-2">🚫</span>'.
+                                                        '<span>OPERATOR CONFLICTS '.htmlspecialchars($operatorName).'</span>'.
+                                                        '</div>'.
+                                                        '<div class="text-red-700 text-sm">'.
+                                                        htmlspecialchars($operatorConflictCount).' scheduling conflict(s) found<br>'.
+                                                        '<span class="text-gray-600">'.htmlspecialchars($shiftInfo).'</span><br>'.
+                                                        '<span class="text-gray-600 italic">Operator is already assigned to other work orders during this time.</span>'.
+                                                        '</div>'.
+                                                        '</div>'
+                                                );
+                                            }
+                                        }
+                                    }
+
+                                    return new \Illuminate\Support\HtmlString(
+                                        '<div class="bg-green-50 border border-green-200 rounded-lg p-3">'.
+                                            '<div class="flex items-center text-green-800 font-semibold mb-2">'.
+                                            '<span class="text-lg mr-2">🟢</span>'.
+                                            '<span>AVAILABLE '.htmlspecialchars($operatorName).'</span>'.
+                                            '</div>'.
+                                            '<div class="text-green-700 text-sm">'.
+                                            'Operator is ready for scheduling<br>'.
+                                            '<span class="text-gray-600">'.htmlspecialchars($shiftInfo).'</span>'.
+                                            '</div>'.
+                                            '</div>'
+                                    );
+                                } catch (\Exception $e) {
+                                    // Log the actual error for debugging
+                                    \Illuminate\Support\Facades\Log::error('Operator status check failed: '.$e->getMessage(), [
+                                        'exception' => $e,
+                                        'operator_id' => $operatorId,
+                                        'factory_id' => $factoryId,
+                                        'status' => $status,
+                                    ]);
+
+                                    return new \Illuminate\Support\HtmlString(
+                                        '<div class="text-red-500 italic">Unable to check operator status<br>'.
+                                            '<small>Error: '.htmlspecialchars($e->getMessage()).'</small></div>'
+                                    );
+                                }
+                            })
+                            ->live(),
+                    ])
+                    ->visible(function (callable $get) {
+                        return $get('operator_id') && Auth::user()->factory_id ?? false;
                     })
                     ->collapsible()
                     ->collapsed(),
@@ -700,13 +906,13 @@ class WorkOrderResource extends Resource
                                     if ($machineId && $factoryId) {
                                         $startValidation = WorkOrder::validateStartStatusTransition($machineId, $factoryId, $recordId);
 
-                                        if (!$startValidation['can_start']) {
+                                        if (! $startValidation['can_start']) {
                                             $fail($startValidation['message']);
                                         }
                                     }
                                 }
                             };
-                        }
+                        },
                     ])
                     ->reactive()
                     ->afterStateUpdated(function ($set, $get, $livewire, $record, $state) {
@@ -721,7 +927,7 @@ class WorkOrderResource extends Resource
                         }
                         if ($status === 'Start' && $record) {
                             $existingLog = $record->workOrderLogs()->where('status', 'Start')->first();
-                            if (!$existingLog) {
+                            if (! $existingLog) {
                                 $record->createWorkOrderLog('Start');
                             }
                         }
@@ -734,11 +940,11 @@ class WorkOrderResource extends Resource
 
                 Forms\Components\TextInput::make('material_batch')
                     ->label('Material Batch ID')
-                    ->required(fn($get, $record) => $get('status') === 'Start' && ! $record?->material_batch)
-                    ->visible(fn($get) => in_array($get('status'), ['Start', 'Hold', 'Completed']))
-                    ->disabled(fn($record) => $record && $record->material_batch)
+                    ->required(fn ($get, $record) => $get('status') === 'Start' && ! $record?->material_batch)
+                    ->visible(fn ($get) => in_array($get('status'), ['Start', 'Hold', 'Completed']))
+                    ->disabled(fn ($record) => $record && $record->material_batch)
                     ->helperText(
-                        fn($get, $record) => $get('status') === 'Start' && ! $record?->material_batch
+                        fn ($get, $record) => $get('status') === 'Start' && ! $record?->material_batch
                             ? 'Material Batch ID is required when starting the work order'
                             : null
                     ),
@@ -748,9 +954,9 @@ class WorkOrderResource extends Resource
                     ->relationship('holdReason', 'description', function ($query) {
                         return $query->where('factory_id', auth()->user()->factory_id);
                     })
-                    ->visible(fn($get) => in_array($get('status'), ['Hold']))
+                    ->visible(fn ($get) => in_array($get('status'), ['Hold']))
                     ->reactive()
-                    ->required(fn($get) => in_array($get('status'), ['Hold']))
+                    ->required(fn ($get) => in_array($get('status'), ['Hold']))
                     ->columnSpanFull(),
 
                 Forms\Components\Section::make('Quantities')
@@ -764,22 +970,22 @@ class WorkOrderResource extends Resource
                                             ->numeric()
                                             ->required()
                                             ->default(0)
-                                            ->disabled(fn($record) => $record && $record->exists),
+                                            ->disabled(fn ($record) => $record && $record->exists),
                                         Forms\Components\TextInput::make('scrapped_quantity')
                                             ->label('Scrapped Quantity')
                                             ->numeric()
                                             ->required()
                                             ->default(0)
-                                            ->disabled(fn($record) => $record && $record->exists),
+                                            ->disabled(fn ($record) => $record && $record->exists),
                                         Forms\Components\Select::make('reason_id')
                                             ->label('Scrapped Reason')
                                             ->relationship(
                                                 'reason',
                                                 'description',
-                                                fn($query) => $query->where('factory_id', Auth::user()->factory_id) // Filter reasons by factory
-                                            )->visible(fn($get) => $get('scrapped_quantity') > 0)
-                                            ->required(fn($get) => $get('scrapped_quantity') > 0)
-                                            ->disabled(fn($record) => $record && $record->exists),
+                                                fn ($query) => $query->where('factory_id', Auth::user()->factory_id) // Filter reasons by factory
+                                            )->visible(fn ($get) => $get('scrapped_quantity') > 0)
+                                            ->required(fn ($get) => $get('scrapped_quantity') > 0)
+                                            ->disabled(fn ($record) => $record && $record->exists),
                                     ]),
                             ])
                             ->columns(1)
@@ -787,7 +993,7 @@ class WorkOrderResource extends Resource
                             ->reorderable()
                             ->collapsible()
                             ->itemLabel(
-                                fn(array $state): ?string => $state['ok_quantity'] > 0 || $state['scrapped_quantity'] > 0
+                                fn (array $state): ?string => $state['ok_quantity'] > 0 || $state['scrapped_quantity'] > 0
                                     ? "OK: {$state['ok_quantity']}, Scrapped: {$state['scrapped_quantity']}"
                                     : null
                             )
@@ -822,7 +1028,7 @@ class WorkOrderResource extends Resource
                             })
                             ->createItemButtonLabel('Add Quantities')
                             ->defaultItems(1)
-                            ->visible(fn($get) => in_array($get('status'), ['Hold', 'Completed']))
+                            ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed']))
                             ->beforeStateDehydrated(function ($state, $record, $get) {
                                 if ($record && $record->exists) {
                                     return;
@@ -859,17 +1065,17 @@ class WorkOrderResource extends Resource
                                     ->label('Total OK Quantities')
                                     ->default(0)
                                     ->readonly()
-                                    ->visible(fn($get) => in_array($get('status'), ['Hold', 'Completed'])),
+                                    ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
 
                                 Forms\Components\TextInput::make('scrapped_qtys')
                                     ->label('Total Scrapped Quantities')
                                     ->default(0)
                                     ->readonly()
-                                    ->visible(fn($get) => in_array($get('status'), ['Hold', 'Completed'])),
+                                    ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
                             ]),
                     ])
                     ->columnSpanFull()
-                    ->visible(fn($get) => in_array($get('status'), ['Hold', 'Completed'])),
+                    ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
             ]);
     }
 
@@ -925,7 +1131,7 @@ class WorkOrderResource extends Resource
                     ->label('Revision'),
                 Tables\Columns\TextColumn::make('machine.name')
                     ->label('Machine')
-                    ->formatStateUsing(fn($record) => "{$record->machine->assetId}")
+                    ->formatStateUsing(fn ($record) => "{$record->machine->assetId}")
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
@@ -940,7 +1146,7 @@ class WorkOrderResource extends Resource
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->color(fn(string $state): string => match ($state) {
+                    ->color(fn (string $state): string => match ($state) {
                         'Assigned' => 'gray',
                         'Start' => 'warning',
                         'Hold' => 'danger',
@@ -973,6 +1179,7 @@ class WorkOrderResource extends Resource
                                 ];
                             }
                         }
+
                         return [];
                     })
                     ->tooltip(function ($record) {
@@ -980,9 +1187,10 @@ class WorkOrderResource extends Resource
                             $plannedEnd = \Carbon\Carbon::parse($record->end_time);
                             $bomLead = \Carbon\Carbon::parse($record->bom->lead_time)->endOfDay();
                             if ($plannedEnd->greaterThan($bomLead)) {
-                                return 'BOM Target Completion Time: ' . \Carbon\Carbon::parse($record->bom->lead_time)->format('d M Y');
+                                return 'BOM Target Completion Time: '.\Carbon\Carbon::parse($record->bom->lead_time)->format('d M Y');
                             }
                         }
+
                         return null;
                     }),
                 Tables\Columns\TextColumn::make('ok_qtys')
@@ -1028,12 +1236,12 @@ class WorkOrderResource extends Resource
                 ActionGroup::make([
                     EditAction::make()
                         ->visible(
-                            fn($record) => (auth()->user()->hasRole('Operator') && $record->status !== 'Closed') ||
+                            fn ($record) => (auth()->user()->hasRole('Operator') && $record->status !== 'Closed') ||
                                 $isAdminOrManager
                         ),
                     ViewAction::make()->hiddenLabel(),
                     Action::make('Alert Manager')
-                        ->visible(fn() => Auth::check() && Auth::user()->hasRole('Operator'))
+                        ->visible(fn () => Auth::check() && Auth::user()->hasRole('Operator'))
                         ->form([
                             Forms\Components\Textarea::make('comments')
                                 ->label('Comments')
@@ -1054,7 +1262,7 @@ class WorkOrderResource extends Resource
                         ->button(), // Ensures it's a button, not a link
 
                     Action::make('Alert Operator')
-                        ->visible(fn() => Auth::check() && (Auth::user()->hasRole('Manager') || Auth::user()->hasRole('Factory Admin')))
+                        ->visible(fn () => Auth::check() && (Auth::user()->hasRole('Manager') || Auth::user()->hasRole('Factory Admin')))
                         ->form([
                             Forms\Components\Textarea::make('comments')
                                 ->label('Comments')
@@ -1160,7 +1368,7 @@ class WorkOrderResource extends Resource
         $recordId = $get('id');
         $status = $get('status');
 
-        if (!$factoryId) {
+        if (! $factoryId) {
             return null;
         }
 
@@ -1171,26 +1379,27 @@ class WorkOrderResource extends Resource
                 'start_time' => $startTime,
                 'end_time' => $endTime,
                 'status' => $status,
-                'id' => $recordId
+                'id' => $recordId,
             ]);
 
             // Check for start status conflicts first (more critical)
-            if (isset($validation['start_validation']) && !$validation['start_validation']['can_start']) {
+            if (isset($validation['start_validation']) && ! $validation['start_validation']['can_start']) {
                 return $validation['start_validation']['message'];
             }
 
             // Check for scheduling conflicts
-            if (!$validation['is_valid']) {
+            if (! $validation['is_valid']) {
                 $conflictMessages = [];
                 foreach ($validation['conflicts'] as $conflict) {
-                    $conflictMessages[] = "Conflict with WO #{$conflict['work_order_unique_id']} ({$conflict['status']}) from " .
-                        \Carbon\Carbon::parse($conflict['planned_start'])->format('M d, H:i') .
-                        " to " . \Carbon\Carbon::parse($conflict['planned_end'])->format('M d, H:i');
+                    $conflictMessages[] = "Conflict with WO #{$conflict['work_order_unique_id']} ({$conflict['status']}) from ".
+                        \Carbon\Carbon::parse($conflict['planned_start'])->format('M d, H:i').
+                        ' to '.\Carbon\Carbon::parse($conflict['planned_end'])->format('M d, H:i');
                 }
-                return 'Machine scheduling conflict detected: ' . implode('; ', $conflictMessages);
+
+                return 'Machine scheduling conflict detected: '.implode('; ', $conflictMessages);
             }
         } catch (\Exception $e) {
-            return 'Unable to validate machine scheduling: ' . $e->getMessage();
+            return 'Unable to validate machine scheduling: '.$e->getMessage();
         }
 
         return null;
@@ -1208,7 +1417,7 @@ class WorkOrderResource extends Resource
         $recordId = $get('id'); // For edit mode
 
         // Only validate if we have all required data
-        if (!$machineId || !$startTime || !$endTime || !$factoryId) {
+        if (! $machineId || ! $startTime || ! $endTime || ! $factoryId) {
             return;
         }
 
@@ -1219,39 +1428,39 @@ class WorkOrderResource extends Resource
                 'factory_id' => $factoryId,
                 'start_time' => $startTime,
                 'end_time' => $endTime,
-                'id' => $recordId
+                'id' => $recordId,
             ];
 
             // Validate scheduling
             $validation = WorkOrder::validateScheduling($workOrderData);
 
             // Show notifications based on validation results
-            if (!$validation['is_valid']) {
+            if (! $validation['is_valid']) {
                 // Show conflict notification
                 $conflictMessages = [];
                 foreach ($validation['conflicts'] as $conflict) {
-                    $conflictMessages[] = "Conflict with WO #{$conflict['work_order_unique_id']} ({$conflict['status']}) from " .
-                        \Carbon\Carbon::parse($conflict['planned_start'])->format('M d, H:i') .
-                        " to " . \Carbon\Carbon::parse($conflict['planned_end'])->format('M d, H:i');
+                    $conflictMessages[] = "Conflict with WO #{$conflict['work_order_unique_id']} ({$conflict['status']}) from ".
+                        \Carbon\Carbon::parse($conflict['planned_start'])->format('M d, H:i').
+                        ' to '.\Carbon\Carbon::parse($conflict['planned_end'])->format('M d, H:i');
                 }
 
                 Notification::make()
                     ->title('🚨 Machine Scheduling Conflict!')
-                    ->body('The selected time slot conflicts with existing work orders:' . PHP_EOL . implode(PHP_EOL, $conflictMessages))
+                    ->body('The selected time slot conflicts with existing work orders:'.PHP_EOL.implode(PHP_EOL, $conflictMessages))
                     ->danger()
                     ->persistent()
                     ->send();
 
                 // Show recommendations if available
-                if (!empty($validation['recommendations'])) {
+                if (! empty($validation['recommendations'])) {
                     $recommendationMessages = [];
                     foreach ($validation['recommendations'] as $recommendation) {
                         if ($recommendation['type'] === 'reschedule_after_conflicts') {
-                            $recommendationMessages[] = "💡 " . $recommendation['message'];
+                            $recommendationMessages[] = '💡 '.$recommendation['message'];
                         }
                     }
 
-                    if (!empty($recommendationMessages)) {
+                    if (! empty($recommendationMessages)) {
                         Notification::make()
                             ->title('Scheduling Recommendations')
                             ->body(implode(PHP_EOL, $recommendationMessages))
@@ -1262,13 +1471,13 @@ class WorkOrderResource extends Resource
                 }
             } else {
                 // Show warnings if machine is currently occupied
-                if (!empty($validation['warnings'])) {
+                if (! empty($validation['warnings'])) {
                     foreach ($validation['warnings'] as $warning) {
                         if ($warning['type'] === 'machine_currently_occupied') {
                             Notification::make()
                                 ->title('⚠️ Machine Currently Occupied')
-                                ->body($warning['message'] . " (Est. completion: " .
-                                    \Carbon\Carbon::parse($warning['estimated_completion'])->format('M d, H:i') . ")")
+                                ->body($warning['message'].' (Est. completion: '.
+                                    \Carbon\Carbon::parse($warning['estimated_completion'])->format('M d, H:i').')')
                                 ->warning()
                                 ->send();
                         }
@@ -1280,7 +1489,162 @@ class WorkOrderResource extends Resource
             // Handle any validation errors gracefully
             Notification::make()
                 ->title('Validation Error')
-                ->body('Unable to validate machine scheduling: ' . $e->getMessage())
+                ->body('Unable to validate machine scheduling: '.$e->getMessage())
+                ->warning()
+                ->send();
+        }
+    }
+
+    /**
+     * Get operator scheduling validation error message for form rules
+     */
+    protected static function getOperatorSchedulingValidationError(callable $get, $operatorId, $startTime, $endTime): ?string
+    {
+        $factoryId = Auth::user()->factory_id ?? null;
+        $recordId = $get('id');
+        $status = $get('status');
+
+        if (! $factoryId) {
+            return null;
+        }
+
+        try {
+            $validation = WorkOrder::validateScheduling([
+                'machine_id' => $get('machine_id'),
+                'operator_id' => $operatorId,
+                'factory_id' => $factoryId,
+                'start_time' => $startTime,
+                'end_time' => $endTime,
+                'status' => $status,
+                'id' => $recordId,
+            ]);
+
+            // Check for operator availability conflicts (blocking)
+            if (! empty($validation['operator_conflicts'])) {
+                $operatorConflictCount = count(array_filter($validation['operator_conflicts'],
+                    fn ($c) => $c['type'] === 'work_order_conflict'));
+
+                if ($operatorConflictCount > 0) {
+                    return 'Operator scheduling conflict detected: operator is already assigned to other work orders during this time.';
+                }
+            }
+
+        } catch (\Exception $e) {
+            return 'Unable to validate operator scheduling: '.$e->getMessage();
+        }
+
+        return null;
+    }
+
+    /**
+     * Validate operator scheduling for conflicts and shift compliance
+     */
+    protected static function validateOperatorScheduling(callable $get, callable $set)
+    {
+        $operatorId = $get('operator_id');
+        $startTime = $get('start_time');
+        $endTime = $get('end_time');
+        $factoryId = Auth::user()->factory_id ?? null;
+        $recordId = $get('id'); // For edit mode
+
+        // Only validate if we have all required data
+        if (! $operatorId || ! $startTime || ! $endTime || ! $factoryId) {
+            return;
+        }
+
+        try {
+            // Prepare validation data
+            $workOrderData = [
+                'machine_id' => $get('machine_id'),
+                'operator_id' => $operatorId,
+                'factory_id' => $factoryId,
+                'start_time' => $startTime,
+                'end_time' => $endTime,
+                'id' => $recordId,
+            ];
+
+            // Validate scheduling
+            $validation = WorkOrder::validateScheduling($workOrderData);
+
+            // Show notifications for shift conflicts (warnings, not blocking)
+            if (! empty($validation['shift_conflicts'])) {
+                foreach ($validation['shift_conflicts'] as $conflict) {
+                    Notification::make()
+                        ->title('⚠️ Operator Shift Warning')
+                        ->body($conflict['message'])
+                        ->warning()
+                        ->send();
+                }
+            }
+
+            // Show notifications for operator availability conflicts (blocking)
+            if (! empty($validation['operator_conflicts'])) {
+                $operatorConflictCount = count(array_filter($validation['operator_conflicts'],
+                    fn ($c) => $c['type'] === 'work_order_conflict'));
+
+                if ($operatorConflictCount > 0) {
+                    $conflictMessages = [];
+                    foreach ($validation['operator_conflicts'] as $conflict) {
+                        if ($conflict['type'] === 'work_order_conflict') {
+                            $conflictMessages[] = "Conflict with WO #{$conflict['work_order_unique_id']} ({$conflict['status']}) from ".
+                                \Carbon\Carbon::parse($conflict['planned_start'])->format('M d, H:i').
+                                ' to '.\Carbon\Carbon::parse($conflict['planned_end'])->format('M d, H:i');
+                        }
+                    }
+
+                    if (! empty($conflictMessages)) {
+                        Notification::make()
+                            ->title('🚨 Operator Scheduling Conflict!')
+                            ->body('The selected time slot conflicts with operator\'s existing assignments:'.PHP_EOL.implode(PHP_EOL, $conflictMessages))
+                            ->danger()
+                            ->persistent()
+                            ->send();
+                    }
+                }
+
+                // Show operator-specific recommendations if available
+                if (! empty($validation['recommendations'])) {
+                    $recommendationMessages = [];
+                    foreach ($validation['recommendations'] as $recommendation) {
+                        if (in_array($recommendation['type'], ['reschedule_within_shift', 'reschedule_after_operator_conflicts'])) {
+                            $recommendationMessages[] = '💡 '.$recommendation['message'];
+                        }
+                    }
+
+                    if (! empty($recommendationMessages)) {
+                        Notification::make()
+                            ->title('Operator Scheduling Recommendations')
+                            ->body(implode(PHP_EOL, $recommendationMessages))
+                            ->warning()
+                            ->persistent()
+                            ->send();
+                    }
+                }
+            }
+
+            // Show warnings if operator is currently occupied
+            if (! empty($validation['warnings'])) {
+                foreach ($validation['warnings'] as $warning) {
+                    if ($warning['type'] === 'operator_shift_conflict') {
+                        Notification::make()
+                            ->title('⚠️ Shift Timing Notice')
+                            ->body($warning['message'])
+                            ->warning()
+                            ->send();
+                    } elseif ($warning['type'] === 'operator_availability_conflict') {
+                        Notification::make()
+                            ->title('🚫 Operator Not Available')
+                            ->body($warning['message'])
+                            ->danger()
+                            ->send();
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // Handle any validation errors gracefully
+            Notification::make()
+                ->title('Validation Error')
+                ->body('Unable to validate operator scheduling: '.$e->getMessage())
                 ->warning()
                 ->send();
         }

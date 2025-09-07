@@ -19,8 +19,8 @@
     $ringBgDark = '#334155'; // slate-700
 @endphp
 
-<div class="flex justify-center items-center min-h-[250px]">
-    <div class="relative w-40 h-40">
+<div class="flex flex-col md:flex-row justify-center items-center min-h-[200px] md:min-h-[250px] p-4">
+    <div class="relative w-32 h-32 sm:w-36 sm:h-36 md:w-40 md:h-40 mb-4 md:mb-0">
         {{-- Outer Ring --}}
         <div
             class="absolute inset-0 rounded-full"
@@ -38,9 +38,9 @@
         ></div>
 
         {{-- Inner Circle --}}
-        <div class="absolute inset-[12px] bg-white dark:bg-gray-900 rounded-full flex flex-col items-center justify-center text-center">
-            <div class="text-xl font-bold text-gray-900 dark:text-gray-100">{{ number_format($progress) }}%</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">
+        <div class="absolute inset-[10px] sm:inset-[11px] md:inset-[12px] bg-white dark:bg-gray-900 rounded-full flex flex-col items-center justify-center text-center">
+            <div class="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100">{{ number_format($progress) }}%</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 px-1 text-center">
                 {{ $isOverdue
                     ? 'Ended ' . $endTime->diffForHumans($now, ['parts' => 1])
                     : 'Ending in ' . $endTime->diffForHumans($now, ['parts' => 1]) }}
@@ -49,7 +49,7 @@
     </div>
 
     {{-- QTY Summary --}}
-    <div class="ml-8 space-y-2 text-sm text-gray-700 dark:text-gray-200">
+    <div class="md:ml-8 space-y-2 text-sm text-gray-700 dark:text-gray-200 text-center md:text-left">
         <div><strong>✅ OK:</strong> {{ $okQty }}</div>
         <div><strong>❌ Scrapped:</strong> {{ $scrappedQty }}</div>
         <div><strong>⏳ Pending:</strong> {{ $pendingQty }}</div>

@@ -58,26 +58,26 @@ class ViewWorkOrder extends ViewRecord
                                     </table>
                                 </div>
                                 <!-- Mobile Card -->
-                                <div class="block lg:hidden bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-300 dark:border-gray-700 mt-4">
+                                <div class="block lg:hidden bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-300 dark:border-gray-700 mt-4 overflow-hidden">
                                     <div class="bg-primary-500 text-white px-4 py-2 rounded-t-lg">
                                         General Information
                                     </div>
-                                    <div class="p-4 space-y-3">
-                                        <div>
-                                            <span class="font-bold text-black dark:text-white">BOM: </span>
-                                            <span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($bom).'</span>
+                                    <div class="p-4 space-y-3 max-w-full overflow-x-auto">
+                                        <div class="flex flex-col sm:flex-row sm:justify-between min-w-0">
+                                            <span class="font-bold text-black dark:text-white mb-1 sm:mb-0 flex-shrink-0">BOM:</span>
+                                            <span class="text-gray-900 dark:text-gray-100 break-all sm:text-right sm:ml-2">'.htmlspecialchars($bom).'</span>
                                         </div>
-                                        <div>
-                                            <span class="font-bold text-black dark:text-white">Quantity: </span>
-                                            <span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($qty).'</span>
+                                        <div class="flex flex-col sm:flex-row sm:justify-between min-w-0">
+                                            <span class="font-bold text-black dark:text-white mb-1 sm:mb-0 flex-shrink-0">Quantity:</span>
+                                            <span class="text-gray-900 dark:text-gray-100 break-all sm:text-right sm:ml-2">'.htmlspecialchars($qty).'</span>
                                         </div>
-                                        <div>
-                                            <span class="font-bold text-black dark:text-white">Machine: </span>
-                                            <span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($machine).'</span>
+                                        <div class="flex flex-col sm:flex-row sm:justify-between min-w-0">
+                                            <span class="font-bold text-black dark:text-white mb-1 sm:mb-0 flex-shrink-0">Machine:</span>
+                                            <span class="text-gray-900 dark:text-gray-100 break-all sm:text-right sm:ml-2">'.htmlspecialchars($machine).'</span>
                                         </div>
-                                        <div>
-                                            <span class="font-bold text-black dark:text-white">Operator: </span>
-                                            <span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($operator).'</span>
+                                        <div class="flex flex-col sm:flex-row sm:justify-between min-w-0">
+                                            <span class="font-bold text-black dark:text-white mb-1 sm:mb-0 flex-shrink-0">Operator:</span>
+                                            <span class="text-gray-900 dark:text-gray-100 break-all sm:text-right sm:ml-2">'.htmlspecialchars($operator).'</span>
                                         </div>
                                     </div>
                                 </div>
@@ -145,46 +145,46 @@ class ViewWorkOrder extends ViewRecord
                                     </table>
                                 </div>
                                 <!-- Mobile Card -->
-                                <div class="block lg:hidden bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-300 dark:border-gray-700 mt-4">
+                                <div class="block lg:hidden bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-300 dark:border-gray-700 mt-4 overflow-hidden">
                                     <div class="bg-primary-500 text-white px-4 py-2 rounded-t-lg">
                                         Details
                                     </div>
-                                    <div class="p-4 space-y-3">
-                                        <div>
-                                            <span class="font-bold text-black dark:text-white">Unique ID: </span>
-                                            <span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($uniqueId).'</span>
+                                    <div class="p-4 space-y-3 max-w-full overflow-x-auto">
+                                        <div class="flex flex-col sm:flex-row sm:justify-between min-w-0">
+                                            <span class="font-bold text-black dark:text-white mb-1 sm:mb-0 flex-shrink-0">Unique ID:</span>
+                                            <span class="text-gray-900 dark:text-gray-100 break-all sm:text-right sm:ml-2">'.htmlspecialchars($uniqueId).'</span>
                                         </div>
-                                        <div>
-                                            <span class="font-bold text-black dark:text-white">Part Number: </span>
-                                            <span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($partNumber).'</span>
+                                        <div class="flex flex-col sm:flex-row sm:justify-between min-w-0">
+                                            <span class="font-bold text-black dark:text-white mb-1 sm:mb-0 flex-shrink-0">Part Number:</span>
+                                            <span class="text-gray-900 dark:text-gray-100 break-all sm:text-right sm:ml-2">'.htmlspecialchars($partNumber).'</span>
                                         </div>
-                                        <div>
-                                            <span class="font-bold text-black dark:text-white">Revision: </span>
-                                            <span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($revision).'</span>
+                                        <div class="flex flex-col sm:flex-row sm:justify-between min-w-0">
+                                            <span class="font-bold text-black dark:text-white mb-1 sm:mb-0 flex-shrink-0">Revision:</span>
+                                            <span class="text-gray-900 dark:text-gray-100 break-all sm:text-right sm:ml-2">'.htmlspecialchars($revision).'</span>
                                         </div>
-                                        <div>
-                                            <span class="font-bold text-black dark:text-white">Status: </span>
-                                            <span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($status).'</span>
+                                        <div class="flex flex-col sm:flex-row sm:justify-between min-w-0">
+                                            <span class="font-bold text-black dark:text-white mb-1 sm:mb-0 flex-shrink-0">Status:</span>
+                                            <span class="text-gray-900 dark:text-gray-100 break-all sm:text-right sm:ml-2">'.htmlspecialchars($status).'</span>
                                         </div>
-                                        <div>
-                                            <span class="font-bold text-black dark:text-white">Planned Start Time: </span>
-                                            <span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($startTime).'</span>
+                                        <div class="flex flex-col sm:flex-row sm:justify-between min-w-0">
+                                            <span class="font-bold text-black dark:text-white mb-1 sm:mb-0 flex-shrink-0">Planned Start Time:</span>
+                                            <span class="text-gray-900 dark:text-gray-100 break-all sm:text-right sm:ml-2">'.htmlspecialchars($startTime).'</span>
                                         </div>
-                                        <div>
-                                            <span class="font-bold text-black dark:text-white">Planned End Time: </span>
-                                            <span class="text-gray-900 dark:text-gray-100">'.$endTimeCell.'</span>
+                                        <div class="flex flex-col sm:flex-row sm:justify-between min-w-0">
+                                            <span class="font-bold text-black dark:text-white mb-1 sm:mb-0 flex-shrink-0">Planned End Time:</span>
+                                            <span class="text-gray-900 dark:text-gray-100 break-all sm:text-right sm:ml-2">'.$endTimeCell.'</span>
                                         </div>
-                                        <div>
-                                            <span class="font-bold text-black dark:text-white">OK Quantities: </span>
-                                            <span class="text-green-600 dark:text-green-400">'.htmlspecialchars($okQty).'</span>
+                                        <div class="flex flex-col sm:flex-row sm:justify-between min-w-0">
+                                            <span class="font-bold text-black dark:text-white mb-1 sm:mb-0 flex-shrink-0">OK Quantities:</span>
+                                            <span class="text-green-600 dark:text-green-400 break-all sm:text-right sm:ml-2">'.htmlspecialchars($okQty).'</span>
                                         </div>
-                                        <div>
-                                            <span class="font-bold text-black dark:text-white">Scrapped Quantities: </span>
-                                            <span class="text-red-600 dark:text-red-400">'.htmlspecialchars($scrapQty).'</span>
+                                        <div class="flex flex-col sm:flex-row sm:justify-between min-w-0">
+                                            <span class="font-bold text-black dark:text-white mb-1 sm:mb-0 flex-shrink-0">Scrapped Quantities:</span>
+                                            <span class="text-red-600 dark:text-red-400 break-all sm:text-right sm:ml-2">'.htmlspecialchars($scrapQty).'</span>
                                         </div>
-                                        <div>
-                                            <span class="font-bold text-black dark:text-white">Material Batch ID: </span>
-                                            <span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($materialBatch).'</span>
+                                        <div class="flex flex-col sm:flex-row sm:justify-between min-w-0">
+                                            <span class="font-bold text-black dark:text-white mb-1 sm:mb-0 flex-shrink-0">Material Batch ID:</span>
+                                            <span class="text-gray-900 dark:text-gray-100 break-all sm:text-right sm:ml-2">'.htmlspecialchars($materialBatch).'</span>
                                         </div>
                                     </div>
                                 </div>
@@ -504,6 +504,15 @@ class ViewWorkOrder extends ViewRecord
         return [
             WorkOrderProgress::class,
             WorkOrderQtyTrendChart::make(['workOrder' => $this->record]),
+        ];
+    }
+
+    public function getHeaderWidgetsColumns(): int | array
+    {
+        return [
+            'sm' => 1,
+            'md' => 2,
+            'lg' => 2,
         ];
     }
 }
