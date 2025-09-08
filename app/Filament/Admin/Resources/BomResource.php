@@ -114,7 +114,7 @@ class BomResource extends Resource
 
                         return \App\Models\OperatorProficiency::where('factory_id', $factoryId)
                             ->pluck('proficiency', 'id');
-                    }),
+                    })->required(),
 
 Forms\Components\DatePicker::make('lead_time')
     ->label('Target Completion Time')
@@ -128,8 +128,11 @@ Forms\Components\DatePicker::make('lead_time')
             return 'PO Delivery Date: ' . \Carbon\Carbon::parse($po->delivery_target_date)->format('d M Y');
         }
     })
+     ->minDate(now()->startOfDay()) // <-- Only allow today or future dates
+    ->required()
     ->reactive(),
-                Forms\Components\Select::make('status')
+
+Forms\Components\Select::make('status')
     ->options(
         collect(BomStatus::cases())
             ->mapWithKeys(fn($case) => [$case->value => $case->label()])

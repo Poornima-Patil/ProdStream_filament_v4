@@ -324,14 +324,16 @@ class WorkOrderResource extends Resource
                     }),
 
                 Forms\Components\DateTimePicker::make('start_time')
+                    ->required()
                     ->disabled(! $isAdminOrManager)
                     ->label('Planned Start Time')
+                    ->minDate(now()->startOfDay()) 
                     ->seconds(false) // Cleaner UI without seconds
                     ->native(false) // Better custom picker
                     ->displayFormat('d M Y, H:i') // "21 Jul 2025, 14:30"
                     ->timezone('Asia/Kolkata')
                     ->live(onBlur: true)
-                    ->required()
+                    
                     ->rules([
                         function (callable $get) {
                             return function (string $attribute, $value, \Closure $fail) use ($get) {
@@ -355,6 +357,7 @@ class WorkOrderResource extends Resource
                     }),
                 Forms\Components\DateTimePicker::make('end_time')
                     ->label('Planned End Time')
+                    ->minDate(now()->startOfDay()) 
                     ->disabled(! $isAdminOrManager)
                     ->seconds(false) // Cleaner UI without seconds
                     ->native(false) // Better custom picker

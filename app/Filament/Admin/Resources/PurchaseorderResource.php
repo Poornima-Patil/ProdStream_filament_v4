@@ -75,9 +75,9 @@ class PurchaseorderResource extends Resource
                 Forms\Components\TextInput::make('QTY')
                     ->required(),
                 Forms\Components\DatePicker::make('delivery_target_date')
-                    ->required() // Make it required if needed
+                    ->required()
                     ->label('Delivery Target Date')
-                    ->nullable() // Make it nullable if you want to allow empty values
+                    ->minDate(now()->startOfDay()) 
                     ->hint('Select the delivery target date')
                     ->displayFormat('Y-m-d'), // You can adjust the date format
 

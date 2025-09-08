@@ -37,7 +37,8 @@ class MachineResource extends Resource
                 Forms\Components\Select::make('status')->options([
                     1 => 'Active',
                     0 => 'Inactive',
-                ])->default(0),
+                ])->default(1)
+                    ->required(),
 
                 Forms\Components\Select::make('department_id')
                     ->label('Department')
