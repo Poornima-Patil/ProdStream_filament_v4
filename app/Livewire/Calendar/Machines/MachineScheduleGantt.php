@@ -17,7 +17,7 @@ class MachineScheduleGantt extends Component
     public array $ganttData = [];
 
     public bool $isExpanded = true;
-    
+
     public bool $showAllRows = true;
 
     public function mount(Machine $machine, string $viewType = 'week')
@@ -37,10 +37,14 @@ class MachineScheduleGantt extends Component
     {
         $date = Carbon::parse($currentDate);
         $range = $this->getDateRange($viewType, $date);
-        
-        // Get work orders for this machine (same logic as Advanced Gantt)
+
+        // Get work orders for this machine that fall strictly within the date range
         $workOrders = $this->machine->workOrders()
-            ->with(['workOrderLogs', 'operator.user'])
+            ->with(['workOrderLogs', 'operator.user', 'bom.purchaseOrder.partNumber'])
+            ->where(function ($query) use ($range) {
+                // Only include work orders that START within the view date range
+                $query->whereBetween('start_time', [$range['start'], $range['end']]);
+            })
             ->get();
 
         $tasks = [];
@@ -57,19 +61,19 @@ class MachineScheduleGantt extends Component
                 'actual_start' => null,
                 'actual_end' => null,
                 'status' => $workOrder->status,
-                'progress' => 0
+                'progress' => 0,
             ];
 
             // Get actual start/end from work order logs
-            $logs = $workOrder->workOrderLogs()->orderBy('created_at')->get();
+            $logs = $workOrder->workOrderLogs()->orderBy('changed_at')->get();
             $startLog = $logs->where('status', 'Start')->first();
-            $completedLog = $logs->where('status', 'Completed')->first();
+            $completedLog = $logs->whereIn('status', ['Completed', 'Closed'])->first();
 
             if ($startLog) {
-                $task['actual_start'] = Carbon::parse($startLog->created_at);
+                $task['actual_start'] = Carbon::parse($startLog->changed_at);
             }
             if ($completedLog) {
-                $task['actual_end'] = Carbon::parse($completedLog->created_at);
+                $task['actual_end'] = Carbon::parse($completedLog->changed_at);
             }
 
             // Calculate progress
@@ -88,11 +92,79 @@ class MachineScheduleGantt extends Component
             $tasks[] = $task;
         }
 
+        // Convert tasks to planned_bars and actual_bars format (like Operator Gantt)
+        $plannedBars = [];
+        $actualBars = [];
+
+        foreach ($tasks as $task) {
+            if ($task['planned_start'] && $task['planned_end']) {
+                $plannedBars[] = [
+                    'id' => $task['work_order_id'],
+                    'work_order_id' => $task['work_order_id'],
+                    'unique_id' => $task['work_order_name'],
+                    'title' => 'WO '.$task['work_order_name'],
+                    'subtitle' => $task['work_order']->bom->purchaseOrder->partNumber->partnumber ?? 'Unknown Part',
+                    'start' => $task['planned_start']->toISOString(),
+                    'end' => $task['planned_end']->toISOString(),
+                    'status' => 'planned',
+                    'machine' => $this->machine->name,
+                    'operator' => $task['work_order']->operator?->user?->getFilamentName() ?? 'Unassigned',
+                    'shift_conflict' => false, // TODO: Add shift conflict logic if needed
+                    'type' => 'planned',
+                    'backgroundColor' => '#3b82f6',
+                    'borderColor' => '#1e40af',
+                    'textColor' => '#ffffff',
+                ];
+            }
+
+            // Generate actual bars for work orders that have started (have actual_start) OR have status not 'Assigned'
+            if ($task['actual_start'] || ! in_array($task['status'], ['Assigned'])) {
+                // For bars based on status and timing
+                $actualBarStart = $task['actual_start'] ? $task['actual_start']->toISOString() : $task['planned_start']->toISOString();
+                $actualBarEnd = null;
+
+                if ($task['status'] === 'Completed' && $task['actual_end']) {
+                    // Completed: Use actual end time
+                    $actualBarEnd = $task['actual_end']->toISOString();
+                } elseif (in_array($task['status'], ['Hold', 'Start']) && $task['planned_end']) {
+                    // Hold/Start: Use planned end time since actual end is unknown
+                    $actualBarEnd = $task['planned_end']->toISOString();
+                } else {
+                    // Fallback to planned end or current time
+                    $actualBarEnd = $task['planned_end'] ? $task['planned_end']->toISOString() : now()->toISOString();
+                }
+
+                $actualBars[] = [
+                    'id' => $task['work_order_id'],
+                    'work_order_id' => $task['work_order_id'],
+                    'unique_id' => $task['work_order_name'],
+                    'title' => 'WO '.$task['work_order_name'],
+                    'subtitle' => $task['work_order']->bom->purchaseOrder->partNumber->partnumber ?? 'Unknown Part',
+                    'start' => $actualBarStart,
+                    'end' => $actualBarEnd,
+                    'status' => $task['status'],
+                    'machine' => $this->machine->name,
+                    'operator' => $task['work_order']->operator?->user?->getFilamentName() ?? 'Unassigned',
+                    'progress' => round($task['progress']),
+                    'progressColor' => $task['status'] === 'Start' ? '#ef4444' : ($task['status'] === 'Completed' ? '#10b981' : '#6b7280'),
+                    'is_running' => $task['status'] === 'Start',
+                    'type' => 'actual',
+                    'backgroundColor' => '#e5e7eb',
+                    'borderColor' => '#9ca3af',
+                    'textColor' => '#374151',
+                ];
+            }
+        }
+
         return [
+            'planned_bars' => $plannedBars,
+            'actual_bars' => $actualBars,
+            'shift_blocks' => [], // TODO: Add shift blocks if needed
+            'date_range' => $this->getDateRange($viewType, $date),
+            'time_slots' => $this->getTimeSlots($viewType, $date),
+            // Keep legacy format for compatibility
             'tasks' => $tasks,
             'machine' => $this->machine,
-            'date_range' => $this->getDateRange($viewType, $date),
-            'time_slots' => $this->getTimeSlots($viewType, $date)
         ];
     }
 
@@ -102,22 +174,22 @@ class MachineScheduleGantt extends Component
             case 'day':
                 return [
                     'start' => $date->copy()->startOfDay(),
-                    'end' => $date->copy()->endOfDay()
+                    'end' => $date->copy()->endOfDay(),
                 ];
             case 'week':
                 return [
                     'start' => $date->copy()->startOfWeek(Carbon::MONDAY),
-                    'end' => $date->copy()->startOfWeek(Carbon::MONDAY)->addDays(6)->endOfDay()
+                    'end' => $date->copy()->startOfWeek(Carbon::MONDAY)->addDays(6)->endOfDay(),
                 ];
             case 'month':
                 return [
                     'start' => $date->copy()->startOfMonth(),
-                    'end' => $date->copy()->endOfMonth()
+                    'end' => $date->copy()->endOfMonth(),
                 ];
             default:
                 return [
                     'start' => $date->copy()->startOfDay(),
-                    'end' => $date->copy()->endOfDay()
+                    'end' => $date->copy()->endOfDay(),
                 ];
         }
     }
@@ -232,12 +304,12 @@ class MachineScheduleGantt extends Component
 
     public function toggleExpanded()
     {
-        $this->isExpanded = !$this->isExpanded;
+        $this->isExpanded = ! $this->isExpanded;
     }
-    
+
     public function toggleShowAllRows()
     {
-        $this->showAllRows = !$this->showAllRows;
+        $this->showAllRows = ! $this->showAllRows;
     }
 
     public function getDateRangeProperty()
@@ -250,6 +322,7 @@ class MachineScheduleGantt extends Component
             case 'week':
                 $start = $date->copy()->startOfWeek(Carbon::MONDAY);
                 $end = $date->copy()->startOfWeek(Carbon::MONDAY)->addDays(6);
+
                 return $start->format('M j').' - '.$end->format('M j, Y');
             case 'month':
                 return $date->format('F Y');
