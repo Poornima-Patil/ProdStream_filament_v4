@@ -90,4 +90,9 @@ class PurchaseOrder extends Model
     {
         return $this->belongsTo(CustomerInformation::class, 'cust_id', 'id');
     }
+
+    public function customerInformation()
+    {
+        return $this->belongsTo(CustomerInformation::class, 'cust_id', 'id');
+    }
 }

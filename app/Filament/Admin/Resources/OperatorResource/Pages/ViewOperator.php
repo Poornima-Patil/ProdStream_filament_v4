@@ -4,7 +4,6 @@ namespace App\Filament\Admin\Resources\OperatorResource\Pages;
 
 use App\Filament\Admin\Resources\OperatorResource;
 use App\Livewire\Calendar\Operators\OperatorScheduleCalendar;
-use App\Livewire\Calendar\Machines\MachineScheduleGantt;
 use Filament\Infolists\Components\Livewire;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
@@ -22,6 +21,7 @@ class ViewOperator extends ViewRecord
 
     public function infolist(Infolist $infolist): Infolist
     {
+
         return $infolist->schema([
             Section::make('Operator Information')
                 ->hiddenLabel()

@@ -4,11 +4,12 @@ namespace App\Filament\Admin\Resources\MachineResource\Pages;
 
 use App\Filament\Admin\Resources\MachineResource;
 use App\Livewire\Calendar\Machines\MachineScheduleCalendar;
-use Filament\Resources\Pages\ViewRecord;
-use Filament\Infolists\Infolist;
+use App\Livewire\Calendar\Machines\MachineScheduleGantt;
+use Filament\Infolists\Components\Livewire;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Components\Livewire;
+use Filament\Infolists\Infolist;
+use Filament\Resources\Pages\ViewRecord;
 
 class ViewMachine extends ViewRecord
 {
@@ -25,7 +26,7 @@ class ViewMachine extends ViewRecord
                         TextEntry::make('View Machine')
                             ->label('')
                             ->getStateUsing(function ($record) {
-                                if (!$record) {
+                                if (! $record) {
                                     return '<div class="text-gray-500 dark:text-gray-400">No Machine Found</div>';
                                 }
                                 $AssetID = $record->assetId;
@@ -39,6 +40,7 @@ class ViewMachine extends ViewRecord
                                 } else {
                                     $StatusLabel = '<span style="color: #dc2626; font-weight: bold;">Inactive</span>'; // red
                                 }
+
                                 return new \Illuminate\Support\HtmlString('
                                     <!-- Desktop Table -->
                                     <div class="hidden lg:block overflow-x-auto shadow rounded-lg">
@@ -103,7 +105,19 @@ class ViewMachine extends ViewRecord
                     ->schema([
                         // No hidden classes, so visible everywhere
                         Livewire::make(MachineScheduleCalendar::class, ['machine' => $this->record])
-                            ->key('machine-calendar-' . $this->record->id)
+                            ->key('machine-calendar-'.$this->record->id),
+                    ]),
+
+                Section::make('Machine Schedule Gantt Chart')
+                    ->schema([
+                        Livewire::make(MachineScheduleGantt::class, ['machine' => $this->record])
+                            ->key('machine-gantt-'.$this->record->id),
+                    ])
+                    ->collapsible()
+                    ->persistCollapsed()
+                    ->id('machine-gantt-section')
+                    ->extraAttributes([
+                        'class' => 'hidden lg:block', // Hide on small/medium devices, show on large and above
                     ]),
             ]);
     }
