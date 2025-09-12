@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Auth;
 
 class KPIDashboard extends Component
 {
-    public $selectedPeriod = '30d';
+    public $fromDate;
+    public $toDate;
     public $kpis = [];
     public $lastUpdated;
     public $currentFactory;
@@ -28,6 +29,12 @@ class KPIDashboard extends Component
         // Get current user's factory (multi-tenant)
         $this->currentFactory = Auth::user()->factory;
 
+        // Set default date range to current month (past 30 days)
+        $today = now();
+        $this->toDate = $today->format('Y-m-d');
+        $this->fromDate = $today->copy()->subDays(30)->format('Y-m-d');
+        
+
         // Load initial KPI data
         $this->loadKPIs();
         $this->lastUpdated = now()->format('H:i:s');
@@ -38,16 +45,18 @@ class KPIDashboard extends Component
         try {
             $kpiService = new KPIService();
 
-            // Always use current user's factory ID
-            $this->kpis = $kpiService->getExecutiveKPIs(
+            // Always use current user's factory ID with custom date range
+            $this->kpis = $kpiService->getExecutiveKPIsWithDateRange(
                 $this->currentFactory->id,
-                $this->selectedPeriod
+                $this->fromDate,
+                $this->toDate
             );
 
             // Debug: Log the KPI data to see what's being returned
             Log::info('KPI Dashboard Data:', [
                 'factory_id' => $this->currentFactory->id,
-                'period' => $this->selectedPeriod,
+                'from_date' => $this->fromDate,
+                'to_date' => $this->toDate,
                 'kpis_count' => count($this->kpis),
                 'kpis_keys' => array_keys($this->kpis),
                 'work_order_data' => $this->kpis['work_order_completion_rate'] ?? 'NOT_SET',
@@ -67,9 +76,26 @@ class KPIDashboard extends Component
         }
     }
 
-    public function updatedSelectedPeriod()
+    public function updatedFromDate()
     {
+        $this->validateDateRange();
         $this->loadKPIs();
+    }
+
+    public function updatedToDate()
+    {
+        $this->validateDateRange();
+        $this->loadKPIs();
+    }
+
+    private function validateDateRange()
+    {
+        if ($this->fromDate && $this->toDate && $this->fromDate > $this->toDate) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'From date cannot be later than To date'
+            ]);
+        }
     }
 
     public function refreshDashboard()
@@ -116,8 +142,8 @@ class KPIDashboard extends Component
         $titles = [
             'work_order_completion_rate' => 'Work Order Completion Rate',
             'on_time_delivery_rate' => 'On-Time Delivery Rate',
-            'quality_rate' => 'Quality Rate',
-            'production_throughput' => 'Production Throughput',
+            'quality_rate' => 'Production Throughput',
+            'production_throughput' => 'Production Throughput (Daily)',
             'scrap_rate' => 'Scrap Rate',
             'machine_utilization' => 'Machine Utilization',
             'work_orders' => 'Work Orders',
@@ -183,15 +209,16 @@ class KPIDashboard extends Component
         }
     }
 
-    public function getPeriodLabel($period)
+    public function getDateRangeLabel()
     {
-        return match ($period) {
-            'today' => 'Today',
-            '7d' => 'Last 7 Days',
-            '30d' => 'Last 30 Days',
-            '90d' => 'Last 90 Days',
-            default => 'Last 30 Days'
-        };
+        if (!$this->fromDate || !$this->toDate) {
+            return 'Date range not set';
+        }
+        
+        $from = \Carbon\Carbon::parse($this->fromDate)->format('M d, Y');
+        $to = \Carbon\Carbon::parse($this->toDate)->format('M d, Y');
+        
+        return "{$from} - {$to}";
     }
 
     public function render()

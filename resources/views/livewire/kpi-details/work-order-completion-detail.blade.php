@@ -45,6 +45,46 @@
 
     {{-- Performance Breakdown --}}
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        {{-- Work Order Status Distribution --}}
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <div class="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/20 rounded-md flex items-center justify-center">
+                        <svg class="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                </div>
+                <div class="ml-5 w-0 flex-1">
+                    <dl>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Status Distribution</dt>
+                        <dd class="text-lg font-medium text-gray-900 dark:text-white">Work Order Status</dd>
+                        <dd class="text-xs text-gray-500 dark:text-gray-500 mt-1 space-y-1">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600 dark:text-gray-400">📋 Assigned:</span>
+                                <span>{{ $kpis['work_order_completion_rate']['status_distribution']['Assigned']['percentage'] ?? '0' }}% ({{ $kpis['work_order_completion_rate']['status_distribution']['Assigned']['count'] ?? '0' }})</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-blue-600 dark:text-blue-400">▶️ Started:</span>
+                                <span>{{ $kpis['work_order_completion_rate']['status_distribution']['Start']['percentage'] ?? '0' }}% ({{ $kpis['work_order_completion_rate']['status_distribution']['Start']['count'] ?? '0' }})</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-yellow-600 dark:text-yellow-400">⏸️ Hold:</span>
+                                <span>{{ $kpis['work_order_completion_rate']['status_distribution']['Hold']['percentage'] ?? '0' }}% ({{ $kpis['work_order_completion_rate']['status_distribution']['Hold']['count'] ?? '0' }})</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-green-600 dark:text-green-400">✅ Completed:</span>
+                                <span>{{ $kpis['work_order_completion_rate']['status_distribution']['Completed']['percentage'] ?? '0' }}% ({{ $kpis['work_order_completion_rate']['status_distribution']['Completed']['count'] ?? '0' }})</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-purple-600 dark:text-purple-400">🔒 Closed:</span>
+                                <span>{{ $kpis['work_order_completion_rate']['status_distribution']['Closed']['percentage'] ?? '0' }}% ({{ $kpis['work_order_completion_rate']['status_distribution']['Closed']['count'] ?? '0' }})</span>
+                            </div>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
         {{-- On-Time Delivery --}}
         <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
             <div class="flex items-center">
@@ -57,27 +97,54 @@
                 </div>
                 <div class="ml-5 w-0 flex-1">
                     <dl>
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">On-Time Delivery</dt>
-                        <dd class="text-lg font-medium text-gray-900 dark:text-white">Coming Soon</dd>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Overall Scrap Rate</dt>
+                        <dd class="text-lg font-medium text-gray-900 dark:text-white">
+                            {{ $kpis['work_order_scrapped_qty']['rate'] ?? '0' }}%
+                        </dd>
+                        <dd class="text-sm text-gray-600 dark:text-gray-400">
+                            {{ $kpis['work_order_scrapped_qty']['scrapped_qty'] ?? '0' }} / {{ $kpis['work_order_scrapped_qty']['total_qty'] ?? '0' }} units
+                        </dd>
+                        <dd class="text-xs text-gray-500 dark:text-gray-500 mt-2 space-y-1">
+                            <div class="flex justify-between">
+                                <span class="text-green-600 dark:text-green-400">✓ Completed:</span>
+                                <span>{{ $kpis['work_order_scrapped_qty']['by_status']['completed']['rate'] ?? '0' }}% ({{ $kpis['work_order_scrapped_qty']['by_status']['completed']['scrapped_qty'] ?? '0' }}/{{ $kpis['work_order_scrapped_qty']['by_status']['completed']['total_qty'] ?? '0' }})</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-yellow-600 dark:text-yellow-400">⏸ Hold:</span>
+                                <span>{{ $kpis['work_order_scrapped_qty']['by_status']['hold']['rate'] ?? '0' }}% ({{ $kpis['work_order_scrapped_qty']['by_status']['hold']['scrapped_qty'] ?? '0' }}/{{ $kpis['work_order_scrapped_qty']['by_status']['hold']['total_qty'] ?? '0' }})</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600 dark:text-gray-400">➤ Closed:</span>
+                                <span>{{ $kpis['work_order_scrapped_qty']['by_status']['closed']['rate'] ?? '0' }}% ({{ $kpis['work_order_scrapped_qty']['by_status']['closed']['scrapped_qty'] ?? '0' }}/{{ $kpis['work_order_scrapped_qty']['by_status']['closed']['total_qty'] ?? '0' }})</span>
+                            </div>
+                        </dd>
                     </dl>
                 </div>
             </div>
         </div>
 
-        {{-- Quality Rate --}}
+        {{-- Production Throughput --}}
         <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
             <div class="flex items-center">
                 <div class="flex-shrink-0">
                     <div class="w-8 h-8 bg-blue-100 dark:bg-blue-900/20 rounded-md flex items-center justify-center">
                         <svg class="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
                         </svg>
                     </div>
                 </div>
                 <div class="ml-5 w-0 flex-1">
                     <dl>
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Quality Rate</dt>
-                        <dd class="text-lg font-medium text-gray-900 dark:text-white">Coming Soon</dd>
+                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Production Throughput</dt>
+                        <dd class="text-lg font-medium text-gray-900 dark:text-white">
+                            {{ number_format($kpis['quality_rate']['rate'] ?? 0, 2) }} units/hr
+                        </dd>
+                        <dd class="text-sm text-gray-600 dark:text-gray-400">
+                            {{ number_format(($kpis['quality_rate']['rate'] ?? 0) * 24, 0) }} units/day
+                        </dd>
+                        <dd class="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                            {{ number_format($kpis['quality_rate']['total_units'] ?? 0) }} units in {{ number_format($kpis['quality_rate']['total_hours'] ?? 0, 1) }}hrs
+                        </dd>
                     </dl>
                 </div>
             </div>
@@ -121,6 +188,7 @@
             </div>
         </div>
     </div>
+
 
     {{-- Charts and Trends --}}
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">

@@ -1,51 +1,44 @@
 <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
-    {{-- Header Section --}}
-    <div class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex flex-col space-y-4 py-4 border-4 bg-gray-500 dark:bg-gray-600 px-4 py-2 rounded-md"> 
-                {{-- Title Section --}}
-                <div class="flex flex-col space-y-1 sm:flex-row sm:items-baseline sm:space-y-0 sm:space-x-3">
-                    <h1 class="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Production KPI Dashboard</h1>
-                    <span class="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Last updated: {{ $lastUpdated }}</span>
+    {{-- Controls Section --}}
+    <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 mb-6 shadow-sm relative">
+        {{-- Last Updated - Top Right Corner --}}
+        <div class="absolute top-3 right-3 flex items-center space-x-2">
+            <svg class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span class="text-xs text-gray-500 dark:text-gray-400">Last updated: {{ $lastUpdated }}</span>
+        </div>
+        
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-center space-y-6 lg:space-y-0 lg:gap-8 mt-4 lg:mt-0">
+            {{-- Centered controls group --}}
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-center space-y-4 sm:space-y-0 sm:gap-8">
+                {{-- Date Range Filter --}}
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-center space-y-3 sm:space-y-0 sm:gap-6 px-4 py-3 sm:py-0 bg-gray-50 dark:bg-gray-700 rounded-lg sm:h-12">
+                    <div class="flex items-center space-x-3">
+                        <label for="fromDate" class="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap min-w-0">From:</label>
+                        <input type="date" 
+                               wire:model.live="fromDate" 
+                               id="fromDate"
+                               class="rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1.5 px-3 transition-all min-w-0 flex-shrink-0">
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <label for="toDate" class="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap min-w-0">To:</label>
+                        <input type="date" 
+                               wire:model.live="toDate" 
+                               id="toDate"
+                               class="rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1.5 px-3 transition-all min-w-0 flex-shrink-0">
+                    </div>
                 </div>
                 
-                {{-- Controls Section --}}
-                <div class="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-                    {{-- Left side controls group --}}
-                    <div class="flex flex-col space-y-3 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-8">
-                        {{-- Current Factory Display - Only show when loaded --}}
-                        @if($currentFactory)
-                            <div class="flex items-center space-x-2 bg-gray-100 dark:bg-gray-700 px-4 py-2.5 rounded-md">
-                                <svg class="w-4 h-4 text-gray-600 dark:text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H9m0 0H5m0 0h2M7 7h10M7 11h4m6 0h4"></path>
-                                </svg>
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ $currentFactory->name }}</span>
-                            </div>
-                        @endif
-                        
-                        {{-- Period Filter --}}
-                        <div class="flex items-center space-x-3">
-                            <label for="period" class="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Period:</label>
-                            <select wire:model.live="selectedPeriod" 
-                                    class="min-w-[160px] rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:focus:border-indigo-400 dark:focus:ring-indigo-400 text-sm py-2.5 px-3">
-                                <option value="today">Today</option>
-                                <option value="7d">Last 7 Days</option>
-                                <option value="30d">Last 30 Days</option>
-                                <option value="90d">Last 90 Days</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    {{-- Right side - Refresh Button --}}
-                    <button wire:click="refreshDashboard" 
-                            class="bg-indigo-600 dark:bg-indigo-500 text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 transition-colors flex items-center justify-center whitespace-nowrap sm:self-auto">
-                        <svg wire:loading.remove wire:target="refreshDashboard" class="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                        </svg>
-                        <div wire:loading wire:target="refreshDashboard" class="inline-block w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
-                        <span>Refresh</span>
-                    </button>
-                </div>
+                {{-- Refresh Button --}}
+                <button wire:click="refreshDashboard" 
+                        class="bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 hover:border-blue-700 px-6 py-3 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 flex items-center justify-center gap-3 dark:focus:ring-offset-gray-800 shadow-sm hover:shadow-md h-12">
+                    <svg wire:loading.remove wire:target="refreshDashboard" class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    <div wire:loading wire:target="refreshDashboard" class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                    <span>Refresh Data</span>
+                </button>
             </div>
         </div>
     </div>
@@ -54,14 +47,20 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         {{-- Factory Context Banner - Only show when loaded --}}
         @if($currentFactory && $kpis)
-            <div class="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
-                <div class="flex items-start sm:items-center">
-                    <svg class="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2 mt-0.5 sm:mt-0 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    <span class="text-sm sm:text-base text-gray-700 dark:text-gray-300 font-medium leading-relaxed">
-                        Showing KPIs for {{ $currentFactory->name }} - {{ $this->getPeriodLabel($selectedPeriod) }}
-                    </span>
+            <div class="bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-6 shadow-sm">
+                <div class="flex items-center">
+                    <div class="flex items-center justify-center w-10 h-10 bg-blue-100 dark:bg-blue-900/50 rounded-lg mr-3">
+                        <svg class="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Factory Analytics</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                            Showing KPIs for <span class="font-medium text-blue-600 dark:text-blue-400">{{ $currentFactory->name }}</span> 
+                            from <span class="font-medium">{{ $this->getDateRangeLabel() }}</span>
+                        </p>
+                    </div>
                 </div>
             </div>
         @endif
@@ -103,44 +102,44 @@
                 </div>
             @endif
 
-            {{-- Production Throughput - Real KPI --}}
-            @if(isset($kpis['production_throughput']))
+            {{-- Production Throughput (by Time) - Real KPI --}}
+            @if(isset($kpis['quality_rate']))
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 hover:shadow-md dark:hover:shadow-lg hover:shadow-gray-200 dark:hover:shadow-gray-900/50 transition-shadow cursor-pointer"
-                     wire:click="viewKPIDetails('production_throughput')">
+                     wire:click="viewKPIDetails('quality_rate')">
                     {{-- Status Indicator --}}
                     <div class="flex items-center justify-between mb-3 sm:mb-4">
                         <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white leading-tight">Production Throughput</h3>
-                        <div class="w-3 h-3 rounded-full {{ $this->getStatusColor($kpis['production_throughput']['status']) }} flex-shrink-0"></div>
+                        <div class="w-3 h-3 rounded-full {{ $this->getStatusColor($kpis['quality_rate']['status']) }} flex-shrink-0"></div>
                     </div>
                     
                     {{-- Main Value --}}
                     <div class="flex items-baseline mb-2 flex-wrap">
-                        <span class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">{{ number_format($kpis['production_throughput']['throughput']) }}</span>
-                        <span class="ml-1 text-base sm:text-lg text-gray-600 dark:text-gray-400">units/day</span>
-                        @if($kpis['production_throughput']['trend'] != 0)
-                            <span class="ml-2 text-xs sm:text-sm font-medium {{ $this->getTrendColor($kpis['production_throughput']['trend']) }}">
-                                {{ $this->getTrendIcon($kpis['production_throughput']['trend']) }} {{ abs($kpis['production_throughput']['trend']) }}
+                        <span class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">{{ number_format($kpis['quality_rate']['rate'], 2) }}</span>
+                        <span class="ml-1 text-base sm:text-lg text-gray-600 dark:text-gray-400">units/hr</span>
+                        @if($kpis['quality_rate']['trend'] != 0)
+                            <span class="ml-2 text-xs sm:text-sm font-medium {{ $this->getTrendColor($kpis['quality_rate']['trend']) }}">
+                                {{ $this->getTrendIcon($kpis['quality_rate']['trend']) }} {{ abs($kpis['quality_rate']['trend']) }}
                             </span>
                         @endif
                     </div>
                     
                     {{-- Details --}}
                     <div class="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                        {{ number_format($kpis['production_throughput']['total_units']) }} units in {{ $kpis['production_throughput']['days'] }} days
+                        {{ number_format($kpis['quality_rate']['total_units']) }} units in {{ $kpis['quality_rate']['total_hours'] }}hrs ({{ $kpis['quality_rate']['orders_count'] }} orders)
                     </div>
                     
                     {{-- Status Text --}}
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-1 sm:space-y-0">
-                        <span class="text-sm font-medium {{ $this->getTrendColor($kpis['production_throughput']['trend']) }}">
-                            {{ $this->getStatusText($kpis['production_throughput']['status']) }}
+                        <span class="text-sm font-medium {{ $this->getTrendColor($kpis['quality_rate']['trend']) }}">
+                            {{ $this->getStatusText($kpis['quality_rate']['status']) }}
                         </span>
-                        <span class="text-xs text-gray-500 dark:text-gray-400">Target: 1000/day</span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Target: 42/hr</span>
                     </div>
                 </div>
             @endif
 
             {{-- Future KPI Cards - Placeholder Design --}}
-            @foreach(['scrap_rate', 'machine_utilization', 'quality_rate', 'on_time_delivery'] as $kpiKey)
+            @foreach(['scrap_rate', 'machine_utilization', 'on_time_delivery'] as $kpiKey)
                 @if(isset($kpis[$kpiKey]))
                     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 opacity-60 relative">
                         {{-- Coming Soon Badge --}}
@@ -270,7 +269,7 @@
                 <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
                     <div>
                         <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $selectedKPITitle }}</h2>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ $currentFactory->name }} - {{ $this->getPeriodLabel($selectedPeriod) }}</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ $currentFactory->name }} - {{ $this->getDateRangeLabel() }}</p>
                     </div>
                     <button wire:click="closeKPIDetail" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

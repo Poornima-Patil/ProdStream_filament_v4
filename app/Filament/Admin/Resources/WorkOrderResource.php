@@ -57,6 +57,7 @@ class WorkOrderResource extends Resource
                     })
                     ->searchable()
                     ->reactive()
+                    ->required()
                     ->preload()
                     ->disabled(! $isAdminOrManager)
                     ->formatStateUsing(function ($record) {
@@ -90,55 +91,95 @@ class WorkOrderResource extends Resource
                     ->searchable()
                     ->disabled(! $isAdminOrManager),
 
-                Forms\Components\Select::make('machine_id')
-                    ->label('Machine')
-                    ->options(function (callable $get) {
-                        $bomId = $get('bom_id'); // Get the selected BOM ID
+            
 
-                        if (! $bomId) {
-                            return []; // No BOM selected, return empty options
-                        }
 
-                        // Find the BOM and get its machine group
-                        $bom = \App\Models\Bom::find($bomId);
-                        if (! $bom || ! $bom->machine_group_id) {
-                            return []; // BOM not found or has no associated machine group
-                        }
+// ...existing code...
+Forms\Components\Select::make('machine_id')
+    ->label('Machine')
+    ->options(function (callable $get) {
+        $bomId = $get('bom_id');
+        $user = \Illuminate\Support\Facades\Auth::user();
 
-                        // Fetch all active machines in the machine group within the current factory
-                        return \App\Models\Machine::where('machine_group_id', $bom->machine_group_id)
-                            ->where('factory_id', \Illuminate\Support\Facades\Auth::user()->factory_id)
-                            ->active()
-                            ->get()
-                            ->mapWithKeys(fn ($machine) => [
-                                (int) $machine->id => "Asset ID: {$machine->assetId} - Name: {$machine->name}",
-                            ])
-                            ->toArray();
-                    })
-                    ->reactive()
-                    ->required()
-                    ->disabled(! $isAdminOrManager)
-                    ->rules([
-                        function (callable $get) {
-                            return function (string $attribute, $value, \Closure $fail) use ($get) {
-                                $startTime = $get('start_time');
-                                $endTime = $get('end_time');
+        if (! $bomId) {
+            return [];
+        }
 
-                                if ($value && $startTime && $endTime) {
-                                    $errorMessage = self::getSchedulingValidationError($get, $value, $startTime, $endTime);
-                                    if ($errorMessage) {
-                                        $fail($errorMessage);
-                                    }
-                                }
-                            };
-                        },
-                    ])
-                    ->afterStateUpdated(function (callable $get, callable $set, $state) {
-                        // Only validate if all required fields are filled and this is not the initial load
-                        if ($state && $get('start_time') && $get('end_time')) {
-                            self::validateMachineScheduling($get, $set);
-                        }
-                    }),
+        $bom = \App\Models\Bom::find($bomId);
+        $machineGroupId = $bom?->machine_group_id;
+
+        // Fetch all active machines in the factory
+        $allMachines = \App\Models\Machine::where('factory_id', $user->factory_id)
+            ->active()
+            ->get();
+
+        // Mark machines in the group as green, others as red
+        return $allMachines->mapWithKeys(function ($machine) use ($machineGroupId) {
+            $inGroup = $machine->machine_group_id == $machineGroupId;
+            $color = $inGroup ? '🟢' : '🔴';
+            $label = "{$color} Asset ID: {$machine->assetId} - Name: {$machine->name}";
+            return [(int) $machine->id => $label];
+        })->toArray();
+    })
+    ->reactive()
+    ->required()
+    ->searchable()
+    ->disabled(! $isAdminOrManager)
+    ->helperText(function (callable $get) {
+        $machineId = $get('machine_id');
+        $bomId = $get('bom_id');
+        if ($machineId && $bomId) {
+            $bom = \App\Models\Bom::find($bomId);
+            $machine = \App\Models\Machine::find($machineId);
+            if ($bom && $machine && $machine->machine_group_id != $bom->machine_group_id) {
+                return "⚠️ This Machine is not as per BOM Specifications.";
+            }
+        }
+        return null;
+    })
+    ->rules([
+        function (callable $get) {
+            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                $bomId = $get('bom_id');
+                if ($bomId && $value) {
+                    $bom = \App\Models\Bom::find($bomId);
+                    $machine = \App\Models\Machine::find($value);
+                    if ($bom && $machine && $machine->machine_group_id != $bom->machine_group_id) {
+                        $fail('This Machine is not as per BOM Specifications.');
+                    }
+                }
+                // ...existing validation logic for scheduling...
+                $startTime = $get('start_time');
+                $endTime = $get('end_time');
+                if ($value && $startTime && $endTime) {
+                    $errorMessage = self::getSchedulingValidationError($get, $value, $startTime, $endTime);
+                    if ($errorMessage) {
+                        $fail($errorMessage);
+                    }
+                }
+            };
+        },
+    ])
+    ->afterStateUpdated(function (callable $get, callable $set, $state) {
+        // Show warning if machine is not as per BOM
+        $bomId = $get('bom_id');
+        if ($bomId && $state) {
+            $bom = \App\Models\Bom::find($bomId);
+            $machine = \App\Models\Machine::find($state);
+            if ($bom && $machine && $machine->machine_group_id != $bom->machine_group_id) {
+                \Filament\Notifications\Notification::make()
+                    ->title('Warning')
+                    ->body('This Machine is not as per BOM Specifications.')
+                    ->warning()
+                    ->send();
+            }
+        }
+        // Only validate if all required fields are filled and this is not the initial load
+        if ($state && $get('start_time') && $get('end_time')) {
+            self::validateMachineScheduling($get, $set);
+        }
+    }),
+ 
 
                 Forms\Components\TextInput::make('qty')
                     ->label('Quantity')
@@ -191,93 +232,122 @@ class WorkOrderResource extends Resource
                         $totalSeconds = $cycleTimeInSeconds * $qty;
                         $set('time_to_complete', self::convertSecondsToTime($totalSeconds));
                     }),
+Forms\Components\Select::make('operator_id')
+    ->label('Operator')
+    ->disabled(! $isAdminOrManager)
+    ->options(function (callable $get) {
+        $bomId = $get('bom_id'); // Get selected BOM ID
 
-                Forms\Components\Select::make('operator_id')
-                    ->label('Operator')
-                    ->disabled(! $isAdminOrManager)
-                    ->options(function (callable $get) {
-                        $bomId = $get('bom_id'); // Get selected BOM ID
+        if (! $bomId) {
+            return []; // No BOM selected, return empty options
+        }
 
-                        if (! $bomId) {
-                            return []; // No BOM selected, return empty options
-                        }
+        // Get the operator proficiency ID from the BOM's linked Purchase Order
+        $operatorProficiencyId = \App\Models\Bom::find($bomId)->operator_proficiency_id;
 
-                        // Get the operator proficiency ID from the BOM's linked Purchase Order
-                        $operatorProficiencyId = \App\Models\Bom::find($bomId)->operator_proficiency_id;
+        // Get all operators for the factory
+        $factoryId = Auth::user()->factory_id; // Get the logged-in user's factory_id
 
-                        // Get operators based on the proficiency ID
-                        $factoryId = Auth::user()->factory_id; // Get the logged-in user's factory_id
+        return Operator::where('factory_id', $factoryId)
+            ->with(['user', 'shift'])
+            ->get()
+            ->mapWithKeys(function ($operator) use ($operatorProficiencyId) {
+                $shiftInfo = $operator->shift
+                    ? " ({$operator->shift->name}: {$operator->shift->start_time}-{$operator->shift->end_time})"
+                    : '';
+                $isMatch = $operator->operator_proficiency_id == $operatorProficiencyId;
+                $color = $isMatch ? '🟢' : '🔴';
+                $label = "{$color} {$operator->user->first_name} {$operator->user->last_name}{$shiftInfo}";
+                return [$operator->id => $label];
+            });
+    })
+    ->searchable()
+    ->required()
+    ->reactive()
+    ->helperText(function (callable $get) {
+        $operatorId = $get('operator_id');
+        $bomId = $get('bom_id');
+        if ($operatorId && $bomId) {
+            $bom = \App\Models\Bom::find($bomId);
+            $operator = \App\Models\Operator::find($operatorId);
+            if ($bom && $operator && $operator->operator_proficiency_id != $bom->operator_proficiency_id) {
+                return "⚠️ The Operator's Profiency does not match with the BOM specifications.";
+            }
+        }
+        // ...existing helperText logic for shift conflicts...
+        $startTime = $get('start_time');
+        $endTime = $get('end_time');
+        $factoryId = Auth::user()->factory_id ?? null;
 
-                        return Operator::where('factory_id', $factoryId)
-                            ->where('operator_proficiency_id', $operatorProficiencyId) // Filter by proficiency
-                            ->with(['user', 'shift']) // Get the associated user and shift
-                            ->get()
-                            ->mapWithKeys(function ($operator) {
-                                $shiftInfo = $operator->shift
-                                    ? " ({$operator->shift->name}: {$operator->shift->start_time}-{$operator->shift->end_time})"
-                                    : '';
+        if (! $operatorId || ! $startTime || ! $endTime || ! $factoryId) {
+            return null;
+        }
 
-                                return [$operator->id => $operator->user->first_name.' '.$operator->user->last_name.$shiftInfo];
-                            });
-                    })
-                    ->searchable()
-                    ->required()
-                    ->reactive()
-                    ->helperText(function (callable $get) {
-                        $operatorId = $get('operator_id');
-                        $startTime = $get('start_time');
-                        $endTime = $get('end_time');
-                        $factoryId = Auth::user()->factory_id ?? null;
+        try {
+            $validation = \App\Models\WorkOrder::validateScheduling([
+                'machine_id' => $get('machine_id'),
+                'operator_id' => $operatorId,
+                'factory_id' => $factoryId,
+                'start_time' => $startTime,
+                'end_time' => $endTime,
+                'status' => $get('status'),
+                'id' => $get('id'),
+            ]);
 
-                        if (! $operatorId || ! $startTime || ! $endTime || ! $factoryId) {
-                            return null;
-                        }
+            // Check for shift conflicts and show prominent warning
+            if (! empty($validation['shift_conflicts'])) {
+                $shiftConflict = $validation['shift_conflicts'][0];
 
-                        try {
-                            $validation = WorkOrder::validateScheduling([
-                                'machine_id' => $get('machine_id'),
-                                'operator_id' => $operatorId,
-                                'factory_id' => $factoryId,
-                                'start_time' => $startTime,
-                                'end_time' => $endTime,
-                                'status' => $get('status'),
-                                'id' => $get('id'),
-                            ]);
+                return '⚠️ SHIFT CONFLICT: '.$shiftConflict['message'];
+            }
+        } catch (\Exception $e) {
+            return null;
+        }
 
-                            // Check for shift conflicts and show prominent warning
-                            if (! empty($validation['shift_conflicts'])) {
-                                $shiftConflict = $validation['shift_conflicts'][0];
+        return null;
+    })
+    ->rules([
+        function (callable $get) {
+            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                $bomId = $get('bom_id');
+                if ($bomId && $value) {
+                    $bom = \App\Models\Bom::find($bomId);
+                    $operator = \App\Models\Operator::find($value);
+                    if ($bom && $operator && $operator->operator_proficiency_id != $bom->operator_proficiency_id) {
+                        $fail("The Operator's Profiency does not match with the BOM specifications.");
+                    }
+                }
+                $startTime = $get('start_time');
+                $endTime = $get('end_time');
 
-                                return '⚠️ SHIFT CONFLICT: '.$shiftConflict['message'];
-                            }
-                        } catch (\Exception $e) {
-                            return null;
-                        }
-
-                        return null;
-                    })
-                    ->rules([
-                        function (callable $get) {
-                            return function (string $attribute, $value, \Closure $fail) use ($get) {
-                                $startTime = $get('start_time');
-                                $endTime = $get('end_time');
-
-                                if ($value && $startTime && $endTime) {
-                                    $errorMessage = self::getOperatorSchedulingValidationError($get, $value, $startTime, $endTime);
-                                    if ($errorMessage) {
-                                        $fail($errorMessage);
-                                    }
-                                }
-                            };
-                        },
-                    ])
-                    ->afterStateUpdated(function (callable $get, callable $set, $state) {
-                        // Only validate if all required fields are filled and this is not the initial load
-                        if ($state && $get('start_time') && $get('end_time')) {
-                            self::validateOperatorScheduling($get, $set);
-                        }
-                    }),
-
+                if ($value && $startTime && $endTime) {
+                    $errorMessage = self::getOperatorSchedulingValidationError($get, $value, $startTime, $endTime);
+                    if ($errorMessage) {
+                        $fail($errorMessage);
+                    }
+                }
+            };
+        },
+    ])
+    ->afterStateUpdated(function (callable $get, callable $set, $state) {
+        // Only show warning if proficiency does not match
+        $bomId = $get('bom_id');
+        if ($bomId && $state) {
+            $bom = \App\Models\Bom::find($bomId);
+            $operator = \App\Models\Operator::find($state);
+            if ($bom && $operator && $operator->operator_proficiency_id != $bom->operator_proficiency_id) {
+                \Filament\Notifications\Notification::make()
+                    ->title('Warning')
+                    ->body("The Operator's Profiency does not match with the BOM specifications.")
+                    ->warning()
+                    ->send();
+            }
+        }
+        // Only validate if all required fields are filled and this is not the initial load
+        if ($state && $get('start_time') && $get('end_time')) {
+            self::validateOperatorScheduling($get, $set);
+        }
+    }),  
                 Forms\Components\TextInput::make('time_to_complete')
                     ->label('Approx time required')
                     ->hint('Time is calculated based on the cycle time provided in the Part number')

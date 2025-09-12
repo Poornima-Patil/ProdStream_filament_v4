@@ -65,9 +65,11 @@ class WorkOrdersTableSeeder extends Seeder
             if ($machines->isEmpty() || $operators->isEmpty()) continue;
 
             // Calculate working days for this BOM (from BOM creation + 1 day to PO target date, skipping Sundays)
-            $bomCreated = Carbon::parse($bom->created_at)->addDay()->startOfDay();
+            // Ensure consistent timezone handling
+            $appTimezone = config('app.timezone');
+            $bomCreated = Carbon::parse($bom->created_at)->setTimezone($appTimezone)->addDay()->startOfDay();
             $poTargetDate = $purchaseOrder->delivery_target_date
-                ? Carbon::parse($purchaseOrder->delivery_target_date)->endOfDay()
+                ? Carbon::parse($purchaseOrder->delivery_target_date)->setTimezone($appTimezone)->endOfDay()
                 : $bomCreated->copy()->addWeek()->endOfDay();
 
             $bomDays = [];
@@ -101,11 +103,12 @@ class WorkOrdersTableSeeder extends Seeder
                         continue;
                     }
 
-                    $shiftStart = $day->copy()->setTimeFromTimeString($shift->start_time);
+                    // Ensure shift times are in the correct timezone
+                    $shiftStart = $day->copy()->setTimezone($appTimezone)->setTimeFromTimeString($shift->start_time);
                     if ($shift->end_time <= $shift->start_time) {
-                        $shiftEnd = $day->copy()->addDay()->setTimeFromTimeString($shift->end_time);
+                        $shiftEnd = $day->copy()->addDay()->setTimezone($appTimezone)->setTimeFromTimeString($shift->end_time);
                     } else {
-                        $shiftEnd = $day->copy()->setTimeFromTimeString($shift->end_time);
+                        $shiftEnd = $day->copy()->setTimezone($appTimezone)->setTimeFromTimeString($shift->end_time);
                     }
 
                     foreach ($machines as $machine) {
@@ -163,21 +166,28 @@ class WorkOrdersTableSeeder extends Seeder
                             $woSerial = str_pad($woSerialCounters[$monthYear], 4, '0', STR_PAD_LEFT);
                             $woDate = $startTime->format('mdy');
                             $woUniqueId = "W{$woSerial}_{$woDate}_{$bom->unique_id}";
-                            $WoCreatedAt = Carbon::parse($bom->created_at)->addDay();
+                            // Ensure work order creation time is in correct timezone and before start time
+                            $WoCreatedAt = Carbon::parse($bom->created_at)->setTimezone($appTimezone)->addDay();
+                            
+                            // Make sure created_at is before start_time to avoid negative durations
+                            if ($WoCreatedAt->greaterThan($startTime)) {
+                                $WoCreatedAt = $startTime->copy()->subHours(rand(1, 12)); // 1-12 hours before start
+                            }
+                            
                             WorkOrder::create([
                                 'bom_id' => $bom->id,
                                 'qty' => $qty,
                                 'machine_id' => $machine->id,
                                 'operator_id' => $operator->id,
-                                'start_time' => $startTime,
-                                'end_time' => $woEnd,
+                                'start_time' => $startTime->toDateTimeString(),
+                                'end_time' => $woEnd->toDateTimeString(),
                                 'status' => 'Assigned',
                                 'ok_qtys' => 0,
                                 'scrapped_qtys' => 0,
                                 'unique_id' => $woUniqueId,
                                 'factory_id' => $factoryId,
-                                'created_at' => $WoCreatedAt,
-                                'updated_at' => $WoCreatedAt,
+                                'created_at' => $WoCreatedAt->toDateTimeString(),
+                                'updated_at' => $WoCreatedAt->toDateTimeString(),
                             ]);
 
                             $this->command->info("Created WO for BOM {$bom->id} with qty $qty, machine {$machine->id}, operator {$operator->id}, shift {$shift->id}, start $startTime, end $woEnd, using calc {$woCalcToggle}");

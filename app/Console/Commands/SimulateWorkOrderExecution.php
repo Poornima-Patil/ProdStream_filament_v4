@@ -48,7 +48,7 @@ class SimulateWorkOrderExecution extends Command
         }
 
         try {
-            $targetDate = Carbon::createFromFormat('Y-m-d', $dateInput)->endOfDay();
+            $targetDate = Carbon::createFromFormat('Y-m-d', $dateInput, config('app.timezone'))->endOfDay();
         } catch (\Exception $e) {
             $this->error('Invalid date format. Please use YYYY-MM-DD format.');
             return 1;
@@ -56,6 +56,7 @@ class SimulateWorkOrderExecution extends Command
 
         $this->info("Simulating work order execution for Factory: {$factory->name} (ID: {$factoryId})");
         $this->info("Processing work orders ending by: {$targetDate->format('Y-m-d H:i:s')}");
+        $this->info("Using timezone: " . config('app.timezone'));
 
         // Get all work orders that should be completed by the target date for the specific factory
         $workOrders = WorkOrder::where('end_time', '<=', $targetDate)
@@ -158,8 +159,10 @@ class SimulateWorkOrderExecution extends Command
     private function simulateWorkOrderExecution(WorkOrder $workOrder)
     {
         DB::transaction(function () use ($workOrder) {
-            $startTime = Carbon::parse($workOrder->start_time);
-            $endTime = Carbon::parse($workOrder->end_time);
+            // Ensure consistent timezone handling
+            $appTimezone = config('app.timezone');
+            $startTime = Carbon::parse($workOrder->start_time)->setTimezone($appTimezone);
+            $endTime = Carbon::parse($workOrder->end_time)->setTimezone($appTimezone);
             $totalDuration = $startTime->diffInMinutes($endTime);
 
             // Generate batch number
@@ -325,11 +328,14 @@ class SimulateWorkOrderExecution extends Command
             $fpy = ($okQtys / ($okQtys + $scrappedQtys)) * 100;
         }
 
+        // Ensure timestamp is in the correct timezone
+        $timestampInAppTimezone = $timestamp->setTimezone(config('app.timezone'));
+        
         // Create log entry directly in database to avoid any model events
         $logId = DB::table('work_order_logs')->insertGetId([
             'work_order_id' => $workOrder->id,
             'status' => $status,
-            'changed_at' => $timestamp,
+            'changed_at' => $timestampInAppTimezone->toDateTimeString(),
             'user_id' => $userId,
             'ok_qtys' => $okQtys,
             'scrapped_qtys' => $scrappedQtys,
@@ -337,8 +343,8 @@ class SimulateWorkOrderExecution extends Command
             'scrapped_reason_id' => $scrappedQtys > 0 ? 1 : null,
             'hold_reason_id' => $status === 'Hold' ? 1 : null,
             'fpy' => $fpy,
-            'created_at' => $timestamp,
-            'updated_at' => $timestamp,
+            'created_at' => $timestampInAppTimezone->toDateTimeString(),
+            'updated_at' => $timestampInAppTimezone->toDateTimeString(),
         ]);
 
         // Return the log model instance
@@ -355,6 +361,9 @@ class SimulateWorkOrderExecution extends Command
             throw new \Exception("Log ID {$log->id} does not belong to Work Order {$workOrder->id}");
         }
 
+        // Ensure timestamp consistency with app timezone
+        $logTimestamp = Carbon::parse($log->changed_at)->setTimezone(config('app.timezone'));
+        
         // Use direct database insertion to maintain timestamp consistency
         DB::table('work_order_quantities')->insert([
             'work_order_id' => $workOrder->id,
@@ -362,8 +371,8 @@ class SimulateWorkOrderExecution extends Command
             'ok_quantity' => $quantities['ok'],
             'scrapped_quantity' => $quantities['ko'],
             'reason_id' => $quantities['ko'] > 0 ? 1 : null, // Assuming reason ID 1 exists
-            'created_at' => $log->changed_at,
-            'updated_at' => $log->changed_at,
+            'created_at' => $logTimestamp->toDateTimeString(),
+            'updated_at' => $logTimestamp->toDateTimeString(),
         ]);
 
         // Log the quantity creation for audit purposes
@@ -383,7 +392,7 @@ class SimulateWorkOrderExecution extends Command
      */
     private function generateBatchNumber(WorkOrder $workOrder): string
     {
-        $date = Carbon::parse($workOrder->start_time)->format('Ymd');
+        $date = Carbon::parse($workOrder->start_time)->setTimezone(config('app.timezone'))->format('Ymd');
         $machineCode = $workOrder->machine ? substr($workOrder->machine->assetId, -3) : '001';
         $random = str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT);
 

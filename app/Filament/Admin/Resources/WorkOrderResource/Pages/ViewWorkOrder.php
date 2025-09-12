@@ -7,6 +7,7 @@ use App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderProgress;
 use App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderQtyTrendChart;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\Livewire;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\Auth;
@@ -21,7 +22,170 @@ class ViewWorkOrder extends ViewRecord
         $isAdminOrManager = $user && in_array($user->role, ['manager', 'admin']);
 
         return $infolist->schema([
-            // Section 1: General Information
+            // Section 1: Work Order KPI
+            Section::make('Work Order KPI')
+                ->collapsible()
+                ->collapsed()
+                ->columns([
+                    'sm' => 1,
+                    'md' => 2,
+                ])
+                ->schema([
+                    // Work Order Progress Section
+                    Section::make('')
+                        ->columnSpan([
+                            'sm' => 'full',
+                            'md' => 1,
+                        ])
+                        ->schema([
+                            TextEntry::make('progress_header')
+                                ->label('')
+                                ->getStateUsing(fn() => new \Illuminate\Support\HtmlString('
+                                    <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg -mb-4">
+                                        <h4 class="font-bold text-black dark:text-white">Work Order Progress</h4>
+                                    </div>
+                                '))->html(),
+                            Livewire::make(WorkOrderProgress::class)
+                                ->label(''),
+                        ]),
+                    
+                    // Work Order Quantity Trend Chart Section
+                    Section::make('')
+                        ->columnSpan([
+                            'sm' => 'full',
+                            'md' => 1,
+                        ])
+                        ->schema([
+                            TextEntry::make('trend_header')
+                                ->label('')
+                                ->getStateUsing(fn() => new \Illuminate\Support\HtmlString('
+                                    <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg -mb-4">
+                                        <h4 class="font-bold text-black dark:text-white">Work Order Quantity Trend Chart</h4>
+                                    </div>
+                                '))->html(),
+                            Livewire::make(WorkOrderQtyTrendChart::class, ['workOrder' => $this->record])
+                                ->label(''),
+                        ]),
+                    
+                    // Production Throughput Section - only show for completed or closed status
+                    TextEntry::make('production_throughput_section')
+                        ->label('')
+                        ->columnSpan([
+                            'sm' => 'full',
+                            'md' => 1,
+                        ])
+                        ->visible(fn($record) => in_array(strtolower($record->status ?? ''), ['completed', 'closed']))
+                        ->getStateUsing(function ($record) {
+                            // Get the completion log for this work order
+                            $completionLog = $record->workOrderLogs()
+                                ->whereIn('status', ['Completed', 'Closed'])
+                                ->orderBy('updated_at', 'desc')
+                                ->first();
+                            
+                            if (!$completionLog) {
+                                return new \Illuminate\Support\HtmlString('
+                                    <div class="mt-4">
+                                        <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
+                                            <h4 class="font-bold text-black dark:text-white">Production Throughput</h4>
+                                        </div>
+                                        <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
+                                            <div class="text-center text-gray-500 dark:text-gray-400">
+                                                No completion data available
+                                            </div>
+                                        </div>
+                                    </div>
+                                ');
+                            }
+                            
+                            // Calculate time period (created_at to completion log updated_at)
+                            $createdAt = \Carbon\Carbon::parse($record->created_at);
+                            
+                            // Use updated_at as the end time
+                            $completedAt = \Carbon\Carbon::parse($completionLog->updated_at);
+                            
+                            // Handle edge cases where completion time might be before creation time
+                            $hours = $createdAt->diffInHours($completedAt, false); // false = can be negative
+                            
+                            // If negative hours, it might be a data issue - use absolute value or show as data error
+                            if ($hours <= 0) {
+                                $hours = abs($hours);
+                                $dataNote = ' (Data inconsistency detected)';
+                            } else {
+                                $dataNote = '';
+                            }
+                            
+                            // Get units produced
+                            $units = $record->ok_qtys ?? 0;
+                            
+                            // Calculate throughput
+                            $throughputPerHour = $hours > 0 ? round($units / $hours, 3) : 0;
+                            $throughputPerDay = round($throughputPerHour * 24, 1);
+                            
+                            return new \Illuminate\Support\HtmlString('
+                                <div class="mt-4">
+                                    <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
+                                        <h4 class="font-bold text-black dark:text-white">Production Throughput</h4>
+                                    </div>
+                                    <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Hourly Rate: ' . $throughputPerHour . ' units/hr' . $dataNote . '</span>
+                                            <span class="text-xs text-gray-600 dark:text-gray-400">' . $units . ' units in ' . number_format($hours, 1) . ' hrs</span>
+                                        </div>
+                                        <div class="flex justify-between items-center mb-4">
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Daily Rate: ' . $throughputPerDay . ' units/day</span>
+                                            <span class="text-xs text-gray-600 dark:text-gray-400">24-hour equivalent</span>
+                                        </div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                                            <div>Started: ' . $createdAt->format('Y-m-d H:i:s') . '</div>
+                                            <div>Completed: ' . $completedAt->format('Y-m-d H:i:s') . '</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ');
+                        })->html(),
+
+                    // Scrap Rate Section - only show for completed, hold, or closed status
+                    TextEntry::make('scrap_rate_section')
+                        ->label('')
+                        ->columnSpan([
+                            'sm' => 'full',
+                            'md' => 1,
+                        ])
+                        ->visible(fn($record) => in_array(strtolower($record->status ?? ''), ['completed', 'hold', 'closed']))
+                        ->getStateUsing(function ($record) {
+                            $totalQty = $record->qty ?? 0;
+                            $scrappedQty = $record->scrapped_qtys ?? 0;
+                            $scrapRate = $totalQty > 0 ? ($scrappedQty / $totalQty) * 100 : 0;
+                            $goodRate = 100 - $scrapRate;
+                            
+                            return new \Illuminate\Support\HtmlString('
+                                <div class="mt-4">
+                                    <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
+                                        <h4 class="font-bold text-black dark:text-white">Scrap Rate</h4>
+                                    </div>
+                                    <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Scrap Rate: ' . number_format($scrapRate, 1) . '%</span>
+                                            <span class="text-xs text-gray-600 dark:text-gray-400">' . $scrappedQty . ' / ' . $totalQty . '</span>
+                                        </div>
+                                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-6 overflow-hidden">
+                                            <div class="flex h-full">
+                                                <div class="bg-green-500 dark:bg-green-600 transition-all duration-500" style="width: ' . $goodRate . '%"></div>
+                                                <div class="bg-red-500 dark:bg-red-600 transition-all duration-500" style="width: ' . $scrapRate . '%"></div>
+                                            </div>
+                                        </div>
+                                        <div class="flex justify-between mt-2 text-xs">
+                                            <span class="text-green-600 dark:text-green-400">✓ Good: ' . number_format($goodRate, 1) . '%</span>
+                                            <span class="text-red-600 dark:text-red-400">✗ Scrapped: ' . number_format($scrapRate, 1) . '%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ');
+                        })->html(),
+            
+                ]),
+
+            // Section 2: General Information
             Section::make('General Information')
                 ->collapsible()
                 ->schema([
@@ -85,7 +249,7 @@ class ViewWorkOrder extends ViewRecord
                         })->html(),
                 ]),
 
-            // Section 2: Details
+            // Section 3: Details
             Section::make('Details')
                 ->collapsible()
                 ->schema([
@@ -192,7 +356,7 @@ class ViewWorkOrder extends ViewRecord
                         })->html(),
                 ]),
 
-            // Section 3: Documents
+            // Section 4: Documents
             Section::make('Documents')
                 ->collapsible()
                 ->schema([
@@ -257,7 +421,7 @@ class ViewWorkOrder extends ViewRecord
                         })->html(),
                 ]),
 
-            // Section 4: Work Order Logs
+            // Section 5: Work Order Logs
             Section::make('Work Order Logs')
                 ->collapsible()
                 ->schema([
@@ -413,7 +577,7 @@ class ViewWorkOrder extends ViewRecord
                         })->html(),
                 ]),
 
-            // Section 5: Work Order Info Messages
+            // Section 6: Work Order Info Messages
             Section::make('Work Order Info Messages')
     ->collapsible()
     ->schema([
@@ -499,20 +663,4 @@ class ViewWorkOrder extends ViewRecord
         ]);
     }
 
-    public function getHeaderWidgets(): array
-    {
-        return [
-            WorkOrderProgress::class,
-            WorkOrderQtyTrendChart::make(['workOrder' => $this->record]),
-        ];
-    }
-
-    public function getHeaderWidgetsColumns(): int | array
-    {
-        return [
-            'sm' => 1,
-            'md' => 2,
-            'lg' => 2,
-        ];
-    }
 }
