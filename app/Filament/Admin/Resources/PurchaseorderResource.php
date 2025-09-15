@@ -2,29 +2,41 @@
 
 namespace App\Filament\Admin\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\Select;
+use App\Models\PartNumber;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\DatePicker;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Admin\Resources\PurchaseorderResource\Pages\ListPurchaseorders;
+use App\Filament\Admin\Resources\PurchaseorderResource\Pages\CreatePurchaseorder;
+use App\Filament\Admin\Resources\PurchaseorderResource\Pages\EditPurchaseorder;
+use App\Filament\Admin\Resources\PurchaseorderResource\Pages\ViewPurchaseorder;
 use App\Filament\Admin\Resources\PurchaseorderResource\Pages;
 use App\Models\CustomerInformation;
 use App\Models\PurchaseOrder;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
-use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
-use Filament\Tables\Enums\ActionsPosition;
 
 class PurchaseorderResource extends Resource
 {
     protected static ?string $model = PurchaseOrder::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-shopping-bag';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-shopping-bag';
 
-    protected static ?string $navigationGroup = 'Process Operations';
+    protected static string | \UnitEnum | null $navigationGroup = 'Process Operations';
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
@@ -33,17 +45,17 @@ class PurchaseorderResource extends Resource
         return 'Sales Order lines'; // This will be displayed in the left panel
     }
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Select::make('part_number_id')
+        return $schema
+            ->components([
+                Select::make('part_number_id')
                     ->label('Partnumber')
                     ->options(function () {
                         $factoryId = Auth::user()->factory_id; // Get the factory ID of the logged-in user
 
                         // Query the PartNumber model and include the partnumber and revision
-                        return \App\Models\PartNumber::where('factory_id', $factoryId)
+                        return PartNumber::where('factory_id', $factoryId)
                             ->get()
                             ->mapWithKeys(function ($partNumber) {
                                 return [
@@ -55,7 +67,7 @@ class PurchaseorderResource extends Resource
                     ->preload()
                     ->searchable()
                     ->reactive(),
-                Forms\Components\Select::make('cust_id')
+                Select::make('cust_id')
                     ->label('Customer')
                     ->options(function () {
                         // Get the factory_id of the currently logged-in user
@@ -72,23 +84,23 @@ class PurchaseorderResource extends Resource
                             ->toArray();
                     })
                     ->required(),
-                Forms\Components\TextInput::make('QTY')
+                TextInput::make('QTY')
                     ->required(),
-                Forms\Components\DatePicker::make('delivery_target_date')
+                DatePicker::make('delivery_target_date')
                     ->required()
                     ->label('Delivery Target Date')
                     ->minDate(now()->startOfDay()) 
                     ->hint('Select the delivery target date')
                     ->displayFormat('Y-m-d'), // You can adjust the date format
 
-                Forms\Components\Select::make('Unit Of Measurement')
+                Select::make('Unit Of Measurement')
                     ->options([
                         'Kgs' => 'Kgs',
                         'Numbers' => 'Numbers',
                     ])
                     ->required(),
 
-                Forms\Components\TextInput::make('price'),
+                TextInput::make('price'),
             ]);
     }
 
@@ -96,23 +108,23 @@ class PurchaseorderResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('unique_id')->label('Unique ID')
+                TextColumn::make('unique_id')->label('Unique ID')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('customer.customer_id')->label('Customer ID')
+                TextColumn::make('customer.customer_id')->label('Customer ID')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('partnumber.partnumber')
+                TextColumn::make('partnumber.partnumber')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('partnumber.revision')->label('Revision'),
-                Tables\Columns\TextColumn::make('QTY'),
-                Tables\Columns\TextColumn::make('Unit Of Measurement')
+                TextColumn::make('partnumber.revision')->label('Revision'),
+                TextColumn::make('QTY'),
+                TextColumn::make('Unit Of Measurement')
                     ->label('UM'),
-                Tables\Columns\TextColumn::make('delivery_target_date') // The column for Delivery Target Date
+                TextColumn::make('delivery_target_date') // The column for Delivery Target Date
                     ->label('Delivery Target Date')
                     ->date(), // Only show the date part
 
-                Tables\Columns\TextColumn::make('price'),
+                TextColumn::make('price'),
 
-                Tables\Columns\TextColumn::make('progress')
+                TextColumn::make('progress')
                     ->label('Progress')
                     ->formatStateUsing(function ($state) {
                         $progressPercent = $state ?? 0;
@@ -127,17 +139,17 @@ class PurchaseorderResource extends Resource
                     ->html(), // Enable HTML rendering for this column
             ])
             ->filters([
-                Tables\Filters\TrashedFilter::make(),
+                TrashedFilter::make(),
             ])
-            ->actions([
+            ->recordActions([
                 ActionGroup::make([
                     EditAction::make()->label('Edit'),
                     ViewAction::make()->label('View'),
                 ])
-            ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ], position: RecordActionsPosition::BeforeColumns)
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -152,10 +164,10 @@ class PurchaseorderResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPurchaseorders::route('/'),
-            'create' => Pages\CreatePurchaseorder::route('/create'),
-            'edit' => Pages\EditPurchaseorder::route('/{record}/edit'),
-            'view' => Pages\ViewPurchaseorder::route('/{record}/'),
+            'index' => ListPurchaseorders::route('/'),
+            'create' => CreatePurchaseorder::route('/create'),
+            'edit' => EditPurchaseorder::route('/{record}/edit'),
+            'view' => ViewPurchaseorder::route('/{record}/'),
 
         ];
     }

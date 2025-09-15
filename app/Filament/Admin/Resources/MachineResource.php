@@ -2,45 +2,56 @@
 
 namespace App\Filament\Admin\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Actions\Action;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Admin\Resources\MachineResource\Pages\ListMachines;
+use App\Filament\Admin\Resources\MachineResource\Pages\CreateMachine;
+use App\Filament\Admin\Resources\MachineResource\Pages\EditMachine;
+use App\Filament\Admin\Resources\MachineResource\Pages\ViewMachine;
 use App\Filament\Admin\Resources\MachineResource\Pages;
 use App\Models\Machine;
 use App\Models\MachineGroup;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
-use Filament\Tables\Actions\Action;
-use Filament\Tables\Enums\ActionsPosition;
 class MachineResource extends Resource
 {
     protected static ?string $model = Machine::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-cog';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-cog';
 
-    protected static ?string $navigationGroup = 'Admin Operations';
+    protected static string | \UnitEnum | null $navigationGroup = 'Admin Operations';
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\TextInput::make('assetId')->required(),
-                Forms\Components\TextInput::make('name')
+        return $schema
+            ->components([
+                TextInput::make('assetId')->required(),
+                TextInput::make('name')
                     ->unique(ignoreRecord: true)->required(),
-                Forms\Components\Select::make('status')->options([
+                Select::make('status')->options([
                     1 => 'Active',
                     0 => 'Inactive',
                 ])->default(1)
                     ->required(),
 
-                Forms\Components\Select::make('department_id')
+                Select::make('department_id')
                     ->label('Department')
                     ->relationship('department', 'name', function ($query) {
                         return $query->where('factory_id', auth()->user()->factory_id);
@@ -49,7 +60,7 @@ class MachineResource extends Resource
                     ->preload()
                     ->default(1)
                     ->required(),
-                Forms\Components\Select::make('machine_group_id')
+                Select::make('machine_group_id')
                     ->label('Machine Group')
                     ->options(MachineGroup::all()->pluck('group_name', 'id'))
                     ->required()  // You can make this required or optional
@@ -61,21 +72,21 @@ class MachineResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('assetId')->searchable(),
-                Tables\Columns\TextColumn::make('name')->searchable()->sortable(),
-                Tables\Columns\IconColumn::make('status')
+                TextColumn::make('assetId')->searchable(),
+                TextColumn::make('name')->searchable()->sortable(),
+                IconColumn::make('status')
                     ->label('Status')
                     ->boolean(),
-                Tables\Columns\TextColumn::make('department.name')->label('Department Name'),
-                Tables\Columns\TextColumn::make('machineGroup.group_name')  // Display the group name
+                TextColumn::make('department.name')->label('Department Name'),
+                TextColumn::make('machineGroup.group_name')  // Display the group name
                     ->label('Machine Group')
                     ->searchable()
                     ->sortable(),
             ])
             ->filters([
-                Tables\Filters\TrashedFilter::make(),
+                TrashedFilter::make(),
             ])
-            ->actions([
+            ->recordActions([
                 ActionGroup::make([
                 EditAction::make()
                     ->label('Edit'),
@@ -88,10 +99,10 @@ class MachineResource extends Resource
                     ->url(fn($record) => MachineResource::getUrl('view', ['record' => $record]) . '#machine-schedule-section')
                     ->openUrlInNewTab(false),
             ])
-            ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ], position: RecordActionsPosition::BeforeColumns)
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -106,10 +117,10 @@ class MachineResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListMachines::route('/'),
-            'create' => Pages\CreateMachine::route('/create'),
-            'edit' => Pages\EditMachine::route(path: '/{record}/edit'),
-            'view' => Pages\ViewMachine::route(path: '/{record}/'),
+            'index' => ListMachines::route('/'),
+            'create' => CreateMachine::route('/create'),
+            'edit' => EditMachine::route(path: '/{record}/edit'),
+            'view' => ViewMachine::route(path: '/{record}/'),
 
         ];
     }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -79,7 +80,7 @@ class Machine extends Model
      */
     public function getCalendarEvents($viewType = 'week', $date = null)
     {
-        $date = $date ? \Carbon\Carbon::parse($date) : now();
+        $date = $date ? Carbon::parse($date) : now();
 
         // Define date ranges based on view type
         switch ($viewType) {
@@ -88,16 +89,16 @@ class Machine extends Model
                 $endDate = $date->copy()->endOfDay();
                 break;
             case 'week':
-                $startDate = $date->copy()->startOfWeek(\Carbon\Carbon::MONDAY);
-                $endDate = $date->copy()->startOfWeek(\Carbon\Carbon::MONDAY)->addDays(5)->endOfDay(); // Monday to Saturday
+                $startDate = $date->copy()->startOfWeek(Carbon::MONDAY);
+                $endDate = $date->copy()->startOfWeek(Carbon::MONDAY)->addDays(5)->endOfDay(); // Monday to Saturday
                 break;
             case 'month':
                 $startDate = $date->copy()->startOfMonth();
                 $endDate = $date->copy()->endOfMonth();
                 break;
             default:
-                $startDate = $date->copy()->startOfWeek(\Carbon\Carbon::MONDAY);
-                $endDate = $date->copy()->startOfWeek(\Carbon\Carbon::MONDAY)->addDays(5)->endOfDay(); // Monday to Saturday
+                $startDate = $date->copy()->startOfWeek(Carbon::MONDAY);
+                $endDate = $date->copy()->startOfWeek(Carbon::MONDAY)->addDays(5)->endOfDay(); // Monday to Saturday
         }
 
         $workOrders = $this->getScheduledWorkOrders($startDate, $endDate);

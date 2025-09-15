@@ -2,6 +2,13 @@
 
 namespace App\Filament\Admin\Resources\WorkOrderResource\Pages;
 
+use Filament\Actions\CreateAction;
+use Log;
+use Filament\Schemas\Components\Tabs\Tab;
+use App\Models\WorkOrder;
+use App\Models\Operator;
+use App\Filament\Admin\Resources\WorkOrderResource\Widgets\SimpleWorkOrderGantt;
+use Illuminate\Database\Eloquent\Model;
 use App\Filament\Admin\Resources\WorkOrderResource;
 use App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderPieChart;
 use App\Models\PartNumber;
@@ -14,7 +21,6 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Concerns\ExposesTableToWidgets;
-use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -33,7 +39,7 @@ class ListWorkOrders extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make()
+            CreateAction::make()
                 ->after(function ($livewire, array $data) {
                     $workOrder = $livewire->record;
 
@@ -51,7 +57,7 @@ class ListWorkOrders extends ListRecords
                         ->success()
                         ->send();
                 })
-                ->form([
+                ->schema([
                     Textarea::make('log_comments')
                         ->label('Comments')
                         ->nullable(),
@@ -83,7 +89,7 @@ class ListWorkOrders extends ListRecords
 
     protected function getTableQuery(): Builder
     {
-        \Log::info('getTableQuery called for WorkOrders');
+        Log::info('getTableQuery called for WorkOrders');
 
         return $this->getResource()::getEloquentQuery()
             ->where('factory_id', auth()->user()->factory_id);
@@ -98,7 +104,7 @@ class ListWorkOrders extends ListRecords
         ];
 
         // Get unique statuses for the current factory
-        $statuses = \App\Models\WorkOrder::where('factory_id', auth()->user()->factory_id)
+        $statuses = WorkOrder::where('factory_id', auth()->user()->factory_id)
             ->pluck('status')
             ->unique();
 
@@ -122,7 +128,7 @@ class ListWorkOrders extends ListRecords
                     ->label('Operator')
                     ->options(function () {
                         // Get all operators for this factory, eager load user
-                        return \App\Models\Operator::with('user')
+                        return Operator::with('user')
                             ->where('factory_id', auth()->user()->factory_id)
                             ->get()
                             ->mapWithKeys(function ($operator) {
@@ -161,7 +167,7 @@ class ListWorkOrders extends ListRecords
                             return;
                         }
                         $partnumber_id = $data['value'];
-                        $part = \App\Models\PartNumber::find($partnumber_id);
+                        $part = PartNumber::find($partnumber_id);
                         if ($part) {
                             $partnumber = $part->partnumber;
                             $revision = $part->revision;
@@ -183,14 +189,14 @@ class ListWorkOrders extends ListRecords
                         $query->where('factory_id', auth()->user()->factory_id)
                             ->where('unique_id', 'like', '%'.(is_array($data) ? implode(',', $data) : $data).'%')
                     )
-                    ->form([
+                    ->schema([
                         TextInput::make('unique_id')->label('Unique ID'),
                     ]),
 
                 // Created Date Range Filter
                 Filter::make('created_at_range')
                     ->label('Created Date Range')
-                    ->form([
+                    ->schema([
                         DatePicker::make('from')
                             ->label('From Date')
                             ->default(Carbon::now()->subDays(30)->toDateString()),
@@ -232,11 +238,11 @@ class ListWorkOrders extends ListRecords
     protected function getFooterWidgets(): array
     {
         return [
-            \App\Filament\Admin\Resources\WorkOrderResource\Widgets\SimpleWorkOrderGantt::class,
+            SimpleWorkOrderGantt::class,
         ];
     }
 
-    public function getTableRecordKey($record): string
+    public function getTableRecordKey(Model|array $record): string
     {
         return $record->unique_id;
     }

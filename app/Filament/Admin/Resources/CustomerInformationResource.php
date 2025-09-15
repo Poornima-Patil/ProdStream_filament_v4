@@ -2,35 +2,45 @@
 
 namespace App\Filament\Admin\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Admin\Resources\CustomerInformationResource\Pages\ListCustomerInformation;
+use App\Filament\Admin\Resources\CustomerInformationResource\Pages\CreateCustomerInformation;
+use App\Filament\Admin\Resources\CustomerInformationResource\Pages\EditCustomerInformation;
+use App\Filament\Admin\Resources\CustomerInformationResource\Pages\ViewCustomerInformation;
 use App\Filament\Admin\Resources\CustomerInformationResource\Pages;
 use App\Models\CustomerInformation;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
-use Filament\Tables\Enums\ActionsPosition;
 class CustomerInformationResource extends Resource
 {
     protected static ?string $model = CustomerInformation::class;
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    protected static ?string $navigationIcon = 'heroicon-o-users';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-users';
 
-    protected static ?string $navigationGroup = 'Admin Operations';
+    protected static string | \UnitEnum | null $navigationGroup = 'Admin Operations';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\TextInput::make('name')->required(),
-                Forms\Components\Textarea::make('address')->required(),
+        return $schema
+            ->components([
+                TextInput::make('name')->required(),
+                Textarea::make('address')->required(),
             ]);
     }
 
@@ -38,26 +48,26 @@ class CustomerInformationResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('customer_id')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('name')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('address')->limit(50),
-                Tables\Columns\TextColumn::make('deleted_at')
+                TextColumn::make('customer_id')->sortable()->searchable(),
+                TextColumn::make('name')->sortable()->searchable(),
+                TextColumn::make('address')->limit(50),
+                TextColumn::make('deleted_at')
                     ->label('Deleted At')
                     ->dateTime()
                     ->hidden(),
             ])
             ->filters([
-                Tables\Filters\TrashedFilter::make(),
+                TrashedFilter::make(),
             ])
-            ->actions([
+            ->recordActions([
                 ActionGroup::make([
                     EditAction::make()->label('Edit'),
                     ViewAction::make()->label('View'),
                 ])
-            ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ], position: RecordActionsPosition::BeforeColumns)
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
         
@@ -73,10 +83,10 @@ class CustomerInformationResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListCustomerInformation::route('/'),
-            'create' => Pages\CreateCustomerInformation::route('/create'),
-            'edit' => Pages\EditCustomerInformation::route('/{record}/edit'),
-            'view' => Pages\ViewCustomerInformation::route('/{record}/view'),
+            'index' => ListCustomerInformation::route('/'),
+            'create' => CreateCustomerInformation::route('/create'),
+            'edit' => EditCustomerInformation::route('/{record}/edit'),
+            'view' => ViewCustomerInformation::route('/{record}/view'),
         ];
     }
 

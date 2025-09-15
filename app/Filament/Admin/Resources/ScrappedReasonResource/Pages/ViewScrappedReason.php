@@ -2,10 +2,11 @@
 
 namespace App\Filament\Admin\Resources\ScrappedReasonResource\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Illuminate\Support\HtmlString;
 use App\Filament\Admin\Resources\ScrappedReasonResource;
-use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewScrappedReason extends ViewRecord
@@ -17,12 +18,12 @@ class ViewScrappedReason extends ViewRecord
         return [];
     }
 
-    public function infolist(Infolist $infolist): Infolist
+    public function infolist(Schema $schema): Schema
     {
-        return $infolist->schema([
+        return $schema->components([
             Section::make('View Scrapped Reason')
                 ->hiddenLabel()
-                ->collapsible()
+                ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('View Scrapped Reason')
                         ->label('')
@@ -34,7 +35,7 @@ class ViewScrappedReason extends ViewRecord
                             $Code = $record->code;
                             $Description = $record->description;
 
-                            return new \Illuminate\Support\HtmlString('
+                            return new HtmlString('
                                 <!-- Large screen table -->
                                 <div class="hidden lg:block overflow-x-auto shadow rounded-lg">
                                     <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900 rounded-lg overflow-hidden">

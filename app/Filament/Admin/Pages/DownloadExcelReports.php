@@ -16,11 +16,11 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class DownloadExcelReports extends Page
 {
-    protected static string $view = 'filament.admin.pages.download-excel-reports';
+    protected string $view = 'filament.admin.pages.download-excel-reports';
 
-    protected static ?string $navigationGroup = 'Reports';
+    protected static string | \UnitEnum | null $navigationGroup = 'Reports';
 
-    protected static ?string $navigationIcon = 'heroicon-o-arrow-down-tray';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-arrow-down-tray';
 
     protected static ?string $navigationLabel = 'Download Excel Reports';
 

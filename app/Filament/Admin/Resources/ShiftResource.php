@@ -2,40 +2,50 @@
 
 namespace App\Filament\Admin\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\TimePicker;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Admin\Resources\ShiftResource\Pages\ListShifts;
+use App\Filament\Admin\Resources\ShiftResource\Pages\CreateShift;
+use App\Filament\Admin\Resources\ShiftResource\Pages\EditShift;
+use App\Filament\Admin\Resources\ShiftResource\Pages\ViewShift;
 use App\Filament\Admin\Resources\ShiftResource\Pages;
 use App\Models\Shift;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
-use Filament\Tables\Enums\ActionsPosition;
 class ShiftResource extends Resource
 {
     protected static ?string $model = Shift::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-clock';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-clock';
 
-    protected static ?string $navigationGroup = 'Admin Operations';
+    protected static string | \UnitEnum | null $navigationGroup = 'Admin Operations';
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\TextInput::make('name'),
-                Forms\Components\TimePicker::make('start_time')
+        return $schema
+            ->components([
+                TextInput::make('name'),
+                TimePicker::make('start_time')
                     ->required()
                     ->withoutSeconds()
                     ->label('Start Time'),
 
-                Forms\Components\TimePicker::make('end_time')
+                TimePicker::make('end_time')
                     ->required()
                     ->withoutSeconds()
                     ->label('End Time'),
@@ -46,28 +56,28 @@ class ShiftResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('name')
+                TextColumn::make('name')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('start_time')
+                TextColumn::make('start_time')
                     ->label('Start Time')
                     ->dateTime('H:i'), // Format to display in 24-hour format,
 
-                Tables\Columns\TextColumn::make('end_time')
+                TextColumn::make('end_time')
                     ->label('End Time')
                     ->dateTime('H:i'), // Format to display in 24-hour format
             ])
             ->filters([
-                Tables\Filters\TrashedFilter::make(),
+                TrashedFilter::make(),
             ])
-            ->actions([
+            ->recordActions([
                 ActionGroup::make([
                     EditAction::make()->label('Edit'),
                     ViewAction::make()->label('View'),
                 ])
-            ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ], position: RecordActionsPosition::BeforeColumns)
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -82,10 +92,10 @@ class ShiftResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListShifts::route('/'),
-            'create' => Pages\CreateShift::route('/create'),
-            'edit' => Pages\EditShift::route('/{record}/edit'),
-            'view' => Pages\ViewShift::route('/{record}/'),
+            'index' => ListShifts::route('/'),
+            'create' => CreateShift::route('/create'),
+            'edit' => EditShift::route('/{record}/edit'),
+            'view' => ViewShift::route('/{record}/'),
 
         ];
     }

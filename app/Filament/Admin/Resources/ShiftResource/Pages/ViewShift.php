@@ -2,10 +2,11 @@
 
 namespace App\Filament\Admin\Resources\ShiftResource\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Illuminate\Support\HtmlString;
 use App\Filament\Admin\Resources\ShiftResource;
-use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewShift extends ViewRecord
@@ -17,12 +18,12 @@ class ViewShift extends ViewRecord
         return [];
     }
 
-    public function infolist(Infolist $infolist): Infolist
+    public function infolist(Schema $schema): Schema
     {
-        return $infolist->schema([
+        return $schema->components([
             Section::make('View Shift')
                 ->hiddenLabel()
-                ->collapsible()
+                ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('View Shift')
                         ->label('')
@@ -35,7 +36,7 @@ class ViewShift extends ViewRecord
                             $ShiftStartTime = $record->start_time;
                             $ShiftEndTime = $record->end_time;
 
-                            return new \Illuminate\Support\HtmlString('
+                            return new HtmlString('
                                 <!-- Large screen table -->
                                 <div class="hidden lg:block overflow-x-auto shadow rounded-lg">
                                     <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900 rounded-lg overflow-hidden">

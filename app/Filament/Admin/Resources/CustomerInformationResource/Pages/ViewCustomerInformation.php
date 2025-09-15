@@ -2,10 +2,11 @@
 
 namespace App\Filament\Admin\Resources\CustomerInformationResource\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Illuminate\Support\HtmlString;
 use App\Filament\Admin\Resources\CustomerInformationResource;
-use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewCustomerInformation extends ViewRecord
@@ -17,12 +18,12 @@ class ViewCustomerInformation extends ViewRecord
         return [];
     }
 
-    public function infolist(Infolist $infolist): Infolist
+    public function infolist(Schema $schema): Schema
     {
-        return $infolist->schema([
+        return $schema->components([
             Section::make('View Customer Information')
                 ->hiddenLabel()
-                ->collapsible()
+                ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('View Customer Information')
                         ->label('')
@@ -36,7 +37,7 @@ class ViewCustomerInformation extends ViewRecord
                             $Address = $record->address;
                            
 
-                            return new \Illuminate\Support\HtmlString('
+                            return new HtmlString('
                                 <!-- Large screen table -->
                                 <div class="hidden lg:block overflow-x-auto shadow rounded-lg">
                                     <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900 rounded-lg overflow-hidden">

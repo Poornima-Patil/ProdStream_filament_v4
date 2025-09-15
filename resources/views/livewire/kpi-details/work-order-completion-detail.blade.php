@@ -23,7 +23,7 @@
                 </div>
             </div>
         </div>
-        
+
         {{-- Completed Orders --}}
         <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
             <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Completed Orders</h4>
@@ -32,7 +32,7 @@
             </div>
             <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Total completed</p>
         </div>
-        
+
         {{-- Total Orders --}}
         <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
             <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Orders</h4>
@@ -43,152 +43,167 @@
         </div>
     </div>
 
-    {{-- Performance Breakdown --}}
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        {{-- Work Order Status Distribution --}}
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <div class="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/20 rounded-md flex items-center justify-center">
-                        <svg class="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                        </svg>
-                    </div>
+    {{-- Related KPIs Grid --}}
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {{-- Production Throughput KPI --}}
+        @if(isset($kpis['quality_rate']))
+            <div class="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/30 rounded-lg p-6 border border-green-200 dark:border-green-700">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-lg font-semibold text-green-900 dark:text-green-100">Production Throughput</h4>
+                    <div class="w-4 h-4 rounded-full {{ $this->getStatusColor($kpis['quality_rate']['status']) }}"></div>
                 </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Status Distribution</dt>
-                        <dd class="text-lg font-medium text-gray-900 dark:text-white">Work Order Status</dd>
-                        <dd class="text-xs text-gray-500 dark:text-gray-500 mt-1 space-y-1">
-                            <div class="flex justify-between">
-                                <span class="text-gray-600 dark:text-gray-400">📋 Assigned:</span>
-                                <span>{{ $kpis['work_order_completion_rate']['status_distribution']['Assigned']['percentage'] ?? '0' }}% ({{ $kpis['work_order_completion_rate']['status_distribution']['Assigned']['count'] ?? '0' }})</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-blue-600 dark:text-blue-400">▶️ Started:</span>
-                                <span>{{ $kpis['work_order_completion_rate']['status_distribution']['Start']['percentage'] ?? '0' }}% ({{ $kpis['work_order_completion_rate']['status_distribution']['Start']['count'] ?? '0' }})</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-yellow-600 dark:text-yellow-400">⏸️ Hold:</span>
-                                <span>{{ $kpis['work_order_completion_rate']['status_distribution']['Hold']['percentage'] ?? '0' }}% ({{ $kpis['work_order_completion_rate']['status_distribution']['Hold']['count'] ?? '0' }})</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-green-600 dark:text-green-400">✅ Completed:</span>
-                                <span>{{ $kpis['work_order_completion_rate']['status_distribution']['Completed']['percentage'] ?? '0' }}% ({{ $kpis['work_order_completion_rate']['status_distribution']['Completed']['count'] ?? '0' }})</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-purple-600 dark:text-purple-400">🔒 Closed:</span>
-                                <span>{{ $kpis['work_order_completion_rate']['status_distribution']['Closed']['percentage'] ?? '0' }}% ({{ $kpis['work_order_completion_rate']['status_distribution']['Closed']['count'] ?? '0' }})</span>
-                            </div>
-                        </dd>
-                    </dl>
+                <div class="text-3xl font-bold text-green-900 dark:text-green-100 mb-2">
+                    {{ number_format($kpis['quality_rate']['rate'], 1) }}
+                    <span class="text-lg font-normal">units/hr</span>
+                </div>
+                <p class="text-sm text-green-700 dark:text-green-300 mb-3">
+                    {{ number_format($kpis['quality_rate']['total_units']) }} units in {{ $kpis['quality_rate']['total_hours'] }}hrs
+                </p>
+                <div class="flex items-center justify-between text-sm">
+                    <span class="text-green-600 dark:text-green-400">Target: 42/hr</span>
+                    @if($kpis['quality_rate']['trend'] != 0)
+                        <span class="font-medium {{ $this->getTrendColor($kpis['quality_rate']['trend']) }}">
+                            {{ $this->getTrendIcon($kpis['quality_rate']['trend']) }} {{ abs($kpis['quality_rate']['trend']) }}
+                        </span>
+                    @endif
                 </div>
             </div>
-        </div>
-        {{-- On-Time Delivery --}}
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <div class="w-8 h-8 bg-green-100 dark:bg-green-900/20 rounded-md flex items-center justify-center">
-                        <svg class="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
+        @else
+            <div class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 rounded-lg p-6 border border-gray-200 dark:border-gray-600 opacity-60">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-lg font-semibold text-gray-600 dark:text-gray-400">Production Throughput</h4>
+                    <div class="w-4 h-4 rounded-full bg-gray-300 dark:bg-gray-600"></div>
                 </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Overall Scrap Rate</dt>
-                        <dd class="text-lg font-medium text-gray-900 dark:text-white">
-                            {{ $kpis['work_order_scrapped_qty']['rate'] ?? '0' }}%
-                        </dd>
-                        <dd class="text-sm text-gray-600 dark:text-gray-400">
-                            {{ $kpis['work_order_scrapped_qty']['scrapped_qty'] ?? '0' }} / {{ $kpis['work_order_scrapped_qty']['total_qty'] ?? '0' }} units
-                        </dd>
-                        <dd class="text-xs text-gray-500 dark:text-gray-500 mt-2 space-y-1">
-                            <div class="flex justify-between">
-                                <span class="text-green-600 dark:text-green-400">✓ Completed:</span>
-                                <span>{{ $kpis['work_order_scrapped_qty']['by_status']['completed']['rate'] ?? '0' }}% ({{ $kpis['work_order_scrapped_qty']['by_status']['completed']['scrapped_qty'] ?? '0' }}/{{ $kpis['work_order_scrapped_qty']['by_status']['completed']['total_qty'] ?? '0' }})</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-yellow-600 dark:text-yellow-400">⏸ Hold:</span>
-                                <span>{{ $kpis['work_order_scrapped_qty']['by_status']['hold']['rate'] ?? '0' }}% ({{ $kpis['work_order_scrapped_qty']['by_status']['hold']['scrapped_qty'] ?? '0' }}/{{ $kpis['work_order_scrapped_qty']['by_status']['hold']['total_qty'] ?? '0' }})</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-gray-600 dark:text-gray-400">➤ Closed:</span>
-                                <span>{{ $kpis['work_order_scrapped_qty']['by_status']['closed']['rate'] ?? '0' }}% ({{ $kpis['work_order_scrapped_qty']['by_status']['closed']['scrapped_qty'] ?? '0' }}/{{ $kpis['work_order_scrapped_qty']['by_status']['closed']['total_qty'] ?? '0' }})</span>
-                            </div>
-                        </dd>
-                    </dl>
+                <div class="text-3xl font-bold text-gray-500 dark:text-gray-400 mb-2">--</div>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Data not available</p>
+                <div class="text-sm text-gray-400 dark:text-gray-500">Coming Soon</div>
+            </div>
+        @endif
+
+        {{-- Scrap Rate KPI --}}
+        @if(isset($kpis['work_order_scrapped_qty']))
+            <div class="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-800/30 rounded-lg p-6 border border-red-200 dark:border-red-700">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-lg font-semibold text-red-900 dark:text-red-100">Scrap Rate</h4>
+                    <div class="w-4 h-4 rounded-full {{ $this->getStatusColor($kpis['work_order_scrapped_qty']['status']) }}"></div>
+                </div>
+                <div class="text-3xl font-bold text-red-900 dark:text-red-100 mb-2">
+                    {{ number_format($kpis['work_order_scrapped_qty']['rate'], 1) }}%
+                </div>
+                <p class="text-sm text-red-700 dark:text-red-300 mb-3">
+                    {{ number_format($kpis['work_order_scrapped_qty']['scrapped_qty']) }} of {{ number_format($kpis['work_order_scrapped_qty']['total_qty']) }} units scrapped
+                </p>
+                <div class="flex items-center justify-between text-sm">
+                    <span class="text-red-600 dark:text-red-400">Target: < 3%</span>
+                    @if($kpis['work_order_scrapped_qty']['trend'] != 0)
+                        <span class="font-medium {{ $this->getTrendColor(-$kpis['work_order_scrapped_qty']['trend']) }}">
+                            {{ $this->getTrendIcon(-$kpis['work_order_scrapped_qty']['trend']) }} {{ abs($kpis['work_order_scrapped_qty']['trend']) }}%
+                        </span>
+                    @endif
                 </div>
             </div>
+        @else
+            <div class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 rounded-lg p-6 border border-gray-200 dark:border-gray-600 opacity-60">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-lg font-semibold text-gray-600 dark:text-gray-400">Scrap Rate</h4>
+                    <div class="w-4 h-4 rounded-full bg-gray-300 dark:bg-gray-600"></div>
+                </div>
+                <div class="text-3xl font-bold text-gray-500 dark:text-gray-400 mb-2">--</div>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Data not available</p>
+                <div class="text-sm text-gray-400 dark:text-gray-500">Coming Soon</div>
+            </div>
+        @endif
+
+        {{-- Machine Utilization KPI --}}
+        @if(isset($kpis['machine_utilization']) && isset($kpis['machine_utilization']['rate']))
+            <div class="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 rounded-lg p-6 border border-purple-200 dark:border-purple-700">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-lg font-semibold text-purple-900 dark:text-purple-100">Machine Utilization</h4>
+                    <div class="w-4 h-4 rounded-full {{ $this->getStatusColor($kpis['machine_utilization']['status'] ?? 'warning') }}"></div>
+                </div>
+                <div class="text-3xl font-bold text-purple-900 dark:text-purple-100 mb-2">
+                    {{ $kpis['machine_utilization']['rate'] }}%
+                </div>
+                <p class="text-sm text-purple-700 dark:text-purple-300 mb-3">
+                    {{ $kpis['machine_utilization']['active_hours'] ?? 0 }}h of {{ $kpis['machine_utilization']['total_hours'] ?? 0 }}h utilized
+                </p>
+                <div class="flex items-center justify-between text-sm">
+                    <span class="text-purple-600 dark:text-purple-400">Target: 80%</span>
+                    @if(isset($kpis['machine_utilization']['trend']) && $kpis['machine_utilization']['trend'] != 0)
+                        <span class="font-medium {{ $this->getTrendColor($kpis['machine_utilization']['trend']) }}">
+                            {{ $this->getTrendIcon($kpis['machine_utilization']['trend']) }} {{ abs($kpis['machine_utilization']['trend']) }}%
+                        </span>
+                    @endif
+                </div>
+            </div>
+        @else
+            <div class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 rounded-lg p-6 border border-gray-200 dark:border-gray-600 opacity-60">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-lg font-semibold text-gray-600 dark:text-gray-400">Machine Utilization</h4>
+                    <div class="w-4 h-4 rounded-full bg-gray-300 dark:bg-gray-600"></div>
+                </div>
+                <div class="text-3xl font-bold text-gray-500 dark:text-gray-400 mb-2">--</div>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Data not available</p>
+                <div class="text-sm text-gray-400 dark:text-gray-500">Coming Soon</div>
+            </div>
+        @endif
+
+        {{-- On-Time Delivery Rate KPI --}}
+        @if(isset($kpis['on_time_delivery_rate']) && isset($kpis['on_time_delivery_rate']['rate']))
+            <div class="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/30 rounded-lg p-6 border border-orange-200 dark:border-orange-700">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-lg font-semibold text-orange-900 dark:text-orange-100">On-Time Delivery</h4>
+                    <div class="w-4 h-4 rounded-full {{ $this->getStatusColor($kpis['on_time_delivery_rate']['status'] ?? 'warning') }}"></div>
+                </div>
+                <div class="text-3xl font-bold text-orange-900 dark:text-orange-100 mb-2">
+                    {{ $kpis['on_time_delivery_rate']['rate'] }}%
+                </div>
+                <p class="text-sm text-orange-700 dark:text-orange-300 mb-3">
+                    {{ $kpis['on_time_delivery_rate']['on_time_orders'] ?? 0 }} of {{ $kpis['on_time_delivery_rate']['total_orders'] ?? 0 }} orders on time
+                </p>
+                <div class="flex items-center justify-between text-sm">
+                    <span class="text-orange-600 dark:text-orange-400">Target: 95%</span>
+                    @if(isset($kpis['on_time_delivery_rate']['trend']) && $kpis['on_time_delivery_rate']['trend'] != 0)
+                        <span class="font-medium {{ $this->getTrendColor($kpis['on_time_delivery_rate']['trend']) }}">
+                            {{ $this->getTrendIcon($kpis['on_time_delivery_rate']['trend']) }} {{ abs($kpis['on_time_delivery_rate']['trend']) }}%
+                        </span>
+                    @endif
+                </div>
+            </div>
+        @else
+            <div class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 rounded-lg p-6 border border-gray-200 dark:border-gray-600 opacity-60">
+                <div class="flex items-center justify-between mb-4">
+                    <h4 class="text-lg font-semibold text-gray-600 dark:text-gray-400">On-Time Delivery</h4>
+                    <div class="w-4 h-4 rounded-full bg-gray-300 dark:bg-gray-600"></div>
+                </div>
+                <div class="text-3xl font-bold text-gray-500 dark:text-gray-400 mb-2">--</div>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Data not available</p>
+                <div class="text-sm text-gray-400 dark:text-gray-500">Coming Soon</div>
+            </div>
+        @endif
+
+        {{-- Quality Score KPI --}}
+        <div class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 rounded-lg p-6 border border-gray-200 dark:border-gray-600 opacity-60">
+            <div class="flex items-center justify-between mb-4">
+                <h4 class="text-lg font-semibold text-gray-600 dark:text-gray-400">Quality Score</h4>
+                <div class="w-4 h-4 rounded-full bg-gray-300 dark:bg-gray-600"></div>
+            </div>
+            <div class="text-3xl font-bold text-gray-500 dark:text-gray-400 mb-2">--</div>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Quality analysis not available</p>
+            <div class="text-sm text-gray-400 dark:text-gray-500">Coming Soon</div>
         </div>
 
-        {{-- Production Throughput --}}
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <div class="w-8 h-8 bg-blue-100 dark:bg-blue-900/20 rounded-md flex items-center justify-center">
-                        <svg class="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Production Throughput</dt>
-                        <dd class="text-lg font-medium text-gray-900 dark:text-white">
-                            {{ number_format($kpis['quality_rate']['rate'] ?? 0, 2) }} units/hr
-                        </dd>
-                        <dd class="text-sm text-gray-600 dark:text-gray-400">
-                            {{ number_format(($kpis['quality_rate']['rate'] ?? 0) * 24, 0) }} units/day
-                        </dd>
-                        <dd class="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                            {{ number_format($kpis['quality_rate']['total_units'] ?? 0) }} units in {{ number_format($kpis['quality_rate']['total_hours'] ?? 0, 1) }}hrs
-                        </dd>
-                    </dl>
-                </div>
+        {{-- Lead Time Analysis --}}
+        <div class="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-700/50 rounded-lg p-6 border border-gray-200 dark:border-gray-600 opacity-60">
+            <div class="flex items-center justify-between mb-4">
+                <h4 class="text-lg font-semibold text-gray-600 dark:text-gray-400">Avg Lead Time</h4>
+                <div class="w-4 h-4 rounded-full bg-gray-300 dark:bg-gray-600"></div>
             </div>
-        </div>
-
-        {{-- Lead Time --}}
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <div class="w-8 h-8 bg-yellow-100 dark:bg-yellow-900/20 rounded-md flex items-center justify-center">
-                        <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Avg Lead Time</dt>
-                        <dd class="text-lg font-medium text-gray-900 dark:text-white">Coming Soon</dd>
-                    </dl>
-                </div>
-            </div>
-        </div>
-
-        {{-- Work Order Aging --}}
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <div class="w-8 h-8 bg-purple-100 dark:bg-purple-900/20 rounded-md flex items-center justify-center">
-                        <svg class="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
-                </div>
-                <div class="ml-5 w-0 flex-1">
-                    <dl>
-                        <dt class="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Aging Analysis</dt>
-                        <dd class="text-lg font-medium text-gray-900 dark:text-white">Coming Soon</dd>
-                    </dl>
-                </div>
-            </div>
+            <div class="text-3xl font-bold text-gray-500 dark:text-gray-400 mb-2">--</div>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-3">Lead time analysis not available</p>
+            <div class="text-sm text-gray-400 dark:text-gray-500">Coming Soon</div>
         </div>
     </div>
-
 
     {{-- Charts and Trends --}}
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -229,7 +244,7 @@
                 </div>
                 <div>
                     <p class="text-sm text-gray-700 dark:text-gray-300">
-                        <span class="font-medium">Monitor overdue orders:</span> 
+                        <span class="font-medium">Monitor overdue orders:</span>
                         Focus on work orders approaching or past due dates to improve completion rate.
                     </p>
                 </div>
@@ -240,7 +255,7 @@
                 </div>
                 <div>
                     <p class="text-sm text-gray-700 dark:text-gray-300">
-                        <span class="font-medium">Resource optimization:</span> 
+                        <span class="font-medium">Resource optimization:</span>
                         Analyze machine and operator utilization to identify bottlenecks.
                     </p>
                 </div>
@@ -251,7 +266,7 @@
                 </div>
                 <div>
                     <p class="text-sm text-gray-700 dark:text-gray-300">
-                        <span class="font-medium">Quality improvement:</span> 
+                        <span class="font-medium">Quality improvement:</span>
                         Review work orders with quality issues to prevent rework and delays.
                     </p>
                 </div>

@@ -10,17 +10,17 @@ use Illuminate\Support\Facades\Log;
 
 class AdvancedWorkOrderGantt extends Page
 {
-    protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-chart-bar';
 
     protected static ?string $navigationLabel = 'Gantt Chart';
 
-    protected static string $view = 'filament.admin.pages.advanced-work-order-gantt';
+    protected string $view = 'filament.admin.pages.advanced-work-order-gantt';
 
     public $timeRange = 'week';
 
     public $selectedDate;
 
-    protected static ?string $navigationGroup = 'Work Order Reports';
+    protected static string | \UnitEnum | null $navigationGroup = 'Work Order Reports';
 
     public function mount()
     {

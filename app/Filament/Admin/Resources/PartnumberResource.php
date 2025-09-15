@@ -2,35 +2,44 @@
 
 namespace App\Filament\Admin\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\TextInput;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Admin\Resources\PartnumberResource\Pages\ListPartnumbers;
+use App\Filament\Admin\Resources\PartnumberResource\Pages\CreatePartnumber;
+use App\Filament\Admin\Resources\PartnumberResource\Pages\EditPartnumber;
+use App\Filament\Admin\Resources\PartnumberResource\Pages\ViewPartnumber;
 use App\Filament\Admin\Resources\PartnumberResource\Pages;
 use App\Models\PartNumber;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Validation\Rule;
-use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
-use Filament\Tables\Enums\ActionsPosition;
 
 class PartnumberResource extends Resource
 {
     protected static ?string $model = PartNumber::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-tag';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-tag';
 
-    protected static ?string $navigationGroup = 'Process Operations';
+    protected static string | \UnitEnum | null $navigationGroup = 'Process Operations';
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
-            Forms\Components\TextInput::make('partnumber')
+        return $schema->components([
+            TextInput::make('partnumber')
                 ->required()
                 ->label('Part Number')
                 ->rules([
@@ -42,7 +51,7 @@ class PartnumberResource extends Resource
                         ->ignore(request()->route('record')), // Exclude current record during editing
                 ])->reactive(),
 
-            Forms\Components\TextInput::make('revision')
+            TextInput::make('revision')
                 ->default(0)
                 ->required()
                 ->label('Revision')
@@ -55,11 +64,11 @@ class PartnumberResource extends Resource
                         ->ignore(request()->route('record')), // Exclude current record during editing
                 ])->reactive(),
 
-            Forms\Components\TextInput::make('description')
+            TextInput::make('description')
                 ->required()
                 ->label('Description'), // This will now update correctly without unnecessary checks
 
-            Forms\Components\TextInput::make('cycle_time')
+            TextInput::make('cycle_time')
                 ->label('Cycle Time (MM:SS)') // Display label
                 ->required()
                 ->mask('99:99') // Mask to ensure correct input format
@@ -75,11 +84,11 @@ class PartnumberResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('partnumber')
+                TextColumn::make('partnumber')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('revision'),
-                Tables\Columns\TextColumn::make('description'),
-                Tables\Columns\TextColumn::make('cycle_time')
+                TextColumn::make('revision'),
+                TextColumn::make('description'),
+                TextColumn::make('cycle_time')
                     ->label('Cycle Time (MM:SS)')
                     ->formatStateUsing(function ($state) {
                         return self::convertSecondsToTime($state); // Convert seconds to MM:SS for display
@@ -87,17 +96,17 @@ class PartnumberResource extends Resource
 
             ])
             ->filters([
-                Tables\Filters\TrashedFilter::make(),
+                TrashedFilter::make(),
             ])
-            ->actions([
+            ->recordActions([
                 ActionGroup::make([
                     EditAction::make()->label('Edit'),
                     ViewAction::make()->label('View'),
                 ])
-            ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ], position: RecordActionsPosition::BeforeColumns)
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -112,10 +121,10 @@ class PartnumberResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPartnumbers::route('/'),
-            'create' => Pages\CreatePartnumber::route('/create'),
-            'edit' => Pages\EditPartnumber::route('/{record}/edit'),
-            'view' => Pages\ViewPartnumber::route('/{record}/'),
+            'index' => ListPartnumbers::route('/'),
+            'create' => CreatePartnumber::route('/create'),
+            'edit' => EditPartnumber::route('/{record}/edit'),
+            'view' => ViewPartnumber::route('/{record}/'),
 
         ];
     }

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Admin\Resources\WorkOrderResource\Widgets;
 
+use Illuminate\Support\Facades\Auth;
+use App\Filament\Admin\Resources\WorkOrderResource\Pages\ListWorkOrders;
 use App\Models\WorkOrderLog;
 use Filament\Widgets\Concerns\InteractsWithPageTable;
 use Filament\Widgets\Widget;
@@ -13,7 +15,7 @@ class SimpleWorkOrderGantt extends Widget
 {
     use InteractsWithPageTable;
 
-    protected static string $view = 'filament.admin.widgets.simple-work-order-gantt';
+    protected string $view = 'filament.admin.widgets.simple-work-order-gantt';
 
     protected int|string|array $columnSpan = 'full';
 
@@ -37,7 +39,7 @@ class SimpleWorkOrderGantt extends Widget
             ->clone()
             ->whereNotNull('start_time')
             ->whereNotNull('end_time')
-            ->where('factory_id', \Illuminate\Support\Facades\Auth::user()->factory_id);
+            ->where('factory_id', Auth::user()->factory_id);
 
         // Apply the same date filtering logic as Advanced Gantt Chart
         if ($this->selectedDate) {
@@ -125,12 +127,12 @@ class SimpleWorkOrderGantt extends Widget
 
     public function getTablePage(): string
     {
-        return \App\Filament\Admin\Resources\WorkOrderResource\Pages\ListWorkOrders::class;
+        return ListWorkOrders::class;
     }
 
     public function render(): View
     {
-        return view(static::$view, [
+        return view($this->view, [
             'workOrders' => $this->getWorkOrders(),
             'timeRange' => $this->timeRange,
             'selectedDate' => $this->selectedDate,

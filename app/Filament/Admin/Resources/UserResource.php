@@ -2,11 +2,26 @@
 
 namespace App\Filament\Admin\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
+use Filament\Facades\Filament;
+use Filament\Forms\Components\Hidden;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Admin\Resources\UserResource\Pages\ListUsers;
+use App\Filament\Admin\Resources\UserResource\Pages\EditUser;
+use App\Filament\Admin\Resources\UserResource\Pages\ViewUser;
 use App\Filament\Admin\Resources\UserResource\Pages;
 use App\Filament\Admin\Resources\UserResource\Pages\CreateUser;
 use App\Models\User;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Pages\Page;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -15,53 +30,49 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
-use Filament\Tables\Enums\ActionsPosition;
 
 class UserResource extends Resource
 {
-    protected static ?string $navigationIcon = 'heroicon-o-user';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-user';
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    protected static ?string $navigationGroup = 'Admin Operations';
+    protected static string | \UnitEnum | null $navigationGroup = 'Admin Operations';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\TextInput::make('first_name')
+        return $schema
+            ->components([
+                TextInput::make('first_name')
                     ->required(),
-                Forms\Components\TextInput::make('last_name')
+                TextInput::make('last_name')
                     ->required(),
-                Forms\Components\TextInput::make('email')
+                TextInput::make('email')
                     ->email()
                     ->required()
                     ->unique(ignoreRecord: true),
-                Forms\Components\TextInput::make('emp_id')
+                TextInput::make('emp_id')
                     ->default('0'),
-                Forms\Components\TextInput::make('password')
+                TextInput::make('password')
                     ->password()
                     ->required()
                     ->dehydrateStateUsing(fn($state) => Hash::make($state))
                     ->dehydrated(fn($state) => filled($state))
                     ->required(fn(Page $livewire) => ($livewire instanceof CreateUser)),
-                Forms\Components\Select::make('roles')
+                Select::make('roles')
                     ->label('Roles')
                     ->multiple()
                     ->relationship('roles', 'name', function (Builder $query) {
-                        return $query->where('factory_id', \Filament\Facades\Filament::getTenant()?->id ?? Auth::user()->factory_id);
+                        return $query->where('factory_id', Filament::getTenant()?->id ?? Auth::user()->factory_id);
                     })
                     ->preload()
                     ->required(),
-                Forms\Components\Hidden::make('factory_id')
-                    ->default(fn() => \Filament\Facades\Filament::getTenant()?->id ?? Auth::user()->factory_id)
-                    ->dehydrated(fn ($state) => $state ?? \Filament\Facades\Filament::getTenant()?->id ?? Auth::user()->factory_id),
-                Forms\Components\Select::make('department_id')
+                Hidden::make('factory_id')
+                    ->default(fn() => Filament::getTenant()?->id ?? Auth::user()->factory_id)
+                    ->dehydrated(fn ($state) => $state ?? Filament::getTenant()?->id ?? Auth::user()->factory_id),
+                Select::make('department_id')
                     ->relationship('department', 'name', function ($query) {
-                        $factoryId = \Filament\Facades\Filament::getTenant()?->id ?? Auth::user()->factory_id;
+                        $factoryId = Filament::getTenant()?->id ?? Auth::user()->factory_id;
                         $query->where('factory_id', $factoryId);
                     }),
             ]);
@@ -71,38 +82,38 @@ class UserResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('first_name')
+                TextColumn::make('first_name')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('last_name')
+                TextColumn::make('last_name')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('emp_id')
+                TextColumn::make('emp_id')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('email')
+                TextColumn::make('email')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('roles.name')
+                TextColumn::make('roles.name')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
+                TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('department.name')->label('Department'),
+                TextColumn::make('department.name')->label('Department'),
             ])
             ->filters([
-                Tables\Filters\TrashedFilter::make(),
+                TrashedFilter::make(),
             ])
-            ->actions([
+            ->recordActions([
                 ActionGroup::make([
                     EditAction::make()->label('Edit'),
                     ViewAction::make()->label('View'),
                 ])
-            ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ], position: RecordActionsPosition::BeforeColumns)
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -117,10 +128,10 @@ class UserResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListUsers::route('/'),
-            'create' => Pages\CreateUser::route('/create'),
-            'edit' => Pages\EditUser::route('/{record}/edit'),
-            'view' => Pages\ViewUser::route('/{record}'),
+            'index' => ListUsers::route('/'),
+            'create' => CreateUser::route('/create'),
+            'edit' => EditUser::route('/{record}/edit'),
+            'view' => ViewUser::route('/{record}'),
 
         ];
     }

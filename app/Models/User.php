@@ -3,7 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-
+use Filament\Facades\Filament;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasName;
 use Filament\Models\Contracts\HasTenants;
@@ -101,7 +101,7 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
 
     public function hasRole($roles, string $guard = null): bool
     {
-        $factoryId = $this->factory_id ?? \Filament\Facades\Filament::getTenant()?->id;
+        $factoryId = $this->factory_id ?? Filament::getTenant()?->id;
 
         if (!$factoryId) {
             return parent::hasRole($roles, $guard);
@@ -129,7 +129,7 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
 
     public function hasPermissionTo($permission, $guardName = null): bool
     {
-        $factoryId = $this->factory_id ?? \Filament\Facades\Filament::getTenant()?->id;
+        $factoryId = $this->factory_id ?? Filament::getTenant()?->id;
 
         if (!$factoryId) {
             return parent::hasPermissionTo($permission, $guardName);

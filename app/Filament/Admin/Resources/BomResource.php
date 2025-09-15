@@ -2,22 +2,37 @@
 
 namespace App\Filament\Admin\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\Select;
+use App\Models\PartNumber;
+use App\Models\PurchaseOrder;
+use App\Models\MachineGroup;
+use App\Models\OperatorProficiency;
+use Filament\Forms\Components\DatePicker;
+use Carbon\Carbon;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Admin\Resources\BomResource\Pages\ListBoms;
+use App\Filament\Admin\Resources\BomResource\Pages\CreateBom;
+use App\Filament\Admin\Resources\BomResource\Pages\EditBom;
+use App\Filament\Admin\Resources\BomResource\Pages\ViewBom;
 use App\Filament\Admin\Resources\BomResource\Pages;
 use App\Models\Bom;
 use App\Models\WorkOrder;
 use Filament\Forms;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
-use Filament\Forms\Form;
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
-use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
-use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -29,23 +44,23 @@ class BomResource extends Resource
 {
     protected static ?string $model = Bom::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-document-text';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-document-text';
 
-    protected static ?string $navigationGroup = 'Process Operations';
+    protected static string | \UnitEnum | null $navigationGroup = 'Process Operations';
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
 
-                Forms\Components\Select::make('part_number_id')
+                Select::make('part_number_id')
                     ->label('Partnumber')
                     ->options(function () {
                         $factoryId = Auth::user()->factory_id; // Get the factory ID of the logged-in user
 
-                        return \App\Models\PartNumber::where('factory_id', $factoryId)
+                        return PartNumber::where('factory_id', $factoryId)
                             ->get()
                             ->mapWithKeys(function ($partNumber) {
                                 return [$partNumber->id => $partNumber->partnumber.' - '.$partNumber->revision];
@@ -63,7 +78,7 @@ class BomResource extends Resource
                         return null; // Return null if the part number doesn't exist
                     }),
 
-                Forms\Components\Select::make('purchase_order_id')
+                Select::make('purchase_order_id')
                     ->label('Sales Order line')
                     ->options(function (callable $get) {
                         $factoryId = Auth::user()->factory_id; // Get the factory ID of the logged-in user
@@ -74,7 +89,7 @@ class BomResource extends Resource
                         }
 
                         // Query Purchase Orders based on the selected PartNumber and Factory
-                        return \App\Models\PurchaseOrder::where('part_number_id', $partNumberId)
+                        return PurchaseOrder::where('part_number_id', $partNumberId)
                             ->where('factory_id', $factoryId)
                             ->get()
                             ->mapWithKeys(function ($purchaseOrder) {
@@ -98,41 +113,41 @@ class BomResource extends Resource
                     ->collection('process_flowchart')
                     ->required(),
 
-                Forms\Components\Select::make('machine_group_id')
+                Select::make('machine_group_id')
                     ->label('Machine Group')
                     ->options(function () {
                         $factoryId = Auth::user()->factory_id;
 
-                        return \App\Models\MachineGroup::where('factory_id', $factoryId)
+                        return MachineGroup::where('factory_id', $factoryId)
                             ->pluck('group_name', 'id');
                     })->required(),
 
-                Forms\Components\Select::make('operator_proficiency_id')
+                Select::make('operator_proficiency_id')
                     ->label('Proficiency')
                     ->options(function () {
                         $factoryId = Auth::user()->factory_id; // Adjust this based on how you get the factory_id
 
-                        return \App\Models\OperatorProficiency::where('factory_id', $factoryId)
+                        return OperatorProficiency::where('factory_id', $factoryId)
                             ->pluck('proficiency', 'id');
                     })->required(),
 
-Forms\Components\DatePicker::make('lead_time')
+DatePicker::make('lead_time')
     ->label('Target Completion Time')
     ->helperText(function (callable $get) {
         $purchaseOrderId = $get('purchase_order_id');
         if (!$purchaseOrderId) {
             return 'Select a Sales Order line to view PO Delivery Date.';
         }
-        $po = \App\Models\PurchaseOrder::find($purchaseOrderId);
+        $po = PurchaseOrder::find($purchaseOrderId);
         if ($po && $po->delivery_target_date) {
-            return 'PO Delivery Date: ' . \Carbon\Carbon::parse($po->delivery_target_date)->format('d M Y');
+            return 'PO Delivery Date: ' . Carbon::parse($po->delivery_target_date)->format('d M Y');
         }
     })
      ->minDate(now()->startOfDay()) // <-- Only allow today or future dates
     ->required()
     ->reactive(),
 
-Forms\Components\Select::make('status')
+Select::make('status')
     ->options(
         collect(BomStatus::cases())
             ->mapWithKeys(fn($case) => [$case->value => $case->label()])
@@ -163,39 +178,39 @@ Forms\Components\Select::make('status')
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('unique_id')
+                TextColumn::make('unique_id')
                     ->label('Unique ID')
                     ->searchable()
                     ->wrap()
                     ->toggleable(),
 
-                Tables\Columns\TextColumn::make('purchaseorder.partnumber.description')
+                TextColumn::make('purchaseorder.partnumber.description')
                     ->label('Description')
                     ->searchable()
                     ->wrap()
                     ->toggleable(),
 
-                Tables\Columns\TextColumn::make('purchaseorder.partnumber.partnumber')
+                TextColumn::make('purchaseorder.partnumber.partnumber')
                     ->label('PartNumber')
                     ->searchable()
                     ->toggleable(),
 
-                Tables\Columns\TextColumn::make('purchaseorder.partnumber.revision')
+                TextColumn::make('purchaseorder.partnumber.revision')
                     ->label('Revision')
                     ->toggleable(),
 
-                Tables\Columns\TextColumn::make('machineGroup.group_name')
+                TextColumn::make('machineGroup.group_name')
                     ->label('Machine Group')
                     ->toggleable(),
 
-                Tables\Columns\TextColumn::make('operatorproficiency.proficiency')
+                TextColumn::make('operatorproficiency.proficiency')
                     ->label('Operator Proficiency')
                     ->toggleable(),
 
-                Tables\Columns\TextColumn::make('lead_time')
+                TextColumn::make('lead_time')
     ->label('Target Completion Time')
     ->formatStateUsing(function ($state) {
-        return $state ? \Carbon\Carbon::parse($state)->format('d M Y') : '-';
+        return $state ? Carbon::parse($state)->format('d M Y') : '-';
     })  ->extraAttributes(function ($record) {
         // Check if BOM and PurchaseOrder exist and have the relevant dates
         if (
@@ -204,8 +219,8 @@ Forms\Components\Select::make('status')
             $record->purchaseOrder &&
             $record->purchaseOrder->delivery_target_date
         ) {
-            $leadTime = \Carbon\Carbon::parse($record->lead_time);
-            $deliveryTarget = \Carbon\Carbon::parse($record->purchaseOrder->delivery_target_date)->endOfDay();
+            $leadTime = Carbon::parse($record->lead_time);
+            $deliveryTarget = Carbon::parse($record->purchaseOrder->delivery_target_date)->endOfDay();
             if ($leadTime->greaterThan($deliveryTarget)) {
                 return [
                     'style' => 'background-color: #FCA5A5; cursor: pointer;',
@@ -221,13 +236,13 @@ Forms\Components\Select::make('status')
             $record->purchaseOrder->delivery_target_date
         ) {
             return 'Sales Order Line Target Completion Date: ' .
-                \Carbon\Carbon::parse($record->purchaseOrder->delivery_target_date)->format('d M Y');
+                Carbon::parse($record->purchaseOrder->delivery_target_date)->format('d M Y');
         }
         return null;
     }),
 
 
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->label('Status')
                     ->formatStateUsing(fn ($state) => match ($state) {
                         1 => 'Active',
@@ -239,18 +254,18 @@ Forms\Components\Select::make('status')
             ])
 
             ->filters([
-            Tables\Filters\TrashedFilter::make(),
+            TrashedFilter::make(),
         ])
 
-            ->actions([
+            ->recordActions([
             ActionGroup::make([
                     EditAction::make()->label('Edit'),
                     ViewAction::make()->label('View'),
             ]),
-        ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([
-            Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+        ], position: RecordActionsPosition::BeforeColumns)
+            ->toolbarActions([
+            BulkActionGroup::make([
+                    DeleteBulkAction::make(),
             ]),
         ]);
     }
@@ -265,10 +280,10 @@ Forms\Components\Select::make('status')
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListBoms::route('/'),
-            'create' => Pages\CreateBom::route('/create'),
-            'edit' => Pages\EditBom::route(path: '/{record}/edit'),
-            'view' => Pages\ViewBom::route(path: '/{record}/'),
+            'index' => ListBoms::route('/'),
+            'create' => CreateBom::route('/create'),
+            'edit' => EditBom::route(path: '/{record}/edit'),
+            'view' => ViewBom::route(path: '/{record}/'),
 
         ];
     }

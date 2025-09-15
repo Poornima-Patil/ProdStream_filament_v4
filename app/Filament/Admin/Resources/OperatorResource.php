@@ -2,36 +2,46 @@
 
 namespace App\Filament\Admin\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\Select;
+use App\Models\OperatorProficiency;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Admin\Resources\OperatorResource\Pages\ListOperators;
+use App\Filament\Admin\Resources\OperatorResource\Pages\CreateOperator;
+use App\Filament\Admin\Resources\OperatorResource\Pages\EditOperator;
+use App\Filament\Admin\Resources\OperatorResource\Pages\ViewOperator;
 use App\Filament\Admin\Resources\OperatorResource\Pages;
 use App\Models\Operator;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
-use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
-use Filament\Tables\Enums\ActionsPosition;
 
 class OperatorResource extends Resource
 {
     protected static ?string $model = Operator::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-users';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-users';
 
-    protected static ?string $navigationGroup = 'Admin Operations';
+    protected static string | \UnitEnum | null $navigationGroup = 'Admin Operations';
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Select::make('user_id')
+        return $schema
+            ->components([
+                Select::make('user_id')
                     ->label('Operator')
                     ->relationship('user', 'first_name', function ($query) {
                         $factoryId = Auth::user()->factory_id;
@@ -46,16 +56,16 @@ class OperatorResource extends Resource
                         return $record->first_name.' '.$record->last_name;
                     })
                     ->required(),
-                Forms\Components\Select::make('operator_proficiency_id')
+                Select::make('operator_proficiency_id')
                     ->label('Proficiency')
                     ->options(function () {
                         $factoryId = Auth::user()->factory_id; // Adjust based on how you get factory_id
 
-                        return \App\Models\OperatorProficiency::where('factory_id', $factoryId)
+                        return OperatorProficiency::where('factory_id', $factoryId)
                             ->pluck('proficiency', 'id');
                     })
                     ->required(),
-                Forms\Components\Select::make('shift_id')
+                Select::make('shift_id')
                     ->label('Shift')
                     ->relationship('shift', 'name', function ($query) {
                         // Example of filtering by a condition, like factory_id
@@ -70,25 +80,25 @@ class OperatorResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('user.first_name')->searchable(),
-                Tables\Columns\TextColumn::make('operator_proficiency.proficiency')
+                TextColumn::make('user.first_name')->searchable(),
+                TextColumn::make('operator_proficiency.proficiency')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('shift.name')
+                TextColumn::make('shift.name')
                     ->searchable(),
 
             ])
             ->filters([
-                Tables\Filters\TrashedFilter::make(),
+                TrashedFilter::make(),
             ])
-           ->actions([
+           ->recordActions([
                 ActionGroup::make([
                     EditAction::make()->label('Edit'),
                     ViewAction::make()->label('View'),
                 ])
-            ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ], position: RecordActionsPosition::BeforeColumns)
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -103,10 +113,10 @@ class OperatorResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListOperators::route('/'),
-            'create' => Pages\CreateOperator::route('/create'),
-            'edit' => Pages\EditOperator::route('/{record}/edit'),
-            'view' => Pages\ViewOperator::route('/{record}/'),
+            'index' => ListOperators::route('/'),
+            'create' => CreateOperator::route('/create'),
+            'edit' => EditOperator::route('/{record}/edit'),
+            'view' => ViewOperator::route('/{record}/'),
 
         ];
     }

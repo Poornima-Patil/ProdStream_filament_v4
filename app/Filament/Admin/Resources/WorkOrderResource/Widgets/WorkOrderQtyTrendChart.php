@@ -11,7 +11,7 @@ class WorkOrderQtyTrendChart extends ChartWidget
 {
     public ?WorkOrder $workOrder = null;
 
-    protected static ?string $heading = null;
+    protected ?string $heading = null;
     
     protected int | string | array $columnSpan = [
         'md' => 1,

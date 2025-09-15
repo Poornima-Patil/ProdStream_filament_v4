@@ -2,17 +2,26 @@
 
 namespace App\Filament\Admin\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\TextInput;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Admin\Resources\HoldReasonResource\Pages\ListHoldReasons;
+use App\Filament\Admin\Resources\HoldReasonResource\Pages\CreateHoldReason;
+use App\Filament\Admin\Resources\HoldReasonResource\Pages\EditHoldReason;
+use App\Filament\Admin\Resources\HoldReasonResource\Pages\ViewHoldReasons;
 use App\Filament\Admin\Resources\HoldReasonResource\Pages;
 use App\Models\HoldReason;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
-use Filament\Tables\Enums\ActionsPosition;
 
 
 class HoldReasonResource extends Resource
@@ -21,17 +30,17 @@ class HoldReasonResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    protected static ?string $navigationIcon = 'heroicon-o-trash';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-trash';
 
-    protected static ?string $navigationGroup = 'Admin Operations';
+    protected static string | \UnitEnum | null $navigationGroup = 'Admin Operations';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\TextInput::make('code')
+        return $schema
+            ->components([
+                TextInput::make('code')
                     ->required(),
-                Forms\Components\TextInput::make('description')
+                TextInput::make('description')
                     ->required(),
             ]);
     }
@@ -40,23 +49,23 @@ class HoldReasonResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('code')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('description')
+                TextColumn::make('code')->searchable()->sortable(),
+                TextColumn::make('description')
                     ->searchable(),
 
             ])
             ->filters([
-                Tables\Filters\TrashedFilter::make(),
+                TrashedFilter::make(),
             ])
-            ->actions([
+            ->recordActions([
                 ActionGroup::make([
                     EditAction::make()->label('Edit'),
                     ViewAction::make()->label('View'),
                 ])
-            ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ], position: RecordActionsPosition::BeforeColumns)
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -71,10 +80,10 @@ class HoldReasonResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListHoldReasons::route('/'),
-            'create' => Pages\CreateHoldReason::route('/create'),
-            'edit' => Pages\EditHoldReason::route('/{record}/edit'),
-            'view' => Pages\ViewHoldReasons::route('/{record}'),
+            'index' => ListHoldReasons::route('/'),
+            'create' => CreateHoldReason::route('/create'),
+            'edit' => EditHoldReason::route('/{record}/edit'),
+            'view' => ViewHoldReasons::route('/{record}'),
         ];
     }
 }

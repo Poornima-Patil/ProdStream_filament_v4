@@ -2,11 +2,11 @@
 
 namespace App\Filament\Admin\Resources\WorkOrderResource\Widgets;
 
+use Filament\Widgets\StatsOverviewWidget\Stat;
 use App\Filament\Admin\Resources\WorkOrderResource\Pages\ListWorkOrders;
 use App\Models\WorkOrder;
 use Filament\Widgets\Concerns\InteractsWithPageTable;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
-use Filament\Widgets\StatsOverviewWidget\Card;
 
 class WorkOrderStats extends BaseWidget
 {
@@ -33,22 +33,22 @@ class WorkOrderStats extends BaseWidget
         // Return the stats cards
         return [
 
-            Card::make('Total orders', $this->getPageTableQuery()->count())
+            Stat::make('Total orders', $this->getPageTableQuery()->count())
                 ->description('Total work orders in the system'),
 
-            Card::make('Started WorkOrders', $this->getPageTableQuery()->where('status', 'Start')->count())
+            Stat::make('Started WorkOrders', $this->getPageTableQuery()->where('status', 'Start')->count())
                 ->description('Started work orders in the system'),
 
-            Card::make('Hold WorkOrders', $this->getPageTableQuery()->where('status', 'Hold')->count())
+            Stat::make('Hold WorkOrders', $this->getPageTableQuery()->where('status', 'Hold')->count())
                 ->description('Hold work orders in the system'),
 
-            Card::make('Completed WorkOrders', $this->getPageTableQuery()->where('status', 'Completed')->count())
+            Stat::make('Completed WorkOrders', $this->getPageTableQuery()->where('status', 'Completed')->count())
                 ->description('Completed Work Orders'),
 
-            Card::make('Closed WorkOrders', $this->getPageTableQuery()->where('status', 'Closed')->count())
+            Stat::make('Closed WorkOrders', $this->getPageTableQuery()->where('status', 'Closed')->count())
                 ->description('Closeed Work Orders'),
 
-            Card::make('Assigned WorkOrders', $this->getPageTableQuery()->where('status', 'Assigned')->count())
+            Stat::make('Assigned WorkOrders', $this->getPageTableQuery()->where('status', 'Assigned')->count())
                 ->description('Work orders that are assigned'),
 
         ];

@@ -2,9 +2,9 @@
 
 namespace App\Filament\Pages\Tenancy;
 
+use Filament\Schemas\Schema;
 use App\Models\Factory;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Form;
 use Filament\Pages\Tenancy\RegisterTenant;
 use Illuminate\Support\Facades\Auth;
 use Filament\Forms\Components\FileUpload;
@@ -17,10 +17,10 @@ class RegisterFactory extends RegisterTenant
         return 'Register Factory';
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 TextInput::make('name'),
                 TextInput::make('slug'),
                 FileUpload::make('template_path')

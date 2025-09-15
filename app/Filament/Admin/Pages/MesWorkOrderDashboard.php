@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Pages;
 
+use Carbon\Carbon;
 use App\Models\Machine;
 use App\Models\Operator;
 use App\Models\WorkOrder;
@@ -12,11 +13,11 @@ use Illuminate\Support\Facades\Log;
 
 class MesWorkOrderDashboard extends Page
 {
-    protected static string $view = 'filament.admin.pages.mes-work-order-dashboard';
+    protected string $view = 'filament.admin.pages.mes-work-order-dashboard';
 
-    protected static ?string $navigationGroup = 'Work Order Reports';
+    protected static string | \UnitEnum | null $navigationGroup = 'Work Order Reports';
 
-    protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-chart-bar';
 
     protected static ?string $navigationLabel = 'MES Work Order Dashboard';
 
@@ -297,7 +298,7 @@ class MesWorkOrderDashboard extends Page
         $this->activeOrders = $inProgressOrders; // Active = In Progress
         $this->completedToday = $workOrders->where('status', 'Completed')
             ->filter(function ($wo) {
-                return $wo->end_time && \Carbon\Carbon::parse($wo->end_time)->isToday();
+                return $wo->end_time && Carbon::parse($wo->end_time)->isToday();
             })->count();
 
         if ($totalOrders > 0) {

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\WorkOrderResource\Widgets;
 
+use App\Filament\Admin\Resources\WorkOrderResource\Pages\ListWorkOrders;
 use Filament\Widgets\ChartWidget;
 use Filament\Widgets\Concerns\InteractsWithPageTable;
 use Illuminate\Support\Carbon;
@@ -9,9 +10,9 @@ use Illuminate\Support\HtmlString;
 
 class WorkOrderEndTimeTrendChart extends ChartWidget
 {
-    protected static ?string $heading = 'WO Completion vs End Time';
+    protected ?string $heading = 'WO Completion vs End Time';
 
-    protected static ?string $maxHeight = '350px';
+    protected ?string $maxHeight = '350px';
 
     protected static ?string $maxWidth = 'full';
 
@@ -132,7 +133,7 @@ class WorkOrderEndTimeTrendChart extends ChartWidget
 
     protected function getTablePage(): string
     {
-        return \App\Filament\Admin\Resources\WorkOrderResource\Pages\ListWorkOrders::class;
+        return ListWorkOrders::class;
     }
 
     public function getColumnSpan(): int|string

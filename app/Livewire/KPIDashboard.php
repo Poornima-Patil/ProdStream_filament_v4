@@ -2,8 +2,11 @@
 
 namespace App\Livewire;
 
+use Exception;
+use Carbon\Carbon;
 use App\Services\KPIService;
 use Livewire\Component;
+use Livewire\Attributes\Reactive;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
@@ -15,10 +18,10 @@ class KPIDashboard extends Component
     public $lastUpdated;
     public $currentFactory;
 
-    // Modal properties
-    public $showKPIDetail = false;
-    public $selectedKPI = '';
-    public $selectedKPITitle = '';
+    // Modal properties for Livewire v3
+    public bool $showKPIDetail = false;
+    public string $selectedKPI = '';
+    public string $selectedKPITitle = '';
 
     protected $listeners = [
         'refreshKPIs' => 'loadKPIs'
@@ -64,7 +67,7 @@ class KPIDashboard extends Component
             ]);
 
             $this->lastUpdated = now()->format('H:i:s');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Error loading KPIs: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()
             ]);
@@ -113,21 +116,19 @@ class KPIDashboard extends Component
         ]);
     }
 
+    public function openModal()
+    {
+        $this->selectedKPI = 'work_order_completion_rate';
+        $this->selectedKPITitle = 'Work Order Completion Rate';
+        $this->showKPIDetail = true;
+    }
+
     public function viewKPIDetails($kpiType)
     {
-        // Debug: Log to see if method is called
-        Log::info('viewKPIDetails called with: ' . $kpiType);
-
         // Set modal properties
         $this->selectedKPI = $kpiType;
         $this->selectedKPITitle = $this->getKPITitle($kpiType);
         $this->showKPIDetail = true;
-
-        // Also show notification for now
-        $this->dispatch('notify', [
-            'type' => 'info',
-            'message' => 'Detailed view for ' . $this->selectedKPITitle . ' opened!'
-        ]);
     }
 
     public function closeKPIDetail()
@@ -215,8 +216,8 @@ class KPIDashboard extends Component
             return 'Date range not set';
         }
         
-        $from = \Carbon\Carbon::parse($this->fromDate)->format('M d, Y');
-        $to = \Carbon\Carbon::parse($this->toDate)->format('M d, Y');
+        $from = Carbon::parse($this->fromDate)->format('M d, Y');
+        $to = Carbon::parse($this->toDate)->format('M d, Y');
         
         return "{$from} - {$to}";
     }

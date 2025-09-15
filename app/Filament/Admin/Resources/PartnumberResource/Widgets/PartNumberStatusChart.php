@@ -2,26 +2,28 @@
 
 namespace App\Filament\Admin\Resources\PartnumberResource\Widgets;
 
+use Illuminate\Database\Eloquent\Model;
+use Log;
 use Filament\Support\RawJs;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\DB;
 
 class PartNumberStatusChart extends ChartWidget
 {
-    protected static ?string $heading = 'Work Order Status Distribution';
+    protected ?string $heading = 'Work Order Status Distribution';
 
     protected static ?int $sort = 1;
 
-    public ?\Illuminate\Database\Eloquent\Model $record = null;
+    public ?Model $record = null;
 
     protected int|string|array $columnSpan = 'full';
 
     protected function getData(): array
     {
-        \Log::info('PartNumberStatusChart getData called with record ID: ' . ($this->record?->id ?? 'null'));
+        Log::info('PartNumberStatusChart getData called with record ID: ' . ($this->record?->id ?? 'null'));
         
         if (!$this->record?->id) {
-            \Log::warning('PartNumberStatusChart: No record available, returning empty data');
+            Log::warning('PartNumberStatusChart: No record available, returning empty data');
             return [
                 'labels' => [],
                 'datasets' => []

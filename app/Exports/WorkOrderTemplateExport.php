@@ -2,6 +2,8 @@
 
 namespace App\Exports;
 
+use App\Models\Factory;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
@@ -12,7 +14,7 @@ class WorkOrderTemplateExport
     public function __construct(
         public string $start,
         public string $end,
-        public \App\Models\Factory $factory
+        public Factory $factory
     ) {}
 
     public function downloadCsv()
@@ -98,7 +100,7 @@ class WorkOrderTemplateExport
 
         copy($templatePath, $tempPath);
 
-        $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($tempPath);
+        $spreadsheet = IOFactory::load($tempPath);
         $sheet = $spreadsheet->getSheetByName('Work Order Header');
 
         if (!$sheet) {

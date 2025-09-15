@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use Carbon\Carbon;
 use App\Models\Bom;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -63,7 +64,7 @@ class BomExport implements FromCollection, WithHeadings
                 'Customer' => optional($bom->purchaseOrder?->customerInformation)->name,
                 'Machine Group' => optional($bom->machineGroup)->group_name,
                 'Operator Proficiency' => optional($bom->operatorProficiency)->proficiency,
-                'Lead Time' => $bom->lead_time ? (\Carbon\Carbon::parse($bom->lead_time)->format('Y-m-d H:i:s')) : '',
+                'Lead Time' => $bom->lead_time ? (Carbon::parse($bom->lead_time)->format('Y-m-d H:i:s')) : '',
                 'Status' => $bom->status ? 'Active' : 'Inactive',
                 'BOM Created At' => $bom->created_at->format('Y-m-d H:i:s'),
                 'BOM Updated At' => $bom->updated_at->format('Y-m-d H:i:s'),

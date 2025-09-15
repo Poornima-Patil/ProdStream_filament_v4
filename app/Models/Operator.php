@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -82,7 +83,7 @@ class Operator extends Model
      */
     public function getGanttCalendarData($viewType = 'week', $date = null)
     {
-        $date = $date ? \Carbon\Carbon::parse($date)->setTimezone(config('app.timezone')) : now()->setTimezone(config('app.timezone'));
+        $date = $date ? Carbon::parse($date)->setTimezone(config('app.timezone')) : now()->setTimezone(config('app.timezone'));
 
         // Define date ranges based on view type
         switch ($viewType) {
@@ -91,16 +92,16 @@ class Operator extends Model
                 $endDate = $date->copy()->endOfDay();
                 break;
             case 'week':
-                $startDate = $date->copy()->startOfWeek(\Carbon\Carbon::MONDAY);
-                $endDate = $date->copy()->startOfWeek(\Carbon\Carbon::MONDAY)->addDays(5)->endOfDay(); // Monday to Saturday
+                $startDate = $date->copy()->startOfWeek(Carbon::MONDAY);
+                $endDate = $date->copy()->startOfWeek(Carbon::MONDAY)->addDays(5)->endOfDay(); // Monday to Saturday
                 break;
             case 'month':
                 $startDate = $date->copy()->startOfMonth();
                 $endDate = $date->copy()->endOfMonth();
                 break;
             default:
-                $startDate = $date->copy()->startOfWeek(\Carbon\Carbon::MONDAY);
-                $endDate = $date->copy()->startOfWeek(\Carbon\Carbon::MONDAY)->addDays(5)->endOfDay(); // Monday to Saturday
+                $startDate = $date->copy()->startOfWeek(Carbon::MONDAY);
+                $endDate = $date->copy()->startOfWeek(Carbon::MONDAY)->addDays(5)->endOfDay(); // Monday to Saturday
         }
 
         $workOrders = $this->getScheduledWorkOrders($startDate, $endDate);
@@ -140,9 +141,9 @@ class Operator extends Model
             $actualEndLog = $workOrder->workOrderLogs->whereIn('status', ['Closed', 'Completed', 'Hold'])->sortByDesc('changed_at')->first();
 
             if ($actualStartLog) {
-                $actualStart = \Carbon\Carbon::parse($actualStartLog->changed_at)->setTimezone(config('app.timezone'));
+                $actualStart = Carbon::parse($actualStartLog->changed_at)->setTimezone(config('app.timezone'));
                 $actualEnd = $actualEndLog
-                    ? \Carbon\Carbon::parse($actualEndLog->changed_at)->setTimezone(config('app.timezone'))
+                    ? Carbon::parse($actualEndLog->changed_at)->setTimezone(config('app.timezone'))
                     : null; // Still running if no end log
 
                 // If still running, estimate end time or use current time + remaining duration
@@ -279,7 +280,7 @@ class Operator extends Model
      */
     public function getCalendarEvents($viewType = 'week', $date = null)
     {
-        $date = $date ? \Carbon\Carbon::parse($date) : now();
+        $date = $date ? Carbon::parse($date) : now();
 
         // Define date ranges based on view type
         switch ($viewType) {
@@ -288,16 +289,16 @@ class Operator extends Model
                 $endDate = $date->copy()->endOfDay();
                 break;
             case 'week':
-                $startDate = $date->copy()->startOfWeek(\Carbon\Carbon::MONDAY);
-                $endDate = $date->copy()->startOfWeek(\Carbon\Carbon::MONDAY)->addDays(5)->endOfDay(); // Monday to Saturday
+                $startDate = $date->copy()->startOfWeek(Carbon::MONDAY);
+                $endDate = $date->copy()->startOfWeek(Carbon::MONDAY)->addDays(5)->endOfDay(); // Monday to Saturday
                 break;
             case 'month':
                 $startDate = $date->copy()->startOfMonth();
                 $endDate = $date->copy()->endOfMonth();
                 break;
             default:
-                $startDate = $date->copy()->startOfWeek(\Carbon\Carbon::MONDAY);
-                $endDate = $date->copy()->startOfWeek(\Carbon\Carbon::MONDAY)->addDays(5)->endOfDay(); // Monday to Saturday
+                $startDate = $date->copy()->startOfWeek(Carbon::MONDAY);
+                $endDate = $date->copy()->startOfWeek(Carbon::MONDAY)->addDays(5)->endOfDay(); // Monday to Saturday
         }
 
         $workOrders = $this->getScheduledWorkOrders($startDate, $endDate);
@@ -397,8 +398,8 @@ class Operator extends Model
             return true; // If no shift defined, assume it's valid
         }
 
-        $workOrderStart = \Carbon\Carbon::parse($workOrder->start_time);
-        $workOrderEnd = \Carbon\Carbon::parse($workOrder->end_time);
+        $workOrderStart = Carbon::parse($workOrder->start_time);
+        $workOrderEnd = Carbon::parse($workOrder->end_time);
 
         // Get shift times for the work order date
         $shiftStart = $workOrderStart->copy()->setTimeFromTimeString($this->shift->start_time);
@@ -422,8 +423,8 @@ class Operator extends Model
      * Check for scheduling conflicts when planning a new Work Order for this operator
      * Considers both operator availability and shift constraints
      *
-     * @param  \Carbon\Carbon  $newStartTime
-     * @param  \Carbon\Carbon  $newEndTime
+     * @param Carbon $newStartTime
+     * @param Carbon $newEndTime
      * @param  int  $factoryId  - Factory ID for multi-tenancy
      * @param  int|null  $excludeWorkOrderId  - Exclude current WO when updating
      * @return array

@@ -2,13 +2,15 @@
 
 namespace App\Filament\Admin\Resources\WorkOrderResource\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Illuminate\Support\HtmlString;
+use Filament\Schemas\Components\Livewire;
+use Carbon\Carbon;
 use App\Filament\Admin\Resources\WorkOrderResource;
 use App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderProgress;
 use App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderQtyTrendChart;
-use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Components\Livewire;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\Auth;
 
@@ -16,15 +18,15 @@ class ViewWorkOrder extends ViewRecord
 {
     protected static string $resource = WorkOrderResource::class;
 
-    public function infolist(Infolist $infolist): Infolist
+    public function infolist(Schema $schema): Schema
     {
         $user = Auth::user();
         $isAdminOrManager = $user && in_array($user->role, ['manager', 'admin']);
 
-        return $infolist->schema([
+        return $schema->components([
             // Section 1: Work Order KPI
             Section::make('Work Order KPI')
-                ->collapsible()
+                ->collapsible()->columnSpanFull()
                 ->collapsed()
                 ->columns([
                     'sm' => 1,
@@ -40,13 +42,12 @@ class ViewWorkOrder extends ViewRecord
                         ->schema([
                             TextEntry::make('progress_header')
                                 ->label('')
-                                ->getStateUsing(fn() => new \Illuminate\Support\HtmlString('
-                                    <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg -mb-4">
+                                ->getStateUsing(fn() => new HtmlString('
+                                    <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
                                         <h4 class="font-bold text-black dark:text-white">Work Order Progress</h4>
                                     </div>
                                 '))->html(),
-                            Livewire::make(WorkOrderProgress::class)
-                                ->label(''),
+                            Livewire::make(WorkOrderProgress::class),
                         ]),
                     
                     // Work Order Quantity Trend Chart Section
@@ -58,13 +59,12 @@ class ViewWorkOrder extends ViewRecord
                         ->schema([
                             TextEntry::make('trend_header')
                                 ->label('')
-                                ->getStateUsing(fn() => new \Illuminate\Support\HtmlString('
-                                    <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg -mb-4">
+                                ->getStateUsing(fn() => new HtmlString('
+                                    <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
                                         <h4 class="font-bold text-black dark:text-white">Work Order Quantity Trend Chart</h4>
                                     </div>
                                 '))->html(),
-                            Livewire::make(WorkOrderQtyTrendChart::class, ['workOrder' => $this->record])
-                                ->label(''),
+                            Livewire::make(WorkOrderQtyTrendChart::class, ['workOrder' => $this->record]),
                         ]),
                     
                     // Production Throughput Section - only show for completed or closed status
@@ -83,7 +83,7 @@ class ViewWorkOrder extends ViewRecord
                                 ->first();
                             
                             if (!$completionLog) {
-                                return new \Illuminate\Support\HtmlString('
+                                return new HtmlString('
                                     <div class="mt-4">
                                         <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
                                             <h4 class="font-bold text-black dark:text-white">Production Throughput</h4>
@@ -98,10 +98,10 @@ class ViewWorkOrder extends ViewRecord
                             }
                             
                             // Calculate time period (created_at to completion log updated_at)
-                            $createdAt = \Carbon\Carbon::parse($record->created_at);
+                            $createdAt = Carbon::parse($record->created_at);
                             
                             // Use updated_at as the end time
-                            $completedAt = \Carbon\Carbon::parse($completionLog->updated_at);
+                            $completedAt = Carbon::parse($completionLog->updated_at);
                             
                             // Handle edge cases where completion time might be before creation time
                             $hours = $createdAt->diffInHours($completedAt, false); // false = can be negative
@@ -121,7 +121,7 @@ class ViewWorkOrder extends ViewRecord
                             $throughputPerHour = $hours > 0 ? round($units / $hours, 3) : 0;
                             $throughputPerDay = round($throughputPerHour * 24, 1);
                             
-                            return new \Illuminate\Support\HtmlString('
+                            return new HtmlString('
                                 <div class="mt-4">
                                     <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
                                         <h4 class="font-bold text-black dark:text-white">Production Throughput</h4>
@@ -158,7 +158,7 @@ class ViewWorkOrder extends ViewRecord
                             $scrapRate = $totalQty > 0 ? ($scrappedQty / $totalQty) * 100 : 0;
                             $goodRate = 100 - $scrapRate;
                             
-                            return new \Illuminate\Support\HtmlString('
+                            return new HtmlString('
                                 <div class="mt-4">
                                     <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
                                         <h4 class="font-bold text-black dark:text-white">Scrap Rate</h4>
@@ -187,7 +187,7 @@ class ViewWorkOrder extends ViewRecord
 
             // Section 2: General Information
             Section::make('General Information')
-                ->collapsible()
+                ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('general_information_table')
                         ->label('')
@@ -199,7 +199,7 @@ class ViewWorkOrder extends ViewRecord
                                 : 'No Machine';
                             $operator = $record->operator->user->first_name ?? 'N/A';
 
-                            return new \Illuminate\Support\HtmlString('
+                            return new HtmlString('
                                 <!-- Desktop Table -->
                                 <div class="hidden lg:block overflow-x-auto shadow rounded-lg">
                                     <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
@@ -251,7 +251,7 @@ class ViewWorkOrder extends ViewRecord
 
             // Section 3: Details
             Section::make('Details')
-                ->collapsible()
+                ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('details_table')
                         ->label('')
@@ -261,14 +261,14 @@ class ViewWorkOrder extends ViewRecord
                             $revision = $record->bom->purchaseorder->partnumber->revision ?? 'N/A';
                             $status = $record->status ?? 'N/A';
                             $endTimeRaw = $record->end_time;
-                            $startTime = $record->start_time ? \Carbon\Carbon::parse($record->start_time)->format('Y-m-d H:i') : 'N/A';
-                            $endTime = $record->end_time ? \Carbon\Carbon::parse($record->end_time)->format('Y-m-d H:i') : 'N/A';
+                            $startTime = $record->start_time ? Carbon::parse($record->start_time)->format('Y-m-d H:i') : 'N/A';
+                            $endTime = $record->end_time ? Carbon::parse($record->end_time)->format('Y-m-d H:i') : 'N/A';
                             $endTimeCell = htmlspecialchars($endTime);
                             if ($record->bom && $record->bom->lead_time && $endTimeRaw) {
-                                $plannedEnd = \Carbon\Carbon::parse($endTimeRaw);
-                                $bomLead = \Carbon\Carbon::parse($record->bom->lead_time)->endOfDay();
+                                $plannedEnd = Carbon::parse($endTimeRaw);
+                                $bomLead = Carbon::parse($record->bom->lead_time)->endOfDay();
                                 if ($plannedEnd->greaterThan($bomLead)) {
-                                    $bomLeadFormatted = \Carbon\Carbon::parse($record->bom->lead_time)->format('d M Y');
+                                    $bomLeadFormatted = Carbon::parse($record->bom->lead_time)->format('d M Y');
                                     $endTimeCell = '<span class="bg-red-100 dark:bg-red-900 dark:text-red-200" style="cursor:pointer;" title="BOM Target Completion Time: '.$bomLeadFormatted.'">'.htmlspecialchars($endTime).'</span>';
                                 }
                             }
@@ -276,7 +276,7 @@ class ViewWorkOrder extends ViewRecord
                             $scrapQty = $record->scrapped_qtys ?? 'N/A';
                             $materialBatch = $record->material_batch ?? 'N/A';
 
-                            return new \Illuminate\Support\HtmlString('
+                            return new HtmlString('
                                 <!-- Desktop Table -->
                                 <div class="hidden lg:block overflow-x-auto shadow rounded-lg">
                                     <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
@@ -358,7 +358,7 @@ class ViewWorkOrder extends ViewRecord
 
             // Section 4: Documents
             Section::make('Documents')
-                ->collapsible()
+                ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('documents_table')
                         ->label('')
@@ -383,7 +383,7 @@ class ViewWorkOrder extends ViewRecord
                                     })->implode('<br>');
                             }
 
-                            return new \Illuminate\Support\HtmlString('
+                            return new HtmlString('
                                 <!-- Desktop Table -->
                                 <div class="hidden lg:block overflow-x-auto shadow rounded-lg">
                                     <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-left bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
@@ -423,7 +423,7 @@ class ViewWorkOrder extends ViewRecord
 
             // Section 5: Work Order Logs
             Section::make('Work Order Logs')
-                ->collapsible()
+                ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('work_order_logs_table')
                         ->label('Work Order Logs')
@@ -542,7 +542,7 @@ class ViewWorkOrder extends ViewRecord
                                 $mobileLogs = '<span class="text-gray-900 dark:text-gray-100">No logs found.</span>';
                             }
 
-                            return new \Illuminate\Support\HtmlString('
+                            return new HtmlString('
                                 <!-- Desktop Table -->
                                 <div class="hidden lg:block overflow-x-auto shadow rounded-lg">
                                     <table class="table-auto w-full text-left border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
@@ -579,7 +579,7 @@ class ViewWorkOrder extends ViewRecord
 
             // Section 6: Work Order Info Messages
             Section::make('Work Order Info Messages')
-    ->collapsible()
+    ->collapsible()->columnSpanFull()
     ->schema([
         TextEntry::make('info_messages_table')
             ->label('Info Messages')
@@ -631,7 +631,7 @@ class ViewWorkOrder extends ViewRecord
                     $mobileRows = '<span class="text-gray-900 dark:text-gray-100">No info messages found.</span>';
                 }
 
-                return new \Illuminate\Support\HtmlString('
+                return new HtmlString('
                     <!-- Desktop Table -->
                     <div class="hidden lg:block overflow-x-auto shadow rounded-lg">
                         <table class="table-auto w-full text-left border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-lg overflow-hidden">

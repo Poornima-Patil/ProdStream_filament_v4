@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\WorkOrderResource\Widgets;
 
+use App\Filament\Admin\Resources\WorkOrderResource\Pages\ListWorkOrders;
 use Filament\Support\RawJs;
 use Filament\Widgets\ChartWidget;
 use Filament\Widgets\Concerns\InteractsWithPageTable;
@@ -13,7 +14,7 @@ WorkOrderPieChart extends ChartWidget
 {
     use InteractsWithPageTable;
 
-    protected static ?string $heading = 'Work Order Status Distribution';
+    protected ?string $heading = 'Work Order Status Distribution';
 
     protected static ?int $sort = 2;
 
@@ -134,6 +135,6 @@ WorkOrderPieChart extends ChartWidget
 
     protected function getTablePage(): string
     {
-        return \App\Filament\Admin\Resources\WorkOrderResource\Pages\ListWorkOrders::class;
+        return ListWorkOrders::class;
     }
 }

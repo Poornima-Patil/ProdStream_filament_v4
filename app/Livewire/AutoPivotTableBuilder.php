@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use Exception;
 use Livewire\Component;
 use App\Models\WorkOrder;
 use Illuminate\Support\Facades\Auth;
@@ -147,7 +148,7 @@ class AutoPivotTableBuilder extends Component
             if (!empty($filteredData)) {
                 $this->pivotResult = $this->createPivotTable($filteredData);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Silently fail auto-updates, user can manually regenerate
         }
     }
@@ -249,7 +250,7 @@ class AutoPivotTableBuilder extends Component
             }
 
             session()->flash('success', 'Pivot table generated successfully!');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             session()->flash('error', 'Error generating pivot table: ' . $e->getMessage());
         }
     }

@@ -2,14 +2,16 @@
 
 namespace App\Filament\Admin\Resources\MachineResource\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Illuminate\Support\HtmlString;
+use Illuminate\Support\Facades\DB;
+use Filament\Schemas\Components\Livewire;
 use App\Filament\Admin\Resources\MachineResource;
 use App\Filament\Admin\Resources\MachineResource\Widgets\MachineStatusChart;
 use App\Livewire\Calendar\Machines\MachineScheduleCalendar;
 use App\Livewire\Calendar\Machines\MachineScheduleGantt;
-use Filament\Infolists\Components\Livewire;
-use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewMachine extends ViewRecord
@@ -23,23 +25,23 @@ class ViewMachine extends ViewRecord
         ];
     }
 
-    public function infolist(Infolist $infolist): Infolist
+    public function infolist(Schema $schema): Schema
     {
-        return $infolist
-            ->schema([
+        return $schema
+            ->components([
                 // Machine Summary Section
                 Section::make('Machine Summary')
-                    ->collapsible()
+                    ->collapsible()->columnSpanFull()
                     ->schema([
                         TextEntry::make('machine_summary')
                             ->label('')
                             ->getStateUsing(function ($record) {
                                 if (!$record) {
-                                    return new \Illuminate\Support\HtmlString('<div class="text-gray-500 dark:text-gray-400">No Machine Found</div>');
+                                    return new HtmlString('<div class="text-gray-500 dark:text-gray-400">No Machine Found</div>');
                                 }
 
                                 // Get work order status distribution for this machine
-                                $statusDistribution = \Illuminate\Support\Facades\DB::table('work_orders')
+                                $statusDistribution = DB::table('work_orders')
                                     ->where('machine_id', $record->id)
                                     ->selectRaw('status, COUNT(*) as count')
                                     ->groupBy('status')
@@ -63,7 +65,7 @@ class ViewMachine extends ViewRecord
                                 }
 
                                 // Get quality data for completed/closed work orders
-                                $qualityData = \Illuminate\Support\Facades\DB::table('work_orders')
+                                $qualityData = DB::table('work_orders')
                                     ->where('machine_id', $record->id)
                                     ->whereIn('status', ['Completed', 'Closed'])
                                     ->selectRaw('
@@ -83,7 +85,7 @@ class ViewMachine extends ViewRecord
                                     $qualityRate = (($totalProduced - $totalScrapped) / $totalProduced) * 100;
                                 }
 
-                                return new \Illuminate\Support\HtmlString('
+                                return new HtmlString('
                                     <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
                                         <!-- Main Container with Side-by-Side Layout -->
                                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -189,7 +191,7 @@ class ViewMachine extends ViewRecord
 
                 Section::make('Machine Information')
                     ->hiddenLabel()
-                    ->collapsible()
+                    ->collapsible()->columnSpanFull()
                     ->schema([
                         TextEntry::make('View Machine')
                             ->label('')
@@ -209,7 +211,7 @@ class ViewMachine extends ViewRecord
                                     $StatusLabel = '<span style="color: #dc2626; font-weight: bold;">Inactive</span>'; // red
                                 }
 
-                                return new \Illuminate\Support\HtmlString('
+                                return new HtmlString('
                                     <!-- Desktop Table -->
                                     <div class="hidden lg:block overflow-x-auto shadow rounded-lg">
                                         <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
@@ -267,7 +269,7 @@ class ViewMachine extends ViewRecord
 
                 // Machine Schedule Calendar visible on both desktop and mobile
                 Section::make('Machine Schedule Calendar')
-                    ->collapsible()
+                    ->collapsible()->columnSpanFull()
                     ->persistCollapsed()
                     ->id('machine-schedule-section')
                     ->schema([
@@ -281,7 +283,7 @@ class ViewMachine extends ViewRecord
                         Livewire::make(MachineScheduleGantt::class, ['machine' => $this->record])
                             ->key('machine-gantt-'.$this->record->id),
                     ])
-                    ->collapsible()
+                    ->collapsible()->columnSpanFull()
                     ->persistCollapsed()
                     ->id('machine-gantt-section')
                     ->extraAttributes([

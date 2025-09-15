@@ -2,11 +2,13 @@
 
 namespace App\Filament\Admin\Resources\BomResource\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Illuminate\Support\HtmlString;
+use Carbon\Carbon;
 use App\Filament\Admin\Resources\BomResource;
 use App\Enums\BomStatus;
-use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewBom extends ViewRecord
@@ -18,12 +20,13 @@ class ViewBom extends ViewRecord
         return [];
     }
 
-    public function infolist(Infolist $infolist): Infolist
+    public function infolist(Schema $schema): Schema
     {
-        return $infolist->schema([
+        return $schema->components([
 
             Section::make('Sale Order Details')
-                ->collapsible()
+                ->collapsible()->columnSpanFull()
+                ->columnSpanFull()
                 ->schema([
                     TextEntry::make('po_details_table')
                         ->label('')
@@ -34,10 +37,10 @@ class ViewBom extends ViewRecord
                             $Revision      = $record->purchaseOrder->partNumber->revision ?? '';
                             $Machine_Group = $record->machine_group_id ?? '';
 
-                            return new \Illuminate\Support\HtmlString('
+                            return new HtmlString('
                                 <!-- Desktop Table -->
-                                <div class="hidden lg:block overflow-x-auto shadow rounded-lg">
-                                    <table class="w-full text-sm text-center bg-white dark:bg-gray-900 border-collapse rounded-lg overflow-hidden">
+                                <div class="hidden lg:block w-full overflow-x-auto shadow rounded-lg">
+                                    <table class="w-full min-w-full text-sm text-center bg-white dark:bg-gray-900 border-collapse rounded-lg overflow-hidden table-fixed">
                                         <thead class="bg-primary-500 dark:bg-primary-700">
                                             <tr>
                                                 <th class="p-2 font-bold border border-white dark:border-gray-700 text-black dark:text-white">Unique ID</th>
@@ -77,14 +80,15 @@ class ViewBom extends ViewRecord
                 ]),
 
             Section::make('Operational Information')
-                ->collapsible()
+                ->collapsible()->columnSpanFull()
+                ->columnSpanFull()
                 ->schema([
                     TextEntry::make('Operators_table')
                         ->label('')
                         ->getStateUsing(function ($record) {
-                            $leadTime = $record->lead_time ? \Carbon\Carbon::parse($record->lead_time) : null;
+                            $leadTime = $record->lead_time ? Carbon::parse($record->lead_time) : null;
                             $deliveryTarget = $record->purchaseOrder && $record->purchaseOrder->delivery_target_date
-                                ? \Carbon\Carbon::parse($record->purchaseOrder->delivery_target_date)->endOfDay()
+                                ? Carbon::parse($record->purchaseOrder->delivery_target_date)->endOfDay()
                                 : null;
 
                             $deliveryDate = $record->purchaseOrder->delivery_target_date ?? null;
@@ -99,10 +103,10 @@ class ViewBom extends ViewRecord
 
                             $statusLabel = BomStatus::tryFrom($record->status)?->label() ?? $record->status;
 
-                            return new \Illuminate\Support\HtmlString('
+                            return new HtmlString('
                                 <!-- Desktop Table -->
-                                <div class="hidden lg:block overflow-x-auto shadow rounded-lg">
-                                    <table class="w-full text-sm text-center bg-white dark:bg-gray-900 border-collapse rounded-lg overflow-hidden">
+                                <div class="hidden lg:block w-full overflow-x-auto shadow rounded-lg">
+                                    <table class="w-full min-w-full text-sm text-center bg-white dark:bg-gray-900 border-collapse rounded-lg overflow-hidden table-fixed">
                                         <thead class="bg-primary-500 dark:bg-primary-700">
                                             <tr>
                                                 <th class="p-2 font-bold border border-white dark:border-gray-700 text-black dark:text-white">Proficiency</th>
@@ -136,7 +140,8 @@ class ViewBom extends ViewRecord
                 ]),
 
             Section::make('Documents')
-                ->collapsible()
+                ->collapsible()->columnSpanFull()
+                ->columnSpanFull()
                 ->schema([
                     TextEntry::make('documents_table')
                         ->label('')
@@ -149,10 +154,10 @@ class ViewBom extends ViewRecord
                                 return "<a href='{$media->getUrl()}' target='_blank' class='block text-blue-500 underline'>{$media->file_name}</a>";
                             })->implode('<br>') ?: 'No Files';
 
-                            return new \Illuminate\Support\HtmlString('
+                            return new HtmlString('
                                 <!-- Desktop Table -->
-                                <div class="hidden lg:block overflow-x-auto shadow rounded-lg">
-                                    <table class="w-full text-sm text-center bg-white dark:bg-gray-900 border-collapse rounded-lg overflow-hidden">
+                                <div class="hidden lg:block w-full overflow-x-auto shadow rounded-lg">
+                                    <table class="w-full min-w-full text-sm text-center bg-white dark:bg-gray-900 border-collapse rounded-lg overflow-hidden table-fixed">
                                         <thead class="bg-primary-500 dark:bg-primary-700">
                                             <tr>
                                                 <th class="p-2 font-bold border border-white dark:border-gray-700 text-black dark:text-white">Requirement Package</th>

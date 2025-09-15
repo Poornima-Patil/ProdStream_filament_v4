@@ -2,10 +2,11 @@
 
 namespace App\Filament\Admin\Resources\MachineGroupResource\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Illuminate\Support\HtmlString;
 use App\Filament\Admin\Resources\MachineGroupResource;
-use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewMachineGroup extends ViewRecord
@@ -17,12 +18,12 @@ class ViewMachineGroup extends ViewRecord
         return [];
     }
 
-    public function infolist(Infolist $infolist): Infolist
+    public function infolist(Schema $schema): Schema
     {
-        return $infolist->schema([
+        return $schema->components([
             Section::make('View Machine Group')
                 ->hiddenLabel()
-                ->collapsible()
+                ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('View Machine Group')
                         ->label('')
@@ -34,7 +35,7 @@ class ViewMachineGroup extends ViewRecord
                             $Name = $record->group_name ?? '';
                             $Description = $record->description ?? '';
 
-                            return new \Illuminate\Support\HtmlString('
+                            return new HtmlString('
                                 <!-- Desktop Table -->
                                 <div class="hidden lg:block overflow-x-auto shadow rounded-lg">
                                     <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900 rounded-lg overflow-hidden">

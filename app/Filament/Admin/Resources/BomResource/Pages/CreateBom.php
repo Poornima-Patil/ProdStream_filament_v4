@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\BomResource\Pages;
 
+use App\Models\PurchaseOrder;
 use App\Filament\Admin\Resources\BomResource;
 use App\Models\Bom;
 use Carbon\Carbon;
@@ -24,10 +25,10 @@ class CreateBom extends CreateRecord
 
         // Get the related PurchaseOrder's cust_id
         $purchaseOrder = $data['purchase_order_id']; // Assuming `purchase_order_id` is passed
-        $custId = \App\Models\PurchaseOrder::find($purchaseOrder)->customer->customer_id;
+        $custId = PurchaseOrder::find($purchaseOrder)->customer->customer_id;
 
         // Get the related PartNumber's part_number and revision
-        $partNumber = \App\Models\PurchaseOrder::find($purchaseOrder)->partNumber;
+        $partNumber = PurchaseOrder::find($purchaseOrder)->partNumber;
         $partnumber = $partNumber->partnumber;
         $revision = $partNumber->revision;
 

@@ -2,6 +2,8 @@
 
 namespace App\Providers\Filament;
 
+use Filament\Pages\Dashboard;
+use Filament\Widgets\AccountWidget;
 use App\Filament\Admin\Pages\WorkOrderWidgets;
 use App\Filament\Pages\Tenancy\EditFactoryProfile;
 use App\Filament\Pages\Tenancy\RegisterFactory;
@@ -44,16 +46,15 @@ class AdminPanelProvider extends PanelProvider
             ->discoverResources(in: app_path('Filament/Admin/Resources'), for: 'App\\Filament\\Admin\\Resources')
             ->discoverPages(in: app_path('Filament/Admin/Pages'), for: 'App\\Filament\\Admin\\Pages')
             ->pages([
-                Pages\Dashboard::class,
+                Dashboard::class,
                 //WorkOrderWidgets::class, // Add the Work Order Widgets page here
             ])
             // ->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\\Filament\\Admin\\Widgets')
             ->widgets([
-                Widgets\AccountWidget::class,
+                AccountWidget::class,
                 // Widgets\FilamentInfoWidget::class, // Removed to eliminate blue patch on refresh  
                 //\App\Filament\Admin\Widgets\WorkOrderWidgetsCard::class, // Keep only the widgets you want globally
             ])
-            ->viteTheme('resources/css/app.css')
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

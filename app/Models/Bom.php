@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Log;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,7 +28,7 @@ class Bom extends Model implements HasMedia
 
     public function purchaseOrder()
     {
-        \Log::info('Accessing PurchaseOrder for BOM:', [
+        Log::info('Accessing PurchaseOrder for BOM:', [
             'bom_id' => $this->id,
             'bom_unique_id' => $this->unique_id,
             'purchase_order_id' => $this->purchase_order_id,
@@ -48,7 +49,7 @@ class Bom extends Model implements HasMedia
 
     public function workOrders()
     {
-        \Log::info('Accessing Work Orders for BOM:', [
+        Log::info('Accessing Work Orders for BOM:', [
             'bom_id' => $this->id,
             'bom_unique_id' => $this->unique_id,
             'purchase_order_id' => $this->purchase_order_id,

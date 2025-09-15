@@ -2,12 +2,13 @@
 
 namespace App\Filament\Admin\Resources\OperatorResource\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Illuminate\Support\HtmlString;
+use Filament\Schemas\Components\Livewire;
 use App\Filament\Admin\Resources\OperatorResource;
 use App\Livewire\Calendar\Operators\OperatorScheduleCalendar;
-use Filament\Infolists\Components\Livewire;
-use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewOperator extends ViewRecord
@@ -19,13 +20,13 @@ class ViewOperator extends ViewRecord
         return [];
     }
 
-    public function infolist(Infolist $infolist): Infolist
+    public function infolist(Schema $schema): Schema
     {
 
-        return $infolist->schema([
+        return $schema->components([
             Section::make('Operator Information')
                 ->hiddenLabel()
-                ->collapsible()
+                ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('View Operator')
                         ->label('')
@@ -40,7 +41,7 @@ class ViewOperator extends ViewRecord
                             $Shift = $record->shift->name;
                             $ShiftHours = $record->shift->start_time.' - '.$record->shift->end_time;
 
-                            return new \Illuminate\Support\HtmlString('
+                            return new HtmlString('
                                 <!-- Desktop Table -->
                                 <div class="hidden lg:block overflow-x-auto rounded-lg shadow">
                                     <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
@@ -96,7 +97,7 @@ class ViewOperator extends ViewRecord
                     Livewire::make(OperatorScheduleCalendar::class, ['operator' => $this->record])
                         ->key('operator-calendar-'.$this->record->id),
                 ])
-                ->collapsible()
+                ->collapsible()->columnSpanFull()
                 ->persistCollapsed()
                 ->id('operator-schedule-section')
                 ->extraAttributes([

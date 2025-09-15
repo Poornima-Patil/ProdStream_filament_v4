@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Auth;
 
 class OperatorScheduleWidget extends Widget
 {
-    protected static string $view = 'filament.widgets.operator-schedule-widget';
+    protected string $view = 'filament.widgets.operator-schedule-widget';
 
     protected int|string|array $columnSpan = 'full';
 

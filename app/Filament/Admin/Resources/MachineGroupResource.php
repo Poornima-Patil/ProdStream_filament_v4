@@ -2,15 +2,27 @@
 
 namespace App\Filament\Admin\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
+use Filament\Tables\Table;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Admin\Resources\MachineGroupResource\Pages\ListMachineGroups;
+use App\Filament\Admin\Resources\MachineGroupResource\Pages\CreateMachineGroup;
+use App\Filament\Admin\Resources\MachineGroupResource\Pages\EditMachineGroup;
+use App\Filament\Admin\Resources\MachineGroupResource\Pages\ViewMachineGroup;
 use App\Filament\Admin\Resources\MachineGroupResource\Pages;
 use App\Models\MachineGroup;
 use Filament\Forms;
 use Filament\Resources\Resource;
 use Filament\Tables;
-use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
-use Filament\Tables\Enums\ActionsPosition;
 
 class MachineGroupResource extends Resource
 {
@@ -18,49 +30,49 @@ class MachineGroupResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    protected static ?string $navigationIcon = 'heroicon-o-cog';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-cog';
 
-    protected static ?string $navigationGroup = 'Admin Operations';
+    protected static string | \UnitEnum | null $navigationGroup = 'Admin Operations';
 
     // Add this for custom labels and navigation
-    public static function form(Forms\Form $form): Forms\Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\TextInput::make('group_name')
+        return $schema
+            ->components([
+                TextInput::make('group_name')
                     ->label('Group Name')
                     ->required(),
-                Forms\Components\Textarea::make('description')
+                Textarea::make('description')
                     ->label('Description')
                     ->required(),
 
             ]);
     }
 
-    public static function table(Tables\Table $table): Tables\Table
+    public static function table(Table $table): Table
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('group_name')
+                TextColumn::make('group_name')
                     ->label('Group Name')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('description')
+                TextColumn::make('description')
                     ->label('Description')
                     ->limit(50),
 
             ])
             ->filters([
-                Tables\Filters\TrashedFilter::make(),
+                TrashedFilter::make(),
             ])
-          ->actions([
+          ->recordActions([
                 ActionGroup::make([
                     EditAction::make()->label('Edit'),
                     ViewAction::make()->label('View'),
                 ])
-            ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ], position: RecordActionsPosition::BeforeColumns)
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -68,10 +80,10 @@ class MachineGroupResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListMachineGroups::route('/'),
-            'create' => Pages\CreateMachineGroup::route('/create'),
-            'edit' => Pages\EditMachineGroup::route('/{record}/edit'),
-            'view' => Pages\ViewMachineGroup::route('/{record}/view'),
+            'index' => ListMachineGroups::route('/'),
+            'create' => CreateMachineGroup::route('/create'),
+            'edit' => EditMachineGroup::route('/{record}/edit'),
+            'view' => ViewMachineGroup::route('/{record}/view'),
         ];
     }
 }

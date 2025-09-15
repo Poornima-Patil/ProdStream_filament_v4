@@ -2,10 +2,22 @@
 
 namespace App\Filament\Admin\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Hidden;
+use Filament\Facades\Filament;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Actions\EditAction;
+use Filament\Actions\RestoreAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\RestoreBulkAction;
+use App\Filament\Admin\Resources\PermissionResource\Pages\ListPermissions;
+use App\Filament\Admin\Resources\PermissionResource\Pages\CreatePermission;
+use App\Filament\Admin\Resources\PermissionResource\Pages\EditPermission;
 use App\Filament\Admin\Resources\PermissionResource\Pages;
 use App\Models\Permission;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -19,21 +31,21 @@ class PermissionResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-rectangle-stack';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\TextInput::make('name'),
-                Forms\Components\TextInput::make('guard_name')
+        return $schema
+            ->components([
+                TextInput::make('name'),
+                TextInput::make('guard_name')
                     ->default('web'),
-                Forms\Components\TextInput::make('group')
+                TextInput::make('group')
                     ->label('Permission Group')
                     ->required(),
-                Forms\Components\Hidden::make('factory_id')
-                    ->default(fn() => \Filament\Facades\Filament::getTenant()?->id ?? Auth::user()->factory_id)
-                    ->dehydrated(fn ($state) => $state ?? \Filament\Facades\Filament::getTenant()?->id ?? Auth::user()->factory_id),
+                Hidden::make('factory_id')
+                    ->default(fn() => Filament::getTenant()?->id ?? Auth::user()->factory_id)
+                    ->dehydrated(fn ($state) => $state ?? Filament::getTenant()?->id ?? Auth::user()->factory_id),
             ]);
     }
 
@@ -41,20 +53,20 @@ class PermissionResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('name'),
-                Tables\Columns\TextColumn::make('group'),
+                TextColumn::make('name'),
+                TextColumn::make('group'),
             ])
             ->filters([
-                Tables\Filters\TrashedFilter::make(),
+                TrashedFilter::make(),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\RestoreAction::make(),
+            ->recordActions([
+                EditAction::make(),
+                RestoreAction::make(),
 
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\RestoreBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    RestoreBulkAction::make(),
                 ]),
             ])->defaultPaginationPageOption(20)
             ->defaultGroup('group');
@@ -70,9 +82,9 @@ class PermissionResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPermissions::route('/'),
-            'create' => Pages\CreatePermission::route('/create'),
-            'edit' => Pages\EditPermission::route('/{record}/edit'),
+            'index' => ListPermissions::route('/'),
+            'create' => CreatePermission::route('/create'),
+            'edit' => EditPermission::route('/{record}/edit'),
         ];
     }
 

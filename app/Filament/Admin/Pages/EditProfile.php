@@ -2,13 +2,15 @@
 
 namespace App\Filament\Admin\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Actions\Action;
 use Exception;
 use Filament\Facades\Filament;
 use Filament\Forms;
-use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Exceptions\Halt;
@@ -21,7 +23,7 @@ class EditProfile extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static string $view = 'filament.pages.edit-profile';
+    protected string $view = 'filament.pages.edit-profile';
 
     protected static bool $shouldRegisterNavigation = false;
 
@@ -44,19 +46,19 @@ class EditProfile extends Page implements HasForms
         ];
     }
 
-    public function editPasswordForm(Form $form): Form
+    public function editPasswordForm(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Update Password')
+        return $schema
+            ->components([
+                Section::make('Update Password')
                     ->description('Ensure your account is using long, random password to stay secure.')
                     ->schema([
-                        Forms\Components\TextInput::make('Current password')
+                        TextInput::make('Current password')
                             ->password()
                             ->required()
                             ->currentPassword(),
 
-                        Forms\Components\TextInput::make('password')
+                        TextInput::make('password')
                             ->password()
                             ->required()
                             ->rule(Password::default())
@@ -65,7 +67,7 @@ class EditProfile extends Page implements HasForms
                             ->live(debounce: 500)
                             ->same('passwordConfirmation'),
 
-                        Forms\Components\TextInput::make('passwordConfirmation')
+                        TextInput::make('passwordConfirmation')
                             ->password()
                             ->required()
                             ->dehydrated(false),

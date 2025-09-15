@@ -2,6 +2,37 @@
 
 namespace App\Filament\Admin\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\Select;
+use App\Models\PartNumber;
+use App\Models\Bom;
+use Closure;
+use Filament\Forms\Components\TextInput;
+use Exception;
+use Filament\Forms\Components\DateTimePicker;
+use Carbon\Carbon;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Placeholder;
+use Illuminate\Support\HtmlString;
+use Illuminate\Support\Facades\Log;
+use Filament\Forms\Components\Repeater;
+use Filament\Schemas\Components\Grid;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Textarea;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Admin\Resources\WorkOrderResource\Pages\ListWorkOrders;
+use App\Filament\Admin\Resources\WorkOrderResource\Pages\CreateWorkOrder;
+use App\Filament\Admin\Resources\WorkOrderResource\Pages\EditWorkOrder;
+use App\Filament\Admin\Resources\WorkOrderResource\Pages\ViewWorkOrder;
+use App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderProgress;
+use App\Filament\Admin\Resources\WorkOrderResource\Widgets\SimpleWorkOrderGantt;
 use App\Filament\Admin\Resources\WorkOrderResource\Pages;
 use App\Models\InfoMessage;
 use App\Models\Machine;
@@ -9,15 +40,9 @@ use App\Models\Operator;
 use App\Models\User;
 use App\Models\WorkOrder;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
-use Filament\Tables\Actions\Action;
-use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
-use Filament\Tables\Enums\ActionsPosition;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -29,25 +54,25 @@ class WorkOrderResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static ?string $navigationGroup = 'Process Operations';
+    protected static string | \UnitEnum | null $navigationGroup = 'Process Operations';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
 
         $user = Auth::user();
         $isAdminOrManager = $user && $user->can(abilities: 'Edit Bom');        // dd($isAdminOrManager);
 
-        return $form
-            ->schema([
-                Forms\Components\Select::make('part_number_id')
+        return $schema
+            ->components([
+                Select::make('part_number_id')
                     ->label('Partnumber')
                     ->options(function () {
                         $factoryId = Auth::user()->factory_id; // Get the factory ID of the logged-in user
 
                         // Query the PartNumber model and include the partnumber and revision
-                        return \App\Models\PartNumber::where('factory_id', $factoryId)
+                        return PartNumber::where('factory_id', $factoryId)
                             ->get()
                             ->mapWithKeys(function ($partNumber) {
                                 return [
@@ -67,7 +92,7 @@ class WorkOrderResource extends Resource
 
                         return null; // Return null if the part number doesn't exist
                     }),
-                Forms\Components\Select::make('bom_id')
+                Select::make('bom_id')
                     ->label('BOM')
                     ->options(function (callable $get) {
                         $partNumberId = $get('part_number_id'); // Get the selected Part Number ID
@@ -76,7 +101,7 @@ class WorkOrderResource extends Resource
                         }
 
                         // Query BOMs through the Purchase Order link and include Part Number description
-                        return \App\Models\Bom::whereHas('purchaseOrder', function ($query) use ($partNumberId) {
+                        return Bom::whereHas('purchaseOrder', function ($query) use ($partNumberId) {
                             $query->where('part_number_id', $partNumberId);
                         })->get()->mapWithKeys(function ($bom) {
                             $partNumberDescription = $bom->purchaseOrder->partNumber->description ?? ''; // Assuming PartNumber has a 'description' field
@@ -95,21 +120,21 @@ class WorkOrderResource extends Resource
 
 
 // ...existing code...
-Forms\Components\Select::make('machine_id')
+Select::make('machine_id')
     ->label('Machine')
     ->options(function (callable $get) {
         $bomId = $get('bom_id');
-        $user = \Illuminate\Support\Facades\Auth::user();
+        $user = Auth::user();
 
         if (! $bomId) {
             return [];
         }
 
-        $bom = \App\Models\Bom::find($bomId);
+        $bom = Bom::find($bomId);
         $machineGroupId = $bom?->machine_group_id;
 
         // Fetch all active machines in the factory
-        $allMachines = \App\Models\Machine::where('factory_id', $user->factory_id)
+        $allMachines = Machine::where('factory_id', $user->factory_id)
             ->active()
             ->get();
 
@@ -129,8 +154,8 @@ Forms\Components\Select::make('machine_id')
         $machineId = $get('machine_id');
         $bomId = $get('bom_id');
         if ($machineId && $bomId) {
-            $bom = \App\Models\Bom::find($bomId);
-            $machine = \App\Models\Machine::find($machineId);
+            $bom = Bom::find($bomId);
+            $machine = Machine::find($machineId);
             if ($bom && $machine && $machine->machine_group_id != $bom->machine_group_id) {
                 return "⚠️ This Machine is not as per BOM Specifications.";
             }
@@ -139,11 +164,11 @@ Forms\Components\Select::make('machine_id')
     })
     ->rules([
         function (callable $get) {
-            return function (string $attribute, $value, \Closure $fail) use ($get) {
+            return function (string $attribute, $value, Closure $fail) use ($get) {
                 $bomId = $get('bom_id');
                 if ($bomId && $value) {
-                    $bom = \App\Models\Bom::find($bomId);
-                    $machine = \App\Models\Machine::find($value);
+                    $bom = Bom::find($bomId);
+                    $machine = Machine::find($value);
                     if ($bom && $machine && $machine->machine_group_id != $bom->machine_group_id) {
                         $fail('This Machine is not as per BOM Specifications.');
                     }
@@ -164,10 +189,10 @@ Forms\Components\Select::make('machine_id')
         // Show warning if machine is not as per BOM
         $bomId = $get('bom_id');
         if ($bomId && $state) {
-            $bom = \App\Models\Bom::find($bomId);
-            $machine = \App\Models\Machine::find($state);
+            $bom = Bom::find($bomId);
+            $machine = Machine::find($state);
             if ($bom && $machine && $machine->machine_group_id != $bom->machine_group_id) {
-                \Filament\Notifications\Notification::make()
+                Notification::make()
                     ->title('Warning')
                     ->body('This Machine is not as per BOM Specifications.')
                     ->warning()
@@ -181,7 +206,7 @@ Forms\Components\Select::make('machine_id')
     }),
  
 
-                Forms\Components\TextInput::make('qty')
+                TextInput::make('qty')
                     ->label('Quantity')
                     ->required()
                     ->disabled(! $isAdminOrManager)
@@ -198,7 +223,7 @@ Forms\Components\Select::make('machine_id')
                         }
 
                         // Get the BOM associated with this Work Order
-                        $bom = \App\Models\Bom::find($get('bom_id'));
+                        $bom = Bom::find($get('bom_id'));
 
                         if ($bom) {
                             // Get the related Purchase Order and its quantity
@@ -206,7 +231,7 @@ Forms\Components\Select::make('machine_id')
 
                             // Check if the entered quantity exceeds the Purchase Order quantity
                             if ($purchaseOrder && $qty > $purchaseOrder->QTY) {
-                                \Filament\Notifications\Notification::make()
+                                Notification::make()
                                     ->title('Quantity Exceeded')
                                     ->body("The entered quantity cannot exceed the Sales Order quantity: {$purchaseOrder->QTY}.")
                                     ->danger() // Red notification
@@ -220,7 +245,7 @@ Forms\Components\Select::make('machine_id')
                         }
 
                         // Get the cycle time from the part number
-                        $cycleTimeInSeconds = \App\Models\PartNumber::where('id', $partNumberId)->value('cycle_time');
+                        $cycleTimeInSeconds = PartNumber::where('id', $partNumberId)->value('cycle_time');
 
                         if (! $cycleTimeInSeconds) {
                             $set('time_to_complete', '00:00:00'); // Default if no cycle time is set
@@ -232,7 +257,7 @@ Forms\Components\Select::make('machine_id')
                         $totalSeconds = $cycleTimeInSeconds * $qty;
                         $set('time_to_complete', self::convertSecondsToTime($totalSeconds));
                     }),
-Forms\Components\Select::make('operator_id')
+Select::make('operator_id')
     ->label('Operator')
     ->disabled(! $isAdminOrManager)
     ->options(function (callable $get) {
@@ -243,7 +268,7 @@ Forms\Components\Select::make('operator_id')
         }
 
         // Get the operator proficiency ID from the BOM's linked Purchase Order
-        $operatorProficiencyId = \App\Models\Bom::find($bomId)->operator_proficiency_id;
+        $operatorProficiencyId = Bom::find($bomId)->operator_proficiency_id;
 
         // Get all operators for the factory
         $factoryId = Auth::user()->factory_id; // Get the logged-in user's factory_id
@@ -268,8 +293,8 @@ Forms\Components\Select::make('operator_id')
         $operatorId = $get('operator_id');
         $bomId = $get('bom_id');
         if ($operatorId && $bomId) {
-            $bom = \App\Models\Bom::find($bomId);
-            $operator = \App\Models\Operator::find($operatorId);
+            $bom = Bom::find($bomId);
+            $operator = Operator::find($operatorId);
             if ($bom && $operator && $operator->operator_proficiency_id != $bom->operator_proficiency_id) {
                 return "⚠️ The Operator's Profiency does not match with the BOM specifications.";
             }
@@ -284,7 +309,7 @@ Forms\Components\Select::make('operator_id')
         }
 
         try {
-            $validation = \App\Models\WorkOrder::validateScheduling([
+            $validation = WorkOrder::validateScheduling([
                 'machine_id' => $get('machine_id'),
                 'operator_id' => $operatorId,
                 'factory_id' => $factoryId,
@@ -300,7 +325,7 @@ Forms\Components\Select::make('operator_id')
 
                 return '⚠️ SHIFT CONFLICT: '.$shiftConflict['message'];
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return null;
         }
 
@@ -308,11 +333,11 @@ Forms\Components\Select::make('operator_id')
     })
     ->rules([
         function (callable $get) {
-            return function (string $attribute, $value, \Closure $fail) use ($get) {
+            return function (string $attribute, $value, Closure $fail) use ($get) {
                 $bomId = $get('bom_id');
                 if ($bomId && $value) {
-                    $bom = \App\Models\Bom::find($bomId);
-                    $operator = \App\Models\Operator::find($value);
+                    $bom = Bom::find($bomId);
+                    $operator = Operator::find($value);
                     if ($bom && $operator && $operator->operator_proficiency_id != $bom->operator_proficiency_id) {
                         $fail("The Operator's Profiency does not match with the BOM specifications.");
                     }
@@ -333,10 +358,10 @@ Forms\Components\Select::make('operator_id')
         // Only show warning if proficiency does not match
         $bomId = $get('bom_id');
         if ($bomId && $state) {
-            $bom = \App\Models\Bom::find($bomId);
-            $operator = \App\Models\Operator::find($state);
+            $bom = Bom::find($bomId);
+            $operator = Operator::find($state);
             if ($bom && $operator && $operator->operator_proficiency_id != $bom->operator_proficiency_id) {
-                \Filament\Notifications\Notification::make()
+                Notification::make()
                     ->title('Warning')
                     ->body("The Operator's Profiency does not match with the BOM specifications.")
                     ->warning()
@@ -348,7 +373,7 @@ Forms\Components\Select::make('operator_id')
             self::validateOperatorScheduling($get, $set);
         }
     }),  
-                Forms\Components\TextInput::make('time_to_complete')
+                TextInput::make('time_to_complete')
                     ->label('Approx time required')
                     ->hint('Time is calculated based on the cycle time provided in the Part number')
                     ->visible($isAdminOrManager)
@@ -360,7 +385,7 @@ Forms\Components\Select::make('operator_id')
                             $qty = $record->qty;
 
                             if ($partNumberId && $qty) {
-                                $cycleTimeInSeconds = \App\Models\PartNumber::where('id', $partNumberId)->value('cycle_time');
+                                $cycleTimeInSeconds = PartNumber::where('id', $partNumberId)->value('cycle_time');
                                 if ($cycleTimeInSeconds) {
                                     $totalSeconds = $cycleTimeInSeconds * $qty;
                                     $component->state(self::convertSecondsToTime($totalSeconds));
@@ -380,7 +405,7 @@ Forms\Components\Select::make('operator_id')
                         }
 
                         // Get the cycle time from the part number
-                        $cycleTimeInSeconds = \App\Models\PartNumber::where('id', $partNumberId)->value('cycle_time');
+                        $cycleTimeInSeconds = PartNumber::where('id', $partNumberId)->value('cycle_time');
 
                         if (! $cycleTimeInSeconds) {
                             $set('time_to_complete', '00:00:00');
@@ -393,7 +418,7 @@ Forms\Components\Select::make('operator_id')
                         $set('time_to_complete', self::convertSecondsToTime($totalSeconds));
                     }),
 
-                Forms\Components\DateTimePicker::make('start_time')
+                DateTimePicker::make('start_time')
                     ->required()
                     ->disabled(! $isAdminOrManager)
                     ->label('Planned Start Time')
@@ -406,7 +431,7 @@ Forms\Components\Select::make('operator_id')
                     
                     ->rules([
                         function (callable $get) {
-                            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                            return function (string $attribute, $value, Closure $fail) use ($get) {
                                 $machineId = $get('machine_id');
                                 $endTime = $get('end_time');
 
@@ -425,7 +450,7 @@ Forms\Components\Select::make('operator_id')
                             self::validateMachineScheduling($get, $set);
                         }
                     }),
-                Forms\Components\DateTimePicker::make('end_time')
+                DateTimePicker::make('end_time')
                     ->label('Planned End Time')
                     ->minDate(now()->startOfDay()) 
                     ->disabled(! $isAdminOrManager)
@@ -437,7 +462,7 @@ Forms\Components\Select::make('operator_id')
                     ->required()
                     ->rules([
                         function (callable $get) {
-                            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                            return function (string $attribute, $value, Closure $fail) use ($get) {
                                 $machineId = $get('machine_id');
                                 $startTime = $get('start_time');
 
@@ -461,9 +486,9 @@ Forms\Components\Select::make('operator_id')
                         if (! $bomId) {
                             return null;
                         }
-                        $bom = \App\Models\Bom::find($bomId);
+                        $bom = Bom::find($bomId);
                         if ($bom && $bom->lead_time) {
-                            return 'BOM Target Completion Time: '.\Carbon\Carbon::parse($bom->lead_time)->format('d M Y');
+                            return 'BOM Target Completion Time: '.Carbon::parse($bom->lead_time)->format('d M Y');
                         }
 
                         return null;
@@ -471,9 +496,9 @@ Forms\Components\Select::make('operator_id')
                     ->reactive(),
 
                 // Machine Status Information Section
-                Forms\Components\Section::make('Machine Scheduling Information')
+                Section::make('Machine Scheduling Information')
                     ->schema([
-                        Forms\Components\Placeholder::make('machine_status')
+                        Placeholder::make('machine_status')
                             ->label('Current Machine Status')
                             ->content(function (callable $get) {
                                 $machineId = $get('machine_id');
@@ -483,17 +508,17 @@ Forms\Components\Select::make('operator_id')
                                 $factoryId = Auth::user()->factory_id ?? null;
 
                                 if (! $machineId || ! $factoryId) {
-                                    return new \Illuminate\Support\HtmlString('<div class="text-gray-500 italic">Select a machine to see status</div>');
+                                    return new HtmlString('<div class="text-gray-500 italic">Select a machine to see status</div>');
                                 }
 
                                 try {
                                     // Get machine details and ensure it belongs to the same factory
-                                    $machine = \App\Models\Machine::where('id', $machineId)
+                                    $machine = Machine::where('id', $machineId)
                                         ->where('factory_id', $factoryId)
                                         ->first();
 
                                     if (! $machine) {
-                                        return new \Illuminate\Support\HtmlString('<div class="text-red-600">⚠️ Machine not found or belongs to different factory</div>');
+                                        return new HtmlString('<div class="text-red-600">⚠️ Machine not found or belongs to different factory</div>');
                                     }
 
                                     $machineName = "({$machine->assetId} - {$machine->name})";
@@ -507,7 +532,7 @@ Forms\Components\Select::make('operator_id')
                                                 ? "{$conflictingWO->operator->user->first_name} {$conflictingWO->operator->user->last_name}"
                                                 : 'Unknown';
                                             $estimatedCompletion = $conflictingWO->end_time
-                                                ? \Carbon\Carbon::parse($conflictingWO->end_time)->format('M d, H:i')
+                                                ? Carbon::parse($conflictingWO->end_time)->format('M d, H:i')
                                                 : 'Unknown';
 
                                             // Generate the edit URL for the conflicting work order
@@ -516,7 +541,7 @@ Forms\Components\Select::make('operator_id')
                                             // Determine if it's a running conflict or scheduled conflict
                                             if ($conflictingWO->status === 'Start') {
                                                 // Work order is actually running
-                                                return new \Illuminate\Support\HtmlString(
+                                                return new HtmlString(
                                                     '<div class="bg-red-50 border border-red-200 rounded-lg p-3">'.
                                                         '<div class="flex items-center text-red-800 font-semibold mb-2">'.
                                                         '<span class="text-lg mr-2">🔴</span>'.
@@ -532,10 +557,10 @@ Forms\Components\Select::make('operator_id')
                                                 );
                                             } else {
                                                 // Work order is scheduled (planned conflict)
-                                                $scheduledStart = \Carbon\Carbon::parse($conflictingWO->start_time)->format('M d, H:i');
-                                                $scheduledEnd = \Carbon\Carbon::parse($conflictingWO->end_time)->format('M d, H:i');
+                                                $scheduledStart = Carbon::parse($conflictingWO->start_time)->format('M d, H:i');
+                                                $scheduledEnd = Carbon::parse($conflictingWO->end_time)->format('M d, H:i');
 
-                                                return new \Illuminate\Support\HtmlString(
+                                                return new HtmlString(
                                                     '<div class="bg-orange-50 border border-orange-200 rounded-lg p-3">'.
                                                         '<div class="flex items-center text-orange-800 font-semibold mb-2">'.
                                                         '<span class="text-lg mr-2">⏰</span>'.
@@ -559,9 +584,9 @@ Forms\Components\Select::make('operator_id')
                                         // Don't show as occupied if it's the current work order being edited
                                         if (! $get('id') || $currentWO->id !== $get('id')) {
                                             $woLink = url("/admin/{$factoryId}/work-orders/{$currentWO->id}");
-                                            $estimatedCompletion = \Carbon\Carbon::parse($currentWO->end_time)->format('M d, H:i');
+                                            $estimatedCompletion = Carbon::parse($currentWO->end_time)->format('M d, H:i');
 
-                                            return new \Illuminate\Support\HtmlString(
+                                            return new HtmlString(
                                                 '<div class="bg-red-50 border border-red-200 rounded-lg p-3">'.
                                                     '<div class="flex items-center text-red-800 font-semibold mb-2">'.
                                                     '<span class="text-lg mr-2">🔴</span>'.
@@ -590,7 +615,7 @@ Forms\Components\Select::make('operator_id')
                                         if (! $validation['is_valid']) {
                                             $conflictCount = count($validation['conflicts']);
 
-                                            return new \Illuminate\Support\HtmlString(
+                                            return new HtmlString(
                                                 '<div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">'.
                                                     '<div class="flex items-center text-yellow-800 font-semibold">'.
                                                     '<span class="text-lg mr-2">⚠️</span>'.
@@ -604,7 +629,7 @@ Forms\Components\Select::make('operator_id')
                                         }
                                     }
 
-                                    return new \Illuminate\Support\HtmlString(
+                                    return new HtmlString(
                                         '<div class="bg-green-50 border border-green-200 rounded-lg p-3">'.
                                             '<div class="flex items-center text-green-800 font-semibold">'.
                                             '<span class="text-lg mr-2">🟢</span>'.
@@ -615,23 +640,23 @@ Forms\Components\Select::make('operator_id')
                                             '</div>'.
                                             '</div>'
                                     );
-                                } catch (\Exception $e) {
+                                } catch (Exception $e) {
                                     // Log the actual error for debugging
-                                    \Illuminate\Support\Facades\Log::error('Machine status check failed: '.$e->getMessage(), [
+                                    Log::error('Machine status check failed: '.$e->getMessage(), [
                                         'exception' => $e,
                                         'machine_id' => $machineId,
                                         'factory_id' => $factoryId,
                                         'status' => $status,
                                     ]);
 
-                                    return new \Illuminate\Support\HtmlString(
+                                    return new HtmlString(
                                         '<div class="text-red-500 italic">Unable to check machine status<br>'.
                                             '<small>Error: '.htmlspecialchars($e->getMessage()).'</small></div>'
                                     );
                                 }
                             })
                             ->live(),
-                        Forms\Components\Placeholder::make('upcoming_schedule')
+                        Placeholder::make('upcoming_schedule')
                             ->label('Relevant Schedule')
                             ->content(function (callable $get) {
                                 $machineId = $get('machine_id');
@@ -640,7 +665,7 @@ Forms\Components\Select::make('operator_id')
                                 $factoryId = Auth::user()->factory_id ?? null;
 
                                 if (! $machineId || ! $factoryId) {
-                                    return new \Illuminate\Support\HtmlString('<div class="text-gray-500 italic">Select a machine to see relevant schedule</div>');
+                                    return new HtmlString('<div class="text-gray-500 italic">Select a machine to see relevant schedule</div>');
                                 }
 
                                 try {
@@ -648,8 +673,8 @@ Forms\Components\Select::make('operator_id')
 
                                     // If user has entered scheduling times, show only relevant work orders
                                     if ($startTime && $endTime) {
-                                        $newStart = \Carbon\Carbon::parse($startTime);
-                                        $newEnd = \Carbon\Carbon::parse($endTime);
+                                        $newStart = Carbon::parse($startTime);
+                                        $newEnd = Carbon::parse($endTime);
 
                                         // Get ALL work orders for this machine to check for conflicts and same-date items
                                         $allWOs = WorkOrder::where('machine_id', $machineId)
@@ -659,8 +684,8 @@ Forms\Components\Select::make('operator_id')
                                             ->get();
 
                                         foreach ($allWOs as $wo) {
-                                            $woStart = \Carbon\Carbon::parse($wo->start_time);
-                                            $woEnd = \Carbon\Carbon::parse($wo->end_time);
+                                            $woStart = Carbon::parse($wo->start_time);
+                                            $woEnd = Carbon::parse($wo->end_time);
 
                                             $includeInList = false;
                                             $icon = '📅';
@@ -719,8 +744,8 @@ Forms\Components\Select::make('operator_id')
                                                 'status' => 'Upcoming',
                                                 'bg_color' => 'bg-blue-50 border-blue-200',
                                                 'text_color' => 'text-blue-800',
-                                                'start_formatted' => \Carbon\Carbon::parse($wo->start_time)->format('M d, H:i'),
-                                                'end_formatted' => \Carbon\Carbon::parse($wo->end_time)->format('H:i'),
+                                                'start_formatted' => Carbon::parse($wo->start_time)->format('M d, H:i'),
+                                                'end_formatted' => Carbon::parse($wo->end_time)->format('H:i'),
                                             ];
                                         }
                                     }
@@ -730,7 +755,7 @@ Forms\Components\Select::make('operator_id')
                                             'No conflicting or same-day work orders found' :
                                             'No upcoming scheduled work orders';
 
-                                        return new \Illuminate\Support\HtmlString(
+                                        return new HtmlString(
                                             '<div class="bg-green-50 border border-green-200 rounded-lg p-3">'.
                                                 '<div class="flex items-center text-green-800">'.
                                                 '<span class="text-lg mr-2">✅</span>'.
@@ -765,10 +790,10 @@ Forms\Components\Select::make('operator_id')
                                     }
                                     $content .= '</div>';
 
-                                    return new \Illuminate\Support\HtmlString($content);
-                                } catch (\Exception $e) {
+                                    return new HtmlString($content);
+                                } catch (Exception $e) {
                                     // Log the actual error for debugging
-                                    \Illuminate\Support\Facades\Log::error('Schedule information failed: '.$e->getMessage(), [
+                                    Log::error('Schedule information failed: '.$e->getMessage(), [
                                         'exception' => $e,
                                         'machine_id' => $machineId,
                                         'factory_id' => $factoryId,
@@ -776,7 +801,7 @@ Forms\Components\Select::make('operator_id')
                                         'end_time' => $endTime,
                                     ]);
 
-                                    return new \Illuminate\Support\HtmlString(
+                                    return new HtmlString(
                                         '<div class="text-red-500 italic">Unable to load schedule information<br>'.
                                             '<small>Error: '.htmlspecialchars($e->getMessage()).'</small></div>'
                                     );
@@ -791,9 +816,9 @@ Forms\Components\Select::make('operator_id')
                     ->collapsed(),
 
                 // Operator Scheduling Information Section
-                Forms\Components\Section::make('Operator Scheduling Information')
+                Section::make('Operator Scheduling Information')
                     ->schema([
-                        Forms\Components\Placeholder::make('operator_status')
+                        Placeholder::make('operator_status')
                             ->label('Current Operator Status')
                             ->content(function (callable $get) {
                                 $operatorId = $get('operator_id');
@@ -803,18 +828,18 @@ Forms\Components\Select::make('operator_id')
                                 $factoryId = Auth::user()->factory_id ?? null;
 
                                 if (! $operatorId || ! $factoryId) {
-                                    return new \Illuminate\Support\HtmlString('<div class="text-gray-500 italic">Select an operator to see status</div>');
+                                    return new HtmlString('<div class="text-gray-500 italic">Select an operator to see status</div>');
                                 }
 
                                 try {
                                     // Get operator details and ensure it belongs to the same factory
-                                    $operator = \App\Models\Operator::where('id', $operatorId)
+                                    $operator = Operator::where('id', $operatorId)
                                         ->where('factory_id', $factoryId)
                                         ->with(['user', 'shift'])
                                         ->first();
 
                                     if (! $operator) {
-                                        return new \Illuminate\Support\HtmlString('<div class="text-red-600">⚠️ Operator not found or belongs to different factory</div>');
+                                        return new HtmlString('<div class="text-red-600">⚠️ Operator not found or belongs to different factory</div>');
                                     }
 
                                     $operatorName = "({$operator->user->first_name} {$operator->user->last_name})";
@@ -828,9 +853,9 @@ Forms\Components\Select::make('operator_id')
                                         // Don't show as occupied if it's the current work order being edited
                                         if (! $get('id') || $currentWO->id !== $get('id')) {
                                             $woLink = url("/admin/{$factoryId}/work-orders/{$currentWO->id}");
-                                            $estimatedCompletion = \Carbon\Carbon::parse($currentWO->end_time)->format('M d, H:i');
+                                            $estimatedCompletion = Carbon::parse($currentWO->end_time)->format('M d, H:i');
 
-                                            return new \Illuminate\Support\HtmlString(
+                                            return new HtmlString(
                                                 '<div class="bg-red-50 border border-red-200 rounded-lg p-3">'.
                                                     '<div class="flex items-center text-red-800 font-semibold mb-2">'.
                                                     '<span class="text-lg mr-2">🔴</span>'.
@@ -862,7 +887,7 @@ Forms\Components\Select::make('operator_id')
                                         if (! empty($validation['shift_conflicts'])) {
                                             $shiftConflict = $validation['shift_conflicts'][0];
 
-                                            return new \Illuminate\Support\HtmlString(
+                                            return new HtmlString(
                                                 '<div class="bg-orange-50 border border-orange-200 rounded-lg p-3">'.
                                                     '<div class="flex items-center text-orange-800 font-semibold mb-2">'.
                                                     '<span class="text-lg mr-2">⚠️</span>'.
@@ -883,7 +908,7 @@ Forms\Components\Select::make('operator_id')
                                                 fn ($c) => $c['type'] === 'work_order_conflict'));
 
                                             if ($operatorConflictCount > 0) {
-                                                return new \Illuminate\Support\HtmlString(
+                                                return new HtmlString(
                                                     '<div class="bg-red-50 border border-red-200 rounded-lg p-3">'.
                                                         '<div class="flex items-center text-red-800 font-semibold mb-2">'.
                                                         '<span class="text-lg mr-2">🚫</span>'.
@@ -900,7 +925,7 @@ Forms\Components\Select::make('operator_id')
                                         }
                                     }
 
-                                    return new \Illuminate\Support\HtmlString(
+                                    return new HtmlString(
                                         '<div class="bg-green-50 border border-green-200 rounded-lg p-3">'.
                                             '<div class="flex items-center text-green-800 font-semibold mb-2">'.
                                             '<span class="text-lg mr-2">🟢</span>'.
@@ -912,16 +937,16 @@ Forms\Components\Select::make('operator_id')
                                             '</div>'.
                                             '</div>'
                                     );
-                                } catch (\Exception $e) {
+                                } catch (Exception $e) {
                                     // Log the actual error for debugging
-                                    \Illuminate\Support\Facades\Log::error('Operator status check failed: '.$e->getMessage(), [
+                                    Log::error('Operator status check failed: '.$e->getMessage(), [
                                         'exception' => $e,
                                         'operator_id' => $operatorId,
                                         'factory_id' => $factoryId,
                                         'status' => $status,
                                     ]);
 
-                                    return new \Illuminate\Support\HtmlString(
+                                    return new HtmlString(
                                         '<div class="text-red-500 italic">Unable to check operator status<br>'.
                                             '<small>Error: '.htmlspecialchars($e->getMessage()).'</small></div>'
                                     );
@@ -935,7 +960,7 @@ Forms\Components\Select::make('operator_id')
                     ->collapsible()
                     ->collapsed(),
 
-                Forms\Components\Select::make('status')
+                Select::make('status')
                     ->label('Status')
                     ->required()
                     ->options(function ($record) {
@@ -969,7 +994,7 @@ Forms\Components\Select::make('operator_id')
                     })
                     ->rules([
                         function (callable $get) {
-                            return function (string $attribute, $value, \Closure $fail) use ($get) {
+                            return function (string $attribute, $value, Closure $fail) use ($get) {
                                 // Only validate when trying to transition to 'Start' status
                                 if ($value === 'Start') {
                                     $machineId = $get('machine_id');
@@ -1011,7 +1036,7 @@ Forms\Components\Select::make('operator_id')
                         }
                     }),
 
-                Forms\Components\TextInput::make('material_batch')
+                TextInput::make('material_batch')
                     ->label('Material Batch ID')
                     ->required(fn ($get, $record) => $get('status') === 'Start' && ! $record?->material_batch)
                     ->visible(fn ($get) => in_array($get('status'), ['Start', 'Hold', 'Completed']))
@@ -1022,7 +1047,7 @@ Forms\Components\Select::make('operator_id')
                             : null
                     ),
 
-                Forms\Components\Select::make('hold_reason_id')
+                Select::make('hold_reason_id')
                     ->label('Hold Reason')
                     ->relationship('holdReason', 'description', function ($query) {
                         return $query->where('factory_id', auth()->user()->factory_id);
@@ -1032,25 +1057,25 @@ Forms\Components\Select::make('operator_id')
                     ->required(fn ($get) => in_array($get('status'), ['Hold']))
                     ->columnSpanFull(),
 
-                Forms\Components\Section::make('Quantities')
+                Section::make('Quantities')
                     ->schema([
-                        Forms\Components\Repeater::make('quantities')
+                        Repeater::make('quantities')
                             ->schema([
-                                Forms\Components\Grid::make(2)
+                                Grid::make(2)
                                     ->schema([
-                                        Forms\Components\TextInput::make('ok_quantity')
+                                        TextInput::make('ok_quantity')
                                             ->label('OK Quantity')
                                             ->numeric()
                                             ->required()
                                             ->default(0)
                                             ->disabled(fn ($record) => $record && $record->exists),
-                                        Forms\Components\TextInput::make('scrapped_quantity')
+                                        TextInput::make('scrapped_quantity')
                                             ->label('Scrapped Quantity')
                                             ->numeric()
                                             ->required()
                                             ->default(0)
                                             ->disabled(fn ($record) => $record && $record->exists),
-                                        Forms\Components\Select::make('reason_id')
+                                        Select::make('reason_id')
                                             ->label('Scrapped Reason')
                                             ->relationship(
                                                 'reason',
@@ -1132,15 +1157,15 @@ Forms\Components\Select::make('operator_id')
                                 }
                             }),
 
-                        Forms\Components\Grid::make(2)
+                        Grid::make(2)
                             ->schema([
-                                Forms\Components\TextInput::make('ok_qtys')
+                                TextInput::make('ok_qtys')
                                     ->label('Total OK Quantities')
                                     ->default(0)
                                     ->readonly()
                                     ->visible(fn ($get) => in_array($get('status'), ['Hold', 'Completed'])),
 
-                                Forms\Components\TextInput::make('scrapped_qtys')
+                                TextInput::make('scrapped_qtys')
                                     ->label('Total Scrapped Quantities')
                                     ->default(0)
                                     ->readonly()
@@ -1185,39 +1210,39 @@ Forms\Components\Select::make('operator_id')
 
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('unique_id')
+                TextColumn::make('unique_id')
                     ->label('Unique ID')
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.description')
+                TextColumn::make('bom.purchaseorder.partnumber.description')
                     ->label('BOM')
                     ->hidden(! $isAdminOrManager)
                     ->toggleable()
                     ->wrap(),
-                Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.partnumber')
+                TextColumn::make('bom.purchaseorder.partnumber.partnumber')
                     ->label('Part Number')
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('bom.purchaseorder.partnumber.revision')
+                TextColumn::make('bom.purchaseorder.partnumber.revision')
                     ->label('Revision'),
-                Tables\Columns\TextColumn::make('machine.name')
+                TextColumn::make('machine.name')
                     ->label('Machine')
                     ->formatStateUsing(fn ($record) => "{$record->machine->assetId}")
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('operator.user.first_name')
+                TextColumn::make('operator.user.first_name')
                     ->label('Operator')
                     ->searchable()
                     ->sortable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('qty')
+                TextColumn::make('qty')
                     ->label('Qty')
                     ->sortable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'Assigned' => 'gray',
@@ -1229,22 +1254,22 @@ Forms\Components\Select::make('operator_id')
                     })
                     ->sortable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('start_time')
+                TextColumn::make('start_time')
                     ->date()
                     ->sortable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('end_time')
+                TextColumn::make('end_time')
                     ->date()
                     ->sortable()
                     ->toggleable()->formatStateUsing(function ($state, $record) {
                         // Format the date as usual
-                        return \Carbon\Carbon::parse($state)->format('d M Y H:i');
+                        return Carbon::parse($state)->format('d M Y H:i');
                     })
                     ->extraAttributes(function ($record) {
                         // Check if BOM exists and has a lead_time
                         if ($record->bom && $record->bom->lead_time && $record->end_time) {
-                            $plannedEnd = \Carbon\Carbon::parse($record->end_time);
-                            $bomLead = \Carbon\Carbon::parse($record->bom->lead_time)->endOfDay();
+                            $plannedEnd = Carbon::parse($record->end_time);
+                            $bomLead = Carbon::parse($record->bom->lead_time)->endOfDay();
                             if ($plannedEnd->greaterThan($bomLead)) {
                                 // Add a background color (e.g., red-100) if planned end exceeds BOM lead_time
                                 return [
@@ -1257,32 +1282,32 @@ Forms\Components\Select::make('operator_id')
                     })
                     ->tooltip(function ($record) {
                         if ($record->bom && $record->bom->lead_time && $record->end_time) {
-                            $plannedEnd = \Carbon\Carbon::parse($record->end_time);
-                            $bomLead = \Carbon\Carbon::parse($record->bom->lead_time)->endOfDay();
+                            $plannedEnd = Carbon::parse($record->end_time);
+                            $bomLead = Carbon::parse($record->bom->lead_time)->endOfDay();
                             if ($plannedEnd->greaterThan($bomLead)) {
-                                return 'BOM Target Completion Time: '.\Carbon\Carbon::parse($record->bom->lead_time)->format('d M Y');
+                                return 'BOM Target Completion Time: '.Carbon::parse($record->bom->lead_time)->format('d M Y');
                             }
                         }
 
                         return null;
                     }),
-                Tables\Columns\TextColumn::make('ok_qtys')
+                TextColumn::make('ok_qtys')
                     ->label('OK Qtys')
                     ->sortable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('scrapped_qtys')
+                TextColumn::make('scrapped_qtys')
                     ->label('KO Qtys')
                     ->sortable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->date()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
+                TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('deleted_at')
+                TextColumn::make('deleted_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -1302,10 +1327,10 @@ Forms\Components\Select::make('operator_id')
                 return $query;
             })
             ->filters([
-                Tables\Filters\TrashedFilter::make(),
+                TrashedFilter::make(),
 
             ])
-            ->actions([
+            ->recordActions([
                 ActionGroup::make([
                     EditAction::make()
                         ->visible(
@@ -1315,11 +1340,11 @@ Forms\Components\Select::make('operator_id')
                     ViewAction::make()->hiddenLabel(),
                     Action::make('Alert Manager')
                         ->visible(fn () => Auth::check() && Auth::user()->hasRole('Operator'))
-                        ->form([
-                            Forms\Components\Textarea::make('comments')
+                        ->schema([
+                            Textarea::make('comments')
                                 ->label('Comments')
                                 ->required(),
-                            Forms\Components\Select::make('priority')
+                            Select::make('priority')
                                 ->label('Priority')
                                 ->options([
                                     'High' => 'High',
@@ -1336,11 +1361,11 @@ Forms\Components\Select::make('operator_id')
 
                     Action::make('Alert Operator')
                         ->visible(fn () => Auth::check() && (Auth::user()->hasRole('Manager') || Auth::user()->hasRole('Factory Admin')))
-                        ->form([
-                            Forms\Components\Textarea::make('comments')
+                        ->schema([
+                            Textarea::make('comments')
                                 ->label('Comments')
                                 ->required(),
-                            Forms\Components\Select::make('priority')
+                            Select::make('priority')
                                 ->label('Priority')
                                 ->options([
                                     'High' => 'High',
@@ -1355,11 +1380,11 @@ Forms\Components\Select::make('operator_id')
                         })
                         ->button(),
                 ]),
-            ], position: ActionsPosition::BeforeColumns)
+            ], position: RecordActionsPosition::BeforeColumns)
             ->headerActions([])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }
@@ -1385,10 +1410,10 @@ Forms\Components\Select::make('operator_id')
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListWorkOrders::route('/'),
-            'create' => Pages\CreateWorkOrder::route('/create'),
-            'edit' => Pages\EditWorkOrder::route('/{record}/edit'),
-            'view' => Pages\ViewWorkOrder::route('/{record}'),
+            'index' => ListWorkOrders::route('/'),
+            'create' => CreateWorkOrder::route('/create'),
+            'edit' => EditWorkOrder::route('/{record}/edit'),
+            'view' => ViewWorkOrder::route('/{record}'),
         ];
     }
 
@@ -1427,8 +1452,8 @@ Forms\Components\Select::make('operator_id')
     public static function getWidgets(): array
     {
         return [
-            \App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderProgress::class,
-            \App\Filament\Admin\Resources\WorkOrderResource\Widgets\SimpleWorkOrderGantt::class,
+            WorkOrderProgress::class,
+            SimpleWorkOrderGantt::class,
         ];
     }
 
@@ -1465,13 +1490,13 @@ Forms\Components\Select::make('operator_id')
                 $conflictMessages = [];
                 foreach ($validation['conflicts'] as $conflict) {
                     $conflictMessages[] = "Conflict with WO #{$conflict['work_order_unique_id']} ({$conflict['status']}) from ".
-                        \Carbon\Carbon::parse($conflict['planned_start'])->format('M d, H:i').
-                        ' to '.\Carbon\Carbon::parse($conflict['planned_end'])->format('M d, H:i');
+                        Carbon::parse($conflict['planned_start'])->format('M d, H:i').
+                        ' to '.Carbon::parse($conflict['planned_end'])->format('M d, H:i');
                 }
 
                 return 'Machine scheduling conflict detected: '.implode('; ', $conflictMessages);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return 'Unable to validate machine scheduling: '.$e->getMessage();
         }
 
@@ -1513,8 +1538,8 @@ Forms\Components\Select::make('operator_id')
                 $conflictMessages = [];
                 foreach ($validation['conflicts'] as $conflict) {
                     $conflictMessages[] = "Conflict with WO #{$conflict['work_order_unique_id']} ({$conflict['status']}) from ".
-                        \Carbon\Carbon::parse($conflict['planned_start'])->format('M d, H:i').
-                        ' to '.\Carbon\Carbon::parse($conflict['planned_end'])->format('M d, H:i');
+                        Carbon::parse($conflict['planned_start'])->format('M d, H:i').
+                        ' to '.Carbon::parse($conflict['planned_end'])->format('M d, H:i');
                 }
 
                 Notification::make()
@@ -1550,7 +1575,7 @@ Forms\Components\Select::make('operator_id')
                             Notification::make()
                                 ->title('⚠️ Machine Currently Occupied')
                                 ->body($warning['message'].' (Est. completion: '.
-                                    \Carbon\Carbon::parse($warning['estimated_completion'])->format('M d, H:i').')')
+                                    Carbon::parse($warning['estimated_completion'])->format('M d, H:i').')')
                                 ->warning()
                                 ->send();
                         }
@@ -1558,7 +1583,7 @@ Forms\Components\Select::make('operator_id')
                 }
                 // Removed the success notification to avoid spam
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Handle any validation errors gracefully
             Notification::make()
                 ->title('Validation Error')
@@ -1602,7 +1627,7 @@ Forms\Components\Select::make('operator_id')
                 }
             }
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return 'Unable to validate operator scheduling: '.$e->getMessage();
         }
 
@@ -1660,8 +1685,8 @@ Forms\Components\Select::make('operator_id')
                     foreach ($validation['operator_conflicts'] as $conflict) {
                         if ($conflict['type'] === 'work_order_conflict') {
                             $conflictMessages[] = "Conflict with WO #{$conflict['work_order_unique_id']} ({$conflict['status']}) from ".
-                                \Carbon\Carbon::parse($conflict['planned_start'])->format('M d, H:i').
-                                ' to '.\Carbon\Carbon::parse($conflict['planned_end'])->format('M d, H:i');
+                                Carbon::parse($conflict['planned_start'])->format('M d, H:i').
+                                ' to '.Carbon::parse($conflict['planned_end'])->format('M d, H:i');
                         }
                     }
 
@@ -1713,7 +1738,7 @@ Forms\Components\Select::make('operator_id')
                     }
                 }
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Handle any validation errors gracefully
             Notification::make()
                 ->title('Validation Error')

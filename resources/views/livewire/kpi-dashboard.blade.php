@@ -70,7 +70,7 @@
             {{-- Work Order Completion Rate - Primary KPI --}}
             @if(isset($kpis['work_order_completion_rate']))
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 hover:shadow-md dark:hover:shadow-lg hover:shadow-gray-200 dark:hover:shadow-gray-900/50 transition-shadow cursor-pointer"
-                     wire:click="viewKPIDetails('work_order_completion_rate')">
+                     wire:click="openModal">
                     {{-- Status Indicator --}}
                     <div class="flex items-center justify-between mb-3 sm:mb-4">
                         <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white leading-tight">Work Order Completion Rate</h3>
@@ -138,8 +138,43 @@
                 </div>
             @endif
 
+            {{-- Work Order Scrapped Quantity - Real KPI --}}
+            @if(isset($kpis['work_order_scrapped_qty']))
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 hover:shadow-md dark:hover:shadow-lg hover:shadow-gray-200 dark:hover:shadow-gray-900/50 transition-shadow cursor-pointer"
+                     wire:click="viewKPIDetails('scrap_rate')">
+                    {{-- Status Indicator --}}
+                    <div class="flex items-center justify-between mb-3 sm:mb-4">
+                        <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white leading-tight">Scrap Rate</h3>
+                        <div class="w-3 h-3 rounded-full {{ $this->getStatusColor($kpis['work_order_scrapped_qty']['status']) }} flex-shrink-0"></div>
+                    </div>
+
+                    {{-- Main Value --}}
+                    <div class="flex items-baseline mb-2 flex-wrap">
+                        <span class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">{{ number_format($kpis['work_order_scrapped_qty']['rate'], 1) }}%</span>
+                        @if($kpis['work_order_scrapped_qty']['trend'] != 0)
+                            <span class="ml-2 text-xs sm:text-sm font-medium {{ $this->getTrendColor(-$kpis['work_order_scrapped_qty']['trend']) }}">
+                                {{ $this->getTrendIcon(-$kpis['work_order_scrapped_qty']['trend']) }} {{ abs($kpis['work_order_scrapped_qty']['trend']) }}%
+                            </span>
+                        @endif
+                    </div>
+
+                    {{-- Details --}}
+                    <div class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                        {{ number_format($kpis['work_order_scrapped_qty']['scrapped_qty']) }} of {{ number_format($kpis['work_order_scrapped_qty']['total_qty']) }} units scrapped
+                    </div>
+
+                    {{-- Status Text --}}
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-1 sm:space-y-0">
+                        <span class="text-sm font-medium {{ $this->getTrendColor(-$kpis['work_order_scrapped_qty']['trend']) }}">
+                            {{ $this->getStatusText($kpis['work_order_scrapped_qty']['status']) }}
+                        </span>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Target: < 3%</span>
+                    </div>
+                </div>
+            @endif
+
             {{-- Future KPI Cards - Placeholder Design --}}
-            @foreach(['scrap_rate', 'machine_utilization', 'on_time_delivery'] as $kpiKey)
+            @foreach(['machine_utilization', 'on_time_delivery'] as $kpiKey)
                 @if(isset($kpis[$kpiKey]))
                     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 opacity-60 relative">
                         {{-- Coming Soon Badge --}}
@@ -261,25 +296,27 @@
         </div>
     </div>
 
+
     {{-- KPI Detail View Modal --}}
     @if($showKPIDetail)
-        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 dark:bg-gray-900 dark:bg-opacity-75 flex items-start justify-center z-50 p-4 overflow-y-auto">
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-7xl w-full my-8">
-                {{-- Detail Header --}}
-                <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-                    <div>
-                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $selectedKPITitle }}</h2>
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ $currentFactory->name }} - {{ $this->getDateRangeLabel() }}</p>
+        <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); z-index: 9999; overflow-y: auto; padding: 1rem;">
+            <div class="min-h-screen flex items-center justify-center p-4">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-7xl w-full max-h-[90vh] flex flex-col">
+                    {{-- Fixed Header --}}
+                    <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $selectedKPITitle }}</h2>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ $currentFactory->name }} - {{ $this->getDateRangeLabel() }}</p>
+                        </div>
+                        <button wire:click="closeKPIDetail" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-all">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
                     </div>
-                    <button wire:click="closeKPIDetail" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-                
-                {{-- Detail Content --}}
-                <div class="p-6">
+
+                    {{-- Scrollable Content --}}
+                    <div class="flex-1 overflow-y-auto p-6">
                     @if($selectedKPI === 'work_order_completion_rate')
                         @include('livewire.kpi-details.work-order-completion-detail')
                     @elseif($selectedKPI === 'production_throughput')
@@ -288,8 +325,20 @@
                         @include('livewire.kpi-details.on-time-delivery-detail')
                     @elseif($selectedKPI === 'quality_rate')
                         @include('livewire.kpi-details.quality-rate-detail')
-                    {{-- Add more KPI detail views --}}
+                    @else
+                        {{-- Generic KPI Details for other types --}}
+                        <div class="text-center py-8">
+                            <svg class="mx-auto h-16 w-16 text-gray-400 dark:text-gray-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">{{ $selectedKPITitle }}</h3>
+                            <p class="text-gray-600 dark:text-gray-400 mb-6">Detailed view for {{ $selectedKPI }} will be available soon.</p>
+                            <button wire:click="closeKPIDetail" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                Close
+                            </button>
+                        </div>
                     @endif
+                    </div>
                 </div>
             </div>
         </div>
@@ -320,7 +369,6 @@
                 }, 3000);
             } else {
                 console.warn('Empty notification blocked:', notification_data);
-            }
             }
         });
     });

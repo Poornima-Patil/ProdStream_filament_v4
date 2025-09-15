@@ -7,9 +7,9 @@ use Illuminate\Support\Facades\Auth;
 
 class KPIDashboard extends Page
 {
-    protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-chart-bar';
 
-    protected static string $view = 'filament.admin.pages.kpi-dashboard';
+    protected string $view = 'filament.admin.pages.kpi-dashboard';
 
     protected static ?string $navigationLabel = 'KPI Dashboard';
 
@@ -17,7 +17,7 @@ class KPIDashboard extends Page
 
     protected static ?int $navigationSort = -10; // Shows at top of navigation
 
-    protected static ?string $navigationGroup = 'Analytics';
+    protected static string | \UnitEnum | null $navigationGroup = 'Analytics';
 
     // Make this the default landing page for factory admins
     public static function shouldRegisterNavigation(): bool

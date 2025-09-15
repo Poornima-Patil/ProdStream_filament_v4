@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Log;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -32,7 +33,7 @@ class PurchaseOrder extends Model
 
     public function boms()
     {
-        \Log::info('Accessing BOMs for PO:', [
+        Log::info('Accessing BOMs for PO:', [
             'po_id' => $this->id,
             'po_unique_id' => $this->unique_id,
             'boms_count' => $this->hasMany(Bom::class)->count(),
@@ -50,7 +51,7 @@ class PurchaseOrder extends Model
 
     public function workOrders()
     {
-        \Log::info('Accessing workOrders relationship for PO:', [
+        Log::info('Accessing workOrders relationship for PO:', [
             'po_id' => $this->id,
             'has_boms' => $this->boms->isNotEmpty(),
             'boms_count' => $this->boms->count(),
@@ -65,7 +66,7 @@ class PurchaseOrder extends Model
             'id' // Local key on BOMs table
         );
 
-        \Log::info('WorkOrders query results:', [
+        Log::info('WorkOrders query results:', [
             'po_id' => $this->id,
             'work_orders_count' => $workOrders->count(),
             'work_orders' => $workOrders->get()->map(function ($wo) {

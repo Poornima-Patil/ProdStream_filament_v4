@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Pages;
 
+use Filament\Schemas\Schema;
 use App\Models\WorkOrder;
 use Filament\Forms;
 use Filament\Pages\Page;
@@ -16,11 +17,11 @@ class WorkOrderPivot extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static string $view = 'filament.admin.pages.work-order-pivot';
-    protected static ?string $navigationIcon = 'heroicon-o-table-cells';
+    protected string $view = 'filament.admin.pages.work-order-pivot';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-table-cells';
     protected static ?string $navigationLabel = 'Pivot Table';
 
-    protected static ?string $navigationGroup = 'Work Order Reports';
+    protected static string | \UnitEnum | null $navigationGroup = 'Work Order Reports';
     public ?string $startDate=null;
     public ?string $endDate=null;
     public Collection $data;
@@ -44,9 +45,9 @@ class WorkOrderPivot extends Page implements HasForms
 
         $this->loadData();
     }
-    public function form(Forms\Form $form): Forms\Form
+    public function form(Schema $schema): Schema
     {
-        return $form->schema([
+        return $schema->components([
             DatePicker::make('startDate')
                 ->label('Start Date')
                 ->required()

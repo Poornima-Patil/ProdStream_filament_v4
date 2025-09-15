@@ -2,16 +2,18 @@
 
 namespace App\Filament\Admin\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Actions;
+use Filament\Actions\Action;
+use Exception;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Filament\Pages\Page;
-use Filament\Forms\Form;
 use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Radio;
-use Filament\Forms\Components\Grid;
-use Filament\Forms\Components\Actions;
-use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Notifications\Notification;
@@ -22,9 +24,9 @@ class PivotTableDashboard extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static string $view = 'filament.admin.pages.pivot-table-dashboard';
-    protected static ?string $navigationGroup = 'Work Order Reports';
-    protected static ?string $navigationIcon = 'heroicon-o-table-cells';
+    protected string $view = 'filament.admin.pages.pivot-table-dashboard';
+    protected static string | \UnitEnum | null $navigationGroup = 'Work Order Reports';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-table-cells';
     protected static ?string $navigationLabel = 'Pivot Table';
 
     public array $data = [];
@@ -39,10 +41,10 @@ class PivotTableDashboard extends Page implements HasForms
         $this->form->fill();
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 Section::make('Upload CSV File')
                     ->description('Upload a CSV file to create a pivot table')
                     ->schema([
@@ -163,7 +165,7 @@ class PivotTableDashboard extends Page implements HasForms
             $fullPath = Storage::path($filePath);
 
             if (!file_exists($fullPath)) {
-                throw new \Exception('File not found');
+                throw new Exception('File not found');
             }
 
             $csvData = [];
@@ -173,7 +175,7 @@ class PivotTableDashboard extends Page implements HasForms
                 // Read headers
                 $headers = fgetcsv($handle);
                 if (!$headers) {
-                    throw new \Exception('Invalid CSV format');
+                    throw new Exception('Invalid CSV format');
                 }
 
                 // Read data rows
@@ -194,7 +196,7 @@ class PivotTableDashboard extends Page implements HasForms
                 ->success()
                 ->body(count($csvData) . ' rows loaded with ' . count($headers) . ' columns')
                 ->send();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Notification::make()
                 ->title('Error processing CSV file')
                 ->danger()
@@ -214,7 +216,7 @@ class PivotTableDashboard extends Page implements HasForms
             $aggregation = $formState['aggregation'] ?? 'sum';
 
             if (empty($rows) && empty($columns)) {
-                throw new \Exception('Please select at least one field for rows or columns');
+                throw new Exception('Please select at least one field for rows or columns');
             }
 
             $pivotData = $this->createPivotTable($rows, $columns, $values, $aggregation);
@@ -225,7 +227,7 @@ class PivotTableDashboard extends Page implements HasForms
                 ->title('Pivot table generated successfully')
                 ->success()
                 ->send();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Notification::make()
                 ->title('Error generating pivot table')
                 ->danger()
@@ -341,7 +343,7 @@ class PivotTableDashboard extends Page implements HasForms
                 case 'pdf':
                     return $this->exportToPdf($filename);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Notification::make()
                 ->title('Export failed')
                 ->danger()
@@ -350,7 +352,7 @@ class PivotTableDashboard extends Page implements HasForms
         }
     }
 
-    private function exportToCsv(string $filename): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    private function exportToCsv(string $filename): BinaryFileResponse
     {
         $csvPath = storage_path("app/temp/{$filename}.csv");
 
@@ -393,17 +395,17 @@ class PivotTableDashboard extends Page implements HasForms
         return response()->download($csvPath)->deleteFileAfterSend();
     }
 
-    private function exportToExcel(string $filename): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    private function exportToExcel(string $filename): BinaryFileResponse
     {
         // Implementation for Excel export using PhpSpreadsheet
         // Similar to CSV but using PhpSpreadsheet library
-        throw new \Exception('Excel export not implemented yet');
+        throw new Exception('Excel export not implemented yet');
     }
 
-    private function exportToPdf(string $filename): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    private function exportToPdf(string $filename): BinaryFileResponse
     {
         // Implementation for PDF export
-        throw new \Exception('PDF export not implemented yet');
+        throw new Exception('PDF export not implemented yet');
     }
 
     public function resetForm(): void

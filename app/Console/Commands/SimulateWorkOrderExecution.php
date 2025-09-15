@@ -2,6 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Factory;
+use Exception;
+use App\Models\User;
 use Illuminate\Console\Command;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderQuantity;
@@ -41,7 +44,7 @@ class SimulateWorkOrderExecution extends Command
         }
 
         // Check if factory exists
-        $factory = \App\Models\Factory::find($factoryId);
+        $factory = Factory::find($factoryId);
         if (!$factory) {
             $this->error("Factory with ID {$factoryId} not found.");
             return 1;
@@ -49,7 +52,7 @@ class SimulateWorkOrderExecution extends Command
 
         try {
             $targetDate = Carbon::createFromFormat('Y-m-d', $dateInput, config('app.timezone'))->endOfDay();
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->error('Invalid date format. Please use YYYY-MM-DD format.');
             return 1;
         }
@@ -109,7 +112,7 @@ class SimulateWorkOrderExecution extends Command
                     'factory_id' => $workOrder->factory_id,
                     'final_status' => $workOrder->status,
                 ]);
-            } catch (\Exception $e) {
+            } catch (Exception $e) {
                 $this->newLine();
                 $this->error("Error processing Work Order {$workOrder->unique_id} (Factory {$workOrder->factory_id}): " . $e->getMessage());
                 Log::error("Work Order Simulation Error", [
@@ -254,7 +257,7 @@ class SimulateWorkOrderExecution extends Command
         }
 
         // Fallback to factory admin for this factory
-        $factoryAdmin = \App\Models\User::where('factory_id', $workOrder->factory_id)
+        $factoryAdmin = User::where('factory_id', $workOrder->factory_id)
             ->whereHas('roles', function ($query) {
                 $query->where('name', 'Factory Admin');
             })->first();
@@ -264,7 +267,7 @@ class SimulateWorkOrderExecution extends Command
         }
 
         // Final fallback to super admin
-        $superAdmin = \App\Models\User::role('Super Admin')->first();
+        $superAdmin = User::role('Super Admin')->first();
         return $superAdmin?->id ?? 1;
     }
 
@@ -358,7 +361,7 @@ class SimulateWorkOrderExecution extends Command
     {
         // Ensure the log belongs to the same work order and factory
         if ($log->work_order_id !== $workOrder->id) {
-            throw new \Exception("Log ID {$log->id} does not belong to Work Order {$workOrder->id}");
+            throw new Exception("Log ID {$log->id} does not belong to Work Order {$workOrder->id}");
         }
 
         // Ensure timestamp consistency with app timezone

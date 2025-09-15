@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use Carbon\Carbon;
 use App\Models\PurchaseOrder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -49,7 +50,7 @@ class SalesOrderExport implements FromCollection, WithHeadings
                 'Unit of Measurement' => $salesOrder->{'Unit Of Measurement'},
                 'Price' => $salesOrder->price,
                 'Delivery Target Date' => $salesOrder->delivery_target_date
-                    ? \Carbon\Carbon::parse($salesOrder->delivery_target_date)->format('Y-m-d') : '',
+                    ? Carbon::parse($salesOrder->delivery_target_date)->format('Y-m-d') : '',
                 'SO Created At' => $salesOrder->created_at->format('Y-m-d H:i:s'),
                 'SO Updated At' => $salesOrder->updated_at->format('Y-m-d H:i:s'),
             ];
@@ -89,7 +90,7 @@ class SalesOrderExport implements FromCollection, WithHeadings
                     'BOM No' => $bom->unique_id ?? ('BOM-'.$bom->id),
                     'BOM Machine Group' => optional($bom->machineGroup)->group_name,
                     'BOM Operator Proficiency' => optional($bom->operatorProficiency)->proficiency,
-                    'BOM Lead Time' => $bom->lead_time ? \Carbon\Carbon::parse($bom->lead_time)->format('Y-m-d H:i:s') : '',
+                    'BOM Lead Time' => $bom->lead_time ? Carbon::parse($bom->lead_time)->format('Y-m-d H:i:s') : '',
                     'BOM Status' => $bom->status ? 'Active' : 'Inactive',
                     'BOM Created At' => $bom->created_at->format('Y-m-d H:i:s'),
                     'BOM Updated At' => $bom->updated_at->format('Y-m-d H:i:s'),

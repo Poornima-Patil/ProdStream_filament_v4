@@ -8,24 +8,16 @@
 
     /* Progress bar styles */
     .progress-bar {
-        @apply bg-gray-200 rounded-full overflow-hidden;
+        background-color: rgb(229 231 235);
+        border-radius: 9999px;
+        overflow: hidden;
     }
 
     .progress-bar-fill {
-        @apply h-full transition-all duration-300;
-    }
-
-    /* Color definitions */
-    .bg-green-500 {
-        @apply bg-[#22c55e];
-    }
-
-    .bg-yellow-500 {
-        @apply bg-[#eab308];
-    }
-
-    .text-white {
-        @apply text-[#ffffff];
+        height: 100%;
+        transition-property: all;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 300ms;
     }
 }
 

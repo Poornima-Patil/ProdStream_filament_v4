@@ -2,17 +2,26 @@
 
 namespace App\Filament\Admin\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Forms\Components\TextInput;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use App\Filament\Admin\Resources\ScrappedReasonResource\Pages\ListScrappedReasons;
+use App\Filament\Admin\Resources\ScrappedReasonResource\Pages\CreateScrappedReason;
+use App\Filament\Admin\Resources\ScrappedReasonResource\Pages\EditScrappedReason;
+use App\Filament\Admin\Resources\ScrappedReasonResource\Pages\ViewScrappedReason;
 use App\Filament\Admin\Resources\ScrappedReasonResource\Pages;
 use App\Models\ScrappedReason;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Actions\ViewAction;
-use Filament\Tables\Enums\ActionsPosition;
 
 class ScrappedReasonResource extends Resource
 {
@@ -20,17 +29,17 @@ class ScrappedReasonResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    protected static ?string $navigationIcon = 'heroicon-o-trash';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-trash';
 
-    protected static ?string $navigationGroup = 'Admin Operations';
+    protected static string | \UnitEnum | null $navigationGroup = 'Admin Operations';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\TextInput::make('code')
+        return $schema
+            ->components([
+                TextInput::make('code')
                     ->required(),
-                Forms\Components\TextInput::make('description')
+                TextInput::make('description')
                     ->required(),
             ]);
     }
@@ -39,23 +48,23 @@ class ScrappedReasonResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('code')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('description')
+                TextColumn::make('code')->searchable()->sortable(),
+                TextColumn::make('description')
                     ->searchable(),
 
             ])
             ->filters([
-                Tables\Filters\TrashedFilter::make(),
+                TrashedFilter::make(),
             ])
-            ->actions([
+            ->recordActions([
                 ActionGroup::make([
                     EditAction::make()->label('Edit'),
                     ViewAction::make()->label('View'),
                 ])
-            ], position: ActionsPosition::BeforeColumns)
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+            ], position: RecordActionsPosition::BeforeColumns)
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
         }
@@ -70,10 +79,10 @@ class ScrappedReasonResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListScrappedReasons::route('/'),
-            'create' => Pages\CreateScrappedReason::route('/create'),
-            'edit' => Pages\EditScrappedReason::route('/{record}/edit'),
-            'view' => Pages\ViewScrappedReason::route('/{record}/'),
+            'index' => ListScrappedReasons::route('/'),
+            'create' => CreateScrappedReason::route('/create'),
+            'edit' => EditScrappedReason::route('/{record}/edit'),
+            'view' => ViewScrappedReason::route('/{record}/'),
 
         ];
     }

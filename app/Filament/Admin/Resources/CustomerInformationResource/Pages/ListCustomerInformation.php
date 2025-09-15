@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\CustomerInformationResource\Pages;
 
+use Filament\Actions\CreateAction;
 use App\Filament\Admin\Resources\CustomerInformationResource;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
@@ -13,7 +14,7 @@ class ListCustomerInformation extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            CreateAction::make(),
         ];
     }
 }

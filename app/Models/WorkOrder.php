@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -109,7 +110,7 @@ class WorkOrder extends Model
         if (! $userId && app()->runningInConsole()) {
             // During seeding, try to find a Factory Admin for this specific factory
             if ($this->factory_id) {
-                $factoryAdmin = \App\Models\User::where('factory_id', $this->factory_id)
+                $factoryAdmin = User::where('factory_id', $this->factory_id)
                     ->whereHas('roles', function ($query) {
                         $query->where('name', 'Factory Admin');
                     })->first();
@@ -118,13 +119,13 @@ class WorkOrder extends Model
 
             // Fallback to any super admin
             if (! $userId) {
-                $superAdmin = \App\Models\User::role('Super Admin')->first();
+                $superAdmin = User::role('Super Admin')->first();
                 $userId = $superAdmin?->id;
             }
 
             // Final fallback to first user or default ID
             if (! $userId) {
-                $userId = \App\Models\User::first()?->id ?? 1;
+                $userId = User::first()?->id ?? 1;
             }
         }
 
@@ -217,8 +218,8 @@ class WorkOrder extends Model
      * Check for scheduling conflicts when planning a new Work Order
      *
      * @param  int  $machineId
-     * @param  \Carbon\Carbon  $newStartTime
-     * @param  \Carbon\Carbon  $newEndTime
+     * @param Carbon $newStartTime
+     * @param Carbon $newEndTime
      * @param  int  $factoryId  - Factory ID for multi-tenancy
      * @param  int|null  $excludeWorkOrderId  - Exclude current WO when updating
      * @return array
@@ -289,7 +290,7 @@ class WorkOrder extends Model
             $plannedDuration = $workOrder->start_time->diffInMinutes($workOrder->end_time);
 
             // Calculate realistic end time: actual start + planned duration
-            $actualStartTime = \Carbon\Carbon::parse($startLog->changed_at);
+            $actualStartTime = Carbon::parse($startLog->changed_at);
             $realisticEndTime = $actualStartTime->copy()->addMinutes($plannedDuration);
 
             return $realisticEndTime;
@@ -396,7 +397,7 @@ class WorkOrder extends Model
                 : 'Unknown Machine';
 
             $estimatedCompletion = $runningWorkOrder->end_time
-                ? \Carbon\Carbon::parse($runningWorkOrder->end_time)->format('M d, H:i')
+                ? Carbon::parse($runningWorkOrder->end_time)->format('M d, H:i')
                 : 'Unknown';
 
             $validation['can_start'] = false;
@@ -434,8 +435,8 @@ class WorkOrder extends Model
                 ? "{$conflictingScheduledWO->machine->assetId} - {$conflictingScheduledWO->machine->name}"
                 : 'Unknown Machine';
 
-            $scheduledStart = \Carbon\Carbon::parse($conflictingScheduledWO->start_time)->format('M d, H:i');
-            $scheduledEnd = \Carbon\Carbon::parse($conflictingScheduledWO->end_time)->format('M d, H:i');
+            $scheduledStart = Carbon::parse($conflictingScheduledWO->start_time)->format('M d, H:i');
+            $scheduledEnd = Carbon::parse($conflictingScheduledWO->end_time)->format('M d, H:i');
 
             $validation['can_start'] = false;
             $validation['conflicting_work_order'] = $conflictingScheduledWO;
@@ -457,8 +458,8 @@ class WorkOrder extends Model
         $machineId = $workOrderData['machine_id'];
         $operatorId = $workOrderData['operator_id'] ?? null;
         $factoryId = $workOrderData['factory_id']; // Multi-tenancy: get factory ID
-        $startTime = \Carbon\Carbon::parse($workOrderData['start_time']);
-        $endTime = \Carbon\Carbon::parse($workOrderData['end_time']);
+        $startTime = Carbon::parse($workOrderData['start_time']);
+        $endTime = Carbon::parse($workOrderData['end_time']);
         $excludeId = $workOrderData['id'] ?? null;
         $newStatus = $workOrderData['status'] ?? null;
 
@@ -508,7 +509,7 @@ class WorkOrder extends Model
 
         // Check operator scheduling conflicts and shift validation
         if ($operatorId) {
-            $operator = \App\Models\Operator::find($operatorId);
+            $operator = Operator::find($operatorId);
             if ($operator) {
                 // Check operator scheduling conflicts
                 $operatorConflicts = $operator->checkSchedulingConflicts($startTime, $endTime, $factoryId, $excludeId);
@@ -582,7 +583,7 @@ class WorkOrder extends Model
         // Find next available slot after conflicts
         $latestConflictEnd = null;
         foreach ($conflicts as $conflict) {
-            $conflictEnd = \Carbon\Carbon::parse($conflict['planned_end']);
+            $conflictEnd = Carbon::parse($conflict['planned_end']);
             if (! $latestConflictEnd || $conflictEnd > $latestConflictEnd) {
                 $latestConflictEnd = $conflictEnd;
             }
@@ -659,7 +660,7 @@ class WorkOrder extends Model
 
             } elseif ($conflict['type'] === 'work_order_conflict') {
                 // Find the latest end time of conflicting work orders
-                $latestConflictEnd = \Carbon\Carbon::parse($conflict['planned_end']);
+                $latestConflictEnd = Carbon::parse($conflict['planned_end']);
                 $recommendedStart = $latestConflictEnd->copy();
                 $recommendedEnd = $recommendedStart->copy()->addMinutes($duration);
 

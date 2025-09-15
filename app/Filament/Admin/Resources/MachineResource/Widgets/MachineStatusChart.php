@@ -2,17 +2,18 @@
 
 namespace App\Filament\Admin\Resources\MachineResource\Widgets;
 
+use Illuminate\Database\Eloquent\Model;
 use Filament\Support\RawJs;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\DB;
 
 class MachineStatusChart extends ChartWidget
 {
-    protected static ?string $heading = 'Work Order Status Distribution';
+    protected ?string $heading = 'Work Order Status Distribution';
 
     protected static ?int $sort = 1;
 
-    public ?\Illuminate\Database\Eloquent\Model $record = null;
+    public ?Model $record = null;
 
     protected int|string|array $columnSpan = 'full';
 

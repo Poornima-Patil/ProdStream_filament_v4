@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use Exception;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\Attributes\Computed;
@@ -49,7 +50,7 @@ class PivotTableBuilder extends Component
             $this->processCsvFile();
             $this->showConfiguration = true;
             session()->flash('success', 'CSV file uploaded successfully!');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             session()->flash('error', 'Error processing CSV: ' . $e->getMessage());
         }
     }
@@ -63,7 +64,7 @@ class PivotTableBuilder extends Component
         if (($handle = fopen($path, 'r')) !== false) {
             $headers = fgetcsv($handle);
             if (!$headers) {
-                throw new \Exception('Invalid CSV format');
+                throw new Exception('Invalid CSV format');
             }
 
             while (($row = fgetcsv($handle)) !== false) {
@@ -107,7 +108,7 @@ class PivotTableBuilder extends Component
             $this->showResults = true;
 
             session()->flash('success', 'Pivot table generated successfully!');
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             session()->flash('error', 'Error generating pivot table: ' . $e->getMessage());
         }
     }

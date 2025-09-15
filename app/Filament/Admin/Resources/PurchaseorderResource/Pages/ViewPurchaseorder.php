@@ -2,11 +2,13 @@
 
 namespace App\Filament\Admin\Resources\PurchaseorderResource\Pages;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Illuminate\Support\HtmlString;
+use Carbon\Carbon;
 use App\Filament\Admin\Resources\PurchaseorderResource;
 use App\Models\PurchaseOrder;
-use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
 use App\Enums\BomStatus;
 
@@ -19,9 +21,9 @@ class ViewPurchaseorder extends ViewRecord
         return [];
     }
 
-    public function infolist(Infolist $infolist): Infolist
+    public function infolist(Schema $schema): Schema
     {
-        return $infolist->schema([
+        return $schema->components([
 
             /*
              * =========================
@@ -29,7 +31,7 @@ class ViewPurchaseorder extends ViewRecord
              * =========================
              */
             Section::make('Sales Order Details')
-                ->collapsible()
+                ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('so_details')
                         ->label('')
@@ -42,7 +44,7 @@ class ViewPurchaseorder extends ViewRecord
                             $progressColor = $progressPercent >= 50 ? 'bg-emerald-500 dark:bg-emerald-400' : 'bg-amber-500 dark:bg-amber-400';
                             $textColor = 'text-white dark:text-gray-900';
 
-                            return new \Illuminate\Support\HtmlString('
+                            return new HtmlString('
                                 <!-- Desktop Table -->
                                 <div class="hidden lg:block lg:overflow-x-auto shadow rounded-lg">
                                     <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
@@ -64,7 +66,7 @@ class ViewPurchaseorder extends ViewRecord
                                                 <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($record->unique_id).'</td>
                                                 <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($record->customer->name ?? "-").'</td>
                                                 <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.htmlspecialchars($record->partNumber->partnumber ?? "-").'</td>
-                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.($record->delivery_target_date ? \Carbon\Carbon::parse($record->delivery_target_date)->format("Y-m-d") : "-").'</td>
+                                                <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.($record->delivery_target_date ? Carbon::parse($record->delivery_target_date)->format("Y-m-d") : "-").'</td>
                                                 <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.$requestedQty.'</td>
                                                 <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.$completedQty.'</td>
                                                 <td class="p-2 border border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100">'.$scrappedQty.'</td>
@@ -88,7 +90,7 @@ class ViewPurchaseorder extends ViewRecord
                                         <div><span class="font-bold text-black dark:text-white">SO Number: </span><span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($record->unique_id).'</span></div>
                                         <div><span class="font-bold text-black dark:text-white">Customer: </span><span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($record->customer->name ?? "-").'</span></div>
                                         <div><span class="font-bold text-black dark:text-white">Part Number: </span><span class="text-gray-900 dark:text-gray-100">'.htmlspecialchars($record->partNumber->partnumber ?? "-").'</span></div>
-                                        <div><span class="font-bold text-black dark:text-white">Target Completion: </span><span class="text-gray-900 dark:text-gray-100">'.($record->delivery_target_date ? \Carbon\Carbon::parse($record->delivery_target_date)->format("Y-m-d") : "-").'</span></div>
+                                        <div><span class="font-bold text-black dark:text-white">Target Completion: </span><span class="text-gray-900 dark:text-gray-100">'.($record->delivery_target_date ? Carbon::parse($record->delivery_target_date)->format("Y-m-d") : "-").'</span></div>
                                         <div><span class="font-bold text-black dark:text-white">Requested Qty: </span><span class="text-gray-900 dark:text-gray-100">'.$requestedQty.'</span></div>
                                         <div><span class="font-bold text-black dark:text-white">Completed Qty: </span><span class="text-gray-900 dark:text-gray-100">'.$completedQty.'</span></div>
                                         <div><span class="font-bold text-black dark:text-white">Scrapped Qty: </span><span class="text-gray-900 dark:text-gray-100">'.$scrappedQty.'</span></div>
@@ -106,7 +108,7 @@ class ViewPurchaseorder extends ViewRecord
              * =========================
              */
             Section::make('Bills of Materials')
-                ->collapsible()
+                ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('boms_table')
                         ->label('')
@@ -175,7 +177,7 @@ class ViewPurchaseorder extends ViewRecord
              * =========================
              */
             Section::make('Work Orders')
-                ->collapsible()
+                ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('workOrders')
                         ->label('')
@@ -204,8 +206,8 @@ class ViewPurchaseorder extends ViewRecord
                                         <tbody>';
 
                             foreach ($record->workOrders as $wo) {
-                                $startTime = $wo->start_time ? \Carbon\Carbon::parse($wo->start_time)->format("Y-m-d H:i") : "-";
-                                $endTime = $wo->end_time ? \Carbon\Carbon::parse($wo->end_time)->format("Y-m-d H:i") : "-";
+                                $startTime = $wo->start_time ? Carbon::parse($wo->start_time)->format("Y-m-d H:i") : "-";
+                                $endTime = $wo->end_time ? Carbon::parse($wo->end_time)->format("Y-m-d H:i") : "-";
 
                                 $table .= '
                                     <tr class="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">
@@ -226,8 +228,8 @@ class ViewPurchaseorder extends ViewRecord
                             // Mobile Cards
                             $cards = '<div class="block lg:hidden space-y-4 mt-4">';
                             foreach ($record->workOrders as $wo) {
-                                $startTime = $wo->start_time ? \Carbon\Carbon::parse($wo->start_time)->format("Y-m-d H:i") : "-";
-                                $endTime = $wo->end_time ? \Carbon\Carbon::parse($wo->end_time)->format("Y-m-d H:i") : "-";
+                                $startTime = $wo->start_time ? Carbon::parse($wo->start_time)->format("Y-m-d H:i") : "-";
+                                $endTime = $wo->end_time ? Carbon::parse($wo->end_time)->format("Y-m-d H:i") : "-";
 
                                 $cards .= '
                                     <div class="bg-white dark:bg-gray-900 shadow rounded-lg border border-gray-300 dark:border-gray-700">

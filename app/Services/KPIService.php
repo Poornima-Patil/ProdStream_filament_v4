@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Exception;
 use App\Models\WorkOrder;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -872,8 +873,8 @@ class KPIService
                     foreach ($workOrders as $workOrder) {
                         if ($workOrder->workOrderLogs->isNotEmpty()) {
                             $log = $workOrder->workOrderLogs->first();
-                            $createdAt = \Carbon\Carbon::parse($workOrder->created_at);
-                            $completedAt = \Carbon\Carbon::parse($log->updated_at);
+                            $createdAt = Carbon::parse($workOrder->created_at);
+                            $completedAt = Carbon::parse($log->updated_at);
                             
                             $hours = $createdAt->diffInHours($completedAt);
                             if ($hours > 0) {
@@ -914,7 +915,7 @@ class KPIService
 
                 return 0;
             });
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return 0;
         }
     }
