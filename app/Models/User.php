@@ -98,4 +98,66 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
     {
         return "{$this->first_name} {$this->last_name}";
     }
+
+    public function hasRole($roles, string $guard = null): bool
+    {
+        $factoryId = $this->factory_id ?? \Filament\Facades\Filament::getTenant()?->id;
+
+        if (!$factoryId) {
+            return parent::hasRole($roles, $guard);
+        }
+
+        if (is_string($roles)) {
+            return $this->roles()
+                ->where('name', $roles)
+                ->where('factory_id', $factoryId)
+                ->where('guard_name', $guard ?? config('auth.defaults.guard'))
+                ->exists();
+        }
+
+        if (is_array($roles)) {
+            foreach ($roles as $role) {
+                if ($this->hasRole($role, $guard)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        return parent::hasRole($roles, $guard);
+    }
+
+    public function hasPermissionTo($permission, $guardName = null): bool
+    {
+        $factoryId = $this->factory_id ?? \Filament\Facades\Filament::getTenant()?->id;
+
+        if (!$factoryId) {
+            return parent::hasPermissionTo($permission, $guardName);
+        }
+
+        $permissionName = is_string($permission) ? $permission : $permission->name;
+        $guard = $guardName ?? config('auth.defaults.guard');
+
+        // Check direct permissions
+        $hasDirectPermission = $this->permissions()
+            ->where('name', $permissionName)
+            ->where('guard_name', $guard)
+            ->where('factory_id', $factoryId)
+            ->exists();
+
+        if ($hasDirectPermission) {
+            return true;
+        }
+
+        // Check permissions via roles
+        return $this->roles()
+            ->where('factory_id', $factoryId)
+            ->where('guard_name', $guard)
+            ->whereHas('permissions', function ($query) use ($permissionName, $guard, $factoryId) {
+                $query->where('name', $permissionName)
+                      ->where('guard_name', $guard)
+                      ->where('factory_id', $factoryId);
+            })
+            ->exists();
+    }
 }

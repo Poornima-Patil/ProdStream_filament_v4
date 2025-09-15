@@ -28,11 +28,13 @@ class RoleResource extends Resource
                 Forms\Components\TextInput::make('name'),
                 Forms\Components\Select::make('permissions')
                     ->multiple()
-                    ->relationship('permissions', 'name')
+                    ->relationship('permissions', 'name', function (Builder $query) {
+                        return $query->where('factory_id', auth()->user()->factory_id ?? \Filament\Facades\Filament::getTenant()?->id);
+                    })
                     ->preload(),
                 Forms\Components\Hidden::make('factory_id')
-                    ->default(Auth::user()->factory_id) // Set the default value dynamically
-                    ->dehydrated(fn ($state) => $state ?? Auth::user()->factory_id),
+                    ->default(fn() => \Filament\Facades\Filament::getTenant()?->id ?? Auth::user()->factory_id)
+                    ->dehydrated(fn ($state) => $state ?? \Filament\Facades\Filament::getTenant()?->id ?? Auth::user()->factory_id),
             ]);
     }
 

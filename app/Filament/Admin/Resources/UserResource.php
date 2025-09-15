@@ -51,16 +51,17 @@ class UserResource extends Resource
                 Forms\Components\Select::make('roles')
                     ->label('Roles')
                     ->multiple()
-                    ->relationship('roles', 'name') // This uses the 'roles' relationship in the User model
-                    ->preload() // Preload roles to prevent loading issues
+                    ->relationship('roles', 'name', function (Builder $query) {
+                        return $query->where('factory_id', \Filament\Facades\Filament::getTenant()?->id ?? Auth::user()->factory_id);
+                    })
+                    ->preload()
                     ->required(),
                 Forms\Components\Hidden::make('factory_id')
-                    ->default(Auth::user()->factory_id) // Set the default value dynamically
-                    ->dehydrated(fn($state) => $state ?? Auth::user()->factory_id),
+                    ->default(fn() => \Filament\Facades\Filament::getTenant()?->id ?? Auth::user()->factory_id)
+                    ->dehydrated(fn ($state) => $state ?? \Filament\Facades\Filament::getTenant()?->id ?? Auth::user()->factory_id),
                 Forms\Components\Select::make('department_id')
                     ->relationship('department', 'name', function ($query) {
-                        // Filter by the current user's factory_id
-                        $factoryId = Auth::user()->factory_id; // Adjust based on your setup
+                        $factoryId = \Filament\Facades\Filament::getTenant()?->id ?? Auth::user()->factory_id;
                         $query->where('factory_id', $factoryId);
                     }),
             ]);

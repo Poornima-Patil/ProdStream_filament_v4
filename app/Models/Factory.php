@@ -84,4 +84,14 @@ class Factory extends Model
     {
         return $this->hasMany(MachineGroup::class);
     }
+
+    public function roles(): HasMany
+    {
+        return $this->hasMany(Role::class);
+    }
+
+    public function permissions(): HasMany
+    {
+        return $this->hasMany(Permission::class);
+    }
 }
