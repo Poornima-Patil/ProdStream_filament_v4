@@ -2,13 +2,12 @@
 
 namespace App\Filament\Admin\Resources\PartnumberResource\Pages;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Illuminate\Support\HtmlString;
-use Illuminate\Support\Facades\DB;
 use App\Filament\Admin\Resources\PartNumberResource;
 use App\Filament\Admin\Resources\PartnumberResource\Widgets\PartNumberStatusChart;
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
 use Filament\Infolists\Components\TextEntry;
+use Illuminate\Support\HtmlString;
 use Filament\Resources\Pages\ViewRecord;
 use Livewire\Component;
 
@@ -28,21 +27,22 @@ class ViewPartnumber extends ViewRecord
         return $schema->components([
             // Section 1: Part Number Summary
             Section::make('Part Number Summary')
-                ->collapsible()->columnSpanFull()
+                ->collapsible()
                 ->schema([
                     TextEntry::make('work_order_summary')
                         ->label('')
                         ->getStateUsing(function ($record) {
                             if (!$record) {
-                                return new HtmlString('<div class="text-gray-500 dark:text-gray-400">No Part Number Found</div>');
+                                return new \Illuminate\Support\HtmlString('<div class="text-gray-500 dark:text-gray-400">No Part Number Found</div>');
                             }
 
                             // Get work order status distribution for this part number
-                            $statusDistribution = DB::table('part_numbers')
+                            $statusDistribution = \Illuminate\Support\Facades\DB::table('part_numbers')
                                 ->join('purchase_orders', 'part_numbers.id', '=', 'purchase_orders.part_number_id')
                                 ->join('boms', 'purchase_orders.id', '=', 'boms.purchase_order_id')
                                 ->join('work_orders', 'boms.id', '=', 'work_orders.bom_id')
                                 ->where('part_numbers.id', $record->id)
+                                ->where('work_orders.factory_id', \Filament\Facades\Filament::getTenant()->id)
                                 ->selectRaw('work_orders.status, COUNT(*) as count')
                                 ->groupBy('work_orders.status')
                                 ->get()
@@ -65,11 +65,12 @@ class ViewPartnumber extends ViewRecord
                             }
 
                             // Get quality data for completed/closed work orders
-                            $qualityData = DB::table('part_numbers')
+                            $qualityData = \Illuminate\Support\Facades\DB::table('part_numbers')
                                 ->join('purchase_orders', 'part_numbers.id', '=', 'purchase_orders.part_number_id')
                                 ->join('boms', 'purchase_orders.id', '=', 'boms.purchase_order_id')
                                 ->join('work_orders', 'boms.id', '=', 'work_orders.bom_id')
                                 ->where('part_numbers.id', $record->id)
+                                ->where('work_orders.factory_id', \Filament\Facades\Filament::getTenant()->id)
                                 ->whereIn('work_orders.status', ['Completed', 'Closed'])
                                 ->selectRaw('
                                     SUM(work_orders.ok_qtys) as total_ok_qtys,
@@ -88,7 +89,7 @@ class ViewPartnumber extends ViewRecord
                                 $qualityRate = (($totalProduced - $totalScrapped) / $totalProduced) * 100;
                             }
 
-                            return new HtmlString('
+                            return new \Illuminate\Support\HtmlString('
                                 <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
                                     <!-- Main Container with Side-by-Side Layout -->
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -193,7 +194,7 @@ class ViewPartnumber extends ViewRecord
                 ]),
 
             Section::make('View Part Number')
-                ->collapsible()->columnSpanFull()
+                ->collapsible()
                 ->schema([
                     TextEntry::make('View PartNumber')
                         ->label('')
@@ -212,7 +213,7 @@ class ViewPartnumber extends ViewRecord
                             $remainingSeconds = $seconds % 60;
                             $Cycle_time = sprintf('%02d:%02d', $minutes, $remainingSeconds);
 
-                            return new HtmlString('
+                            return new \Illuminate\Support\HtmlString('
                                 <!-- Desktop Table -->
                                 <div class="hidden lg:block overflow-x-auto shadow rounded-lg">
                                     <table class="w-full text-sm border border-gray-300 dark:border-gray-700 text-center bg-white dark:bg-gray-900 rounded-lg overflow-hidden">

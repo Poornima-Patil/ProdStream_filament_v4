@@ -28,14 +28,26 @@ class WorkOrder extends Model
         'hold_reason_id',
         'material_batch',
         'factory_id',
+        'work_order_group_id',
+        'dependency_status',
+        'sequence_order',
+        'is_dependency_root',
+        'dependency_satisfied_at',
+        'dependency_metadata',
     ];
 
-    protected $casts = [
-        'hold_reason_id' => 'integer',
-        'machine_id' => 'integer',
-        'start_time' => 'datetime',
-        'end_time' => 'datetime', // Ensures it's treated as an integer
-    ];
+    protected function casts(): array
+    {
+        return [
+            'hold_reason_id' => 'integer',
+            'machine_id' => 'integer',
+            'start_time' => 'datetime',
+            'end_time' => 'datetime',
+            'dependency_satisfied_at' => 'datetime',
+            'dependency_metadata' => 'array',
+            'is_dependency_root' => 'boolean',
+        ];
+    }
 
     public function bom()
     {
@@ -61,6 +73,11 @@ class WorkOrder extends Model
     public function factory(): BelongsTo
     {
         return $this->belongsTo(Factory::class);
+    }
+
+    public function workOrderGroup(): BelongsTo
+    {
+        return $this->belongsTo(WorkOrderGroup::class);
     }
 
     public function scrappedQuantities()
@@ -148,7 +165,8 @@ class WorkOrder extends Model
     protected static function booted()
     {
         static::created(function ($workOrder) {
-            $workOrder->createWorkOrderLog('Assigned');
+            // Create log with the work order's actual status, not hardcoded 'Assigned'
+            $workOrder->createWorkOrderLog($workOrder->status);
         });
 
         static::updated(function ($workOrder) {
@@ -161,6 +179,11 @@ class WorkOrder extends Model
                 ) {
                     $workOrder->createWorkOrderLog($workOrder->status);
                 }
+            }
+
+            // Process dependency chain updates when quantities change
+            if ($workOrder->isDirty(['ok_qtys', 'scrapped_qtys'])) {
+                $workOrder->processDependencyChainUpdates();
             }
         });
 
@@ -703,5 +726,142 @@ class WorkOrder extends Model
         }
 
         return $recommendations;
+    }
+
+    /**
+     * Check if all dependencies for this work order are satisfied
+     *
+     * @return bool
+     */
+    public function areDependenciesSatisfied(): bool
+    {
+        // If this is a root work order (no dependencies), it's always ready
+        if ($this->is_dependency_root) {
+            return true;
+        }
+
+        // Get all dependencies where this work order is the successor
+        $dependencies = WorkOrderDependency::where('successor_work_order_id', $this->id)
+            ->where('work_order_group_id', $this->work_order_group_id)
+            ->get();
+
+        if ($dependencies->isEmpty()) {
+            // No dependencies defined, treat as ready if in a group
+            return $this->work_order_group_id !== null;
+        }
+
+        // Check if all dependencies are satisfied
+        foreach ($dependencies as $dependency) {
+            if (!$dependency->is_satisfied) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Update work order status based on dependency satisfaction
+     *
+     * @return bool Whether the status was changed
+     */
+    public function updateStatusBasedOnDependencies(): bool
+    {
+        // Only process work orders that are in a group and currently waiting
+        if (!$this->work_order_group_id || $this->status !== 'Waiting') {
+            return false;
+        }
+
+        // Check if dependencies are satisfied
+        if ($this->areDependenciesSatisfied()) {
+            $this->update([
+                'status' => 'Assigned',
+                'dependency_status' => 'ready'
+            ]);
+
+            Log::info('Work order status updated from Waiting to Assigned', [
+                'work_order_id' => $this->id,
+                'unique_id' => $this->unique_id,
+                'group_id' => $this->work_order_group_id
+            ]);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Process dependency chain updates when this work order's quantities change
+     * This should be called when ok_qtys or scrapped_qtys are updated
+     *
+     * @return void
+     */
+    public function processDependencyChainUpdates(): void
+    {
+        if (!$this->work_order_group_id) {
+            return;
+        }
+
+        // Find all dependencies where this work order is the predecessor
+        $dependentWorkOrders = WorkOrderDependency::where('predecessor_work_order_id', $this->id)
+            ->where('work_order_group_id', $this->work_order_group_id)
+            ->with('successor')
+            ->get();
+
+        foreach ($dependentWorkOrders as $dependency) {
+            // Update the dependency satisfaction status
+            $dependency->checkSatisfaction();
+
+            // If dependency is now satisfied, check if successor can be moved to Assigned
+            if ($dependency->is_satisfied && $dependency->successor) {
+                $dependency->successor->updateStatusBasedOnDependencies();
+            }
+        }
+
+        // Also trigger group-wide dependency check for any other waiting work orders
+        $this->workOrderGroup?->updateWaitingWorkOrderStatuses();
+    }
+
+    /**
+     * Initialize work order statuses in a group based on dependencies
+     * Called when a work order group is activated
+     *
+     * @return void
+     */
+    public function initializeGroupWorkOrderStatuses(): void
+    {
+        if (!$this->work_order_group_id) {
+            return;
+        }
+
+        $group = $this->workOrderGroup;
+        if (!$group) {
+            return;
+        }
+
+        // Get all work orders in the group
+        $workOrders = $group->workOrders()->get();
+
+        foreach ($workOrders as $workOrder) {
+            if ($workOrder->is_dependency_root) {
+                // Root work orders start as Assigned
+                $workOrder->update([
+                    'status' => 'Assigned',
+                    'dependency_status' => 'ready'
+                ]);
+            } else {
+                // Non-root work orders start as Waiting until dependencies are satisfied
+                $workOrder->update([
+                    'status' => 'Waiting',
+                    'dependency_status' => 'blocked'
+                ]);
+            }
+        }
+
+        Log::info('Initialized work order statuses for group', [
+            'group_id' => $group->id,
+            'work_orders_count' => $workOrders->count()
+        ]);
     }
 }

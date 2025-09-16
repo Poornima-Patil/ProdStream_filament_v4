@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Filament\Admin\Resources\PartnumberResource\Widgets;
+namespace App\Filament\Admin\Resources\MachineGroupResource\Widgets;
 
 use Filament\Support\RawJs;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\DB;
 
-class PartNumberStatusChart extends ChartWidget
+class MachineGroupStatusChart extends ChartWidget
 {
     protected ?string $heading = 'Work Order Status Distribution';
 
@@ -18,22 +18,17 @@ class PartNumberStatusChart extends ChartWidget
 
     protected function getData(): array
     {
-        \Log::info('PartNumberStatusChart getData called with record ID: ' . ($this->record?->id ?? 'null'));
-        
         if (!$this->record?->id) {
-            \Log::warning('PartNumberStatusChart: No record available, returning empty data');
             return [
                 'labels' => [],
                 'datasets' => []
             ];
         }
 
-        // Get work order status distribution for this part number
-        $statusDistribution = DB::table('part_numbers')
-            ->join('purchase_orders', 'part_numbers.id', '=', 'purchase_orders.part_number_id')
-            ->join('boms', 'purchase_orders.id', '=', 'boms.purchase_order_id')
-            ->join('work_orders', 'boms.id', '=', 'work_orders.bom_id')
-            ->where('part_numbers.id', $this->record->id)
+        // Get work order status distribution for this machine group
+        $statusDistribution = DB::table('work_orders')
+            ->join('machines', 'work_orders.machine_id', '=', 'machines.id')
+            ->where('machines.machine_group_id', $this->record->id)
             ->where('work_orders.factory_id', \Filament\Facades\Filament::getTenant()->id)
             ->selectRaw('work_orders.status, COUNT(*) as count')
             ->groupBy('work_orders.status')

@@ -36,7 +36,7 @@ class KPIDashboard extends Component
         $today = now();
         $this->toDate = $today->format('Y-m-d');
         $this->fromDate = $today->copy()->subDays(30)->format('Y-m-d');
-        
+
 
         // Load initial KPI data
         $this->loadKPIs();
@@ -215,10 +215,10 @@ class KPIDashboard extends Component
         if (!$this->fromDate || !$this->toDate) {
             return 'Date range not set';
         }
-        
+
         $from = Carbon::parse($this->fromDate)->format('M d, Y');
         $to = Carbon::parse($this->toDate)->format('M d, Y');
-        
+
         return "{$from} - {$to}";
     }
 
@@ -227,3 +227,4 @@ class KPIDashboard extends Component
         return view('livewire.kpi-dashboard');
     }
 }
+

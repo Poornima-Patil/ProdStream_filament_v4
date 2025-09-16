@@ -96,6 +96,11 @@ class PermissionsTableSeeder_new extends Seeder
             'Edit MachineGroup',
             'View MachineGroup',
             'Delete MachineGroup',
+
+            'View WorkOrderGroup',
+            'Create WorkOrderGroup',
+            'Edit WorkOrderGroup',
+            'Delete WorkOrderGroup',
         ];
 
         foreach ($permissions as $permission) {

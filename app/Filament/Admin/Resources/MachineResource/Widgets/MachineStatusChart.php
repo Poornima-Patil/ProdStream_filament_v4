@@ -2,7 +2,6 @@
 
 namespace App\Filament\Admin\Resources\MachineResource\Widgets;
 
-use Illuminate\Database\Eloquent\Model;
 use Filament\Support\RawJs;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +12,7 @@ class MachineStatusChart extends ChartWidget
 
     protected static ?int $sort = 1;
 
-    public ?Model $record = null;
+    public ?\Illuminate\Database\Eloquent\Model $record = null;
 
     protected int|string|array $columnSpan = 'full';
 
@@ -29,6 +28,7 @@ class MachineStatusChart extends ChartWidget
         // Get work order status distribution for this machine
         $statusDistribution = DB::table('work_orders')
             ->where('machine_id', $this->record->id)
+            ->where('factory_id', \Filament\Facades\Filament::getTenant()->id)
             ->selectRaw('status, COUNT(*) as count')
             ->groupBy('status')
             ->get()

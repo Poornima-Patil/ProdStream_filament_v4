@@ -154,6 +154,11 @@ class FactorySeeder extends Seeder
             'Create Customer Information',
             'Edit Customer Information',
             'Delete Customer Information',
+
+            'View WorkOrderGroup',
+            'Create WorkOrderGroup',
+            'Edit WorkOrderGroup',
+            'Delete WorkOrderGroup',
         ];
 
         foreach ($permissions as $permission) {
@@ -199,6 +204,7 @@ class FactorySeeder extends Seeder
                     'View HoldReason', 'Create HoldReason', 'Edit HoldReason',
                     'View MachineGroup', 'Create MachineGroup', 'Edit MachineGroup',
                     'View Customer Information', 'Create Customer Information', 'Edit Customer Information',
+                    'View WorkOrderGroup', 'Create WorkOrderGroup', 'Edit WorkOrderGroup',
                 ]
             ],
             [

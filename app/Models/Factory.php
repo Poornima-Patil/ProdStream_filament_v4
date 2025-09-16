@@ -65,6 +65,11 @@ class Factory extends Model
         return $this->hasMany(WorkOrder::class);
     }
 
+    public function workOrderGroups(): HasMany
+    {
+        return $this->hasMany(WorkOrderGroup::class);
+    }
+
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class);
