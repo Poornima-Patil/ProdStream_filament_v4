@@ -9,14 +9,14 @@ The Laravel Boost guidelines are specifically curated by Laravel maintainers for
 This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
 
 - php - 8.4.2
-- filament/filament (FILAMENT) - v3
-- laravel/framework (LARAVEL) - v11
-- laravel/prompts (PROMPTS) - v0
-- livewire/livewire (LIVEWIRE) - v3
-- laravel/pint (PINT) - v1
-- laravel/sail (SAIL) - v1
-- pestphp/pest (PEST) - v3
-- tailwindcss (TAILWINDCSS) - v3
+- filament/filament (FILAMENT) - v4.0.13
+- laravel/framework (LARAVEL) - v12.28.1
+- laravel/prompts (PROMPTS) - v0.3.6
+- livewire/livewire (LIVEWIRE) - v3.6.4
+- laravel/pint (PINT) - v1.24.0
+- laravel/sail (SAIL) - v1.45.0
+- pestphp/pest (PEST) - v3.8.4
+- tailwindcss (TAILWINDCSS) - v4.1.13
 
 
 ## Conventions
@@ -201,19 +201,23 @@ Forms\Components\Select::make('user_id')
 </code-snippet>
 
 
-=== filament/v3 rules ===
+=== filament/v4 rules ===
 
-## Filament 3
+## Filament 4
 
-## Version 3 Changes To Focus On
+## Version 4 Changes To Focus On
 - Resources are located in `app/Filament/Resources/` directory.
 - Resource pages (List, Create, Edit) are auto-generated within the resource's directory - e.g., `app/Filament/Resources/PostResource/Pages/`.
 - Forms use the `Forms\Components` namespace for form fields.
 - Tables use the `Tables\Columns` namespace for table columns.
+- Infolists use the `Infolists\Components` namespace for entries.
+- Schemas use the `Schemas\Components` namespace for layout components.
 - A new `Filament\Forms\Components\RichEditor` component is available.
 - Form and table schemas now use fluent method chaining.
 - Added `php artisan filament:optimize` command for production optimization.
 - Requires implementing `FilamentUser` contract for production access control.
+- Upgraded to use Schemas instead of direct form/table definitions in many contexts.
+- Enhanced support for multi-tenancy with tenant ownership relationships.
 
 
 === laravel/core rules ===
@@ -262,14 +266,14 @@ Forms\Components\Select::make('user_id')
 - If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
 
 
-=== laravel/v11 rules ===
+=== laravel/v12 rules ===
 
-## Laravel 11
+## Laravel 12
 
 - Use the `search-docs` tool to get version specific documentation.
-- Laravel 11 brought a new streamlined file structure which this project now uses.
+- Laravel 12 maintains the streamlined file structure introduced in Laravel 11.
 
-### Laravel 11 Structure
+### Laravel 12 Structure
 - No middleware files in `app/Http/Middleware/`.
 - `bootstrap/app.php` is the file to register middleware, exceptions, and routing files.
 - `bootstrap/providers.php` contains application specific service providers.
@@ -278,13 +282,13 @@ Forms\Components\Select::make('user_id')
 
 ### Database
 - When modifying a column, the migration must include all of the attributes that were previously defined on the column. Otherwise, they will be dropped and lost.
-- Laravel 11 allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10);`.
+- Laravel allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10);`.
 
 ### Models
 - Casts can and likely should be set in a `casts()` method on a model rather than the `$casts` property. Follow existing conventions from other models.
 
 ### New Artisan Commands
-- List Artisan commands using Boost's MCP tool, if available. New commands available in Laravel 11:
+- List Artisan commands using Boost's MCP tool, if available. Available commands include:
     - `php artisan make:enum`
     - `php artisan make:class`
     - `php artisan make:interface`
@@ -460,9 +464,10 @@ it('has emails', function (string $email) {
 - If existing pages and components support dark mode, new pages and components must support dark mode in a similar way, typically using `dark:`.
 
 
-=== tailwindcss/v3 rules ===
+=== tailwindcss/v4 rules ===
 
-## Tailwind 3
+## Tailwind 4
 
-- Always use Tailwind CSS v3 - verify you're using only classes supported by this version.
+- Always use Tailwind CSS v4 - verify you're using only classes supported by this version.
+- Tailwind v4 includes new features and improved performance over v3.
 </laravel-boost-guidelines>
