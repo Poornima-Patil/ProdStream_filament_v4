@@ -29,6 +29,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use Carbon\Carbon;
 
 class PurchaseorderResource extends Resource
 {
@@ -89,7 +90,8 @@ class PurchaseorderResource extends Resource
                 DatePicker::make('delivery_target_date')
                     ->required()
                     ->label('Delivery Target Date')
-                    ->minDate(now()->startOfDay()) 
+                    ->minDate(fn (string $operation): ?Carbon => $operation === 'create' ? now()->startOfDay() : null)
+
                     ->hint('Select the delivery target date')
                     ->displayFormat('Y-m-d'), // You can adjust the date format
 

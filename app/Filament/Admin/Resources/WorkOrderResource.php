@@ -422,7 +422,7 @@ Select::make('operator_id')
                     ->required()
                     ->disabled(! $isAdminOrManager)
                     ->label('Planned Start Time')
-                    ->minDate(now()->startOfDay()) 
+                    ->minDate(fn (string $operation): ?\Carbon\Carbon => $operation === 'create' ? now()->startOfDay() : null) 
                     ->seconds(false) // Cleaner UI without seconds
                     ->native(false) // Better custom picker
                     ->displayFormat('d M Y, H:i') // "21 Jul 2025, 14:30"
@@ -452,7 +452,7 @@ Select::make('operator_id')
                     }),
                 DateTimePicker::make('end_time')
                     ->label('Planned End Time')
-                    ->minDate(now()->startOfDay()) 
+                    ->minDate(fn (string $operation): ?\Carbon\Carbon => $operation === 'create' ? now()->startOfDay() : null) 
                     ->disabled(! $isAdminOrManager)
                     ->seconds(false) // Cleaner UI without seconds
                     ->native(false) // Better custom picker
@@ -1091,8 +1091,8 @@ Select::make('operator_id')
                             ->reorderable()
                             ->collapsible()
                             ->itemLabel(
-                                fn (array $state): ?string => $state['ok_quantity'] > 0 || $state['scrapped_quantity'] > 0
-                                    ? "OK: {$state['ok_quantity']}, Scrapped: {$state['scrapped_quantity']}"
+                                fn (array $state): ?string => ($state['ok_quantity'] ?? 0) > 0 || ($state['scrapped_quantity'] ?? 0) > 0
+                                    ? "OK: " . ($state['ok_quantity'] ?? 0) . ", Scrapped: " . ($state['scrapped_quantity'] ?? 0)
                                     : null
                             )
                             ->live()
