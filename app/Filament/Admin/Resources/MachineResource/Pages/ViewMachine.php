@@ -31,6 +31,7 @@ class ViewMachine extends ViewRecord
                 // Machine Summary Section
                 Section::make('Machine Summary')
                     ->collapsible()
+                    ->columnSpanFull()
                     ->schema([
                         TextEntry::make('machine_summary')
                             ->label('')
@@ -193,6 +194,7 @@ class ViewMachine extends ViewRecord
                 Section::make('Machine Information')
                     ->hiddenLabel()
                     ->collapsible()
+                    ->columnSpanFull()
                     ->schema([
                         TextEntry::make('View Machine')
                             ->label('')
@@ -272,6 +274,7 @@ class ViewMachine extends ViewRecord
                 Section::make('Machine Schedule Calendar')
                     ->collapsible()
                     ->persistCollapsed()
+                    ->columnSpanFull()
                     ->id('machine-schedule-section')
                     ->schema([
                         // No hidden classes, so visible everywhere
@@ -280,6 +283,7 @@ class ViewMachine extends ViewRecord
                     ]),
 
                 Section::make('Machine Schedule Gantt Chart')
+                    ->columnSpanFull()
                     ->schema([
                         Livewire::make(MachineScheduleGantt::class, ['machine' => $this->record])
                             ->key('machine-gantt-'.$this->record->id),

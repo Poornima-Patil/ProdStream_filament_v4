@@ -250,7 +250,7 @@ class WorkOrdersRelationManager extends RelationManager
                     ->required()
                     ->disabled(!$isAdminOrManager)
                     ->label('Planned Start Time')
-                    ->minDate(now()->startOfDay())
+                    ->minDate(fn (string $operation): ?\Carbon\Carbon => $operation === 'create' ? now()->startOfDay() : null)
                     ->seconds(false)
                     ->native(false)
                     ->displayFormat('d M Y, H:i')
@@ -259,7 +259,7 @@ class WorkOrdersRelationManager extends RelationManager
 
                 DateTimePicker::make('end_time')
                     ->label('Planned End Time')
-                    ->minDate(now()->startOfDay())
+                    ->minDate(fn (string $operation): ?\Carbon\Carbon => $operation === 'create' ? now()->startOfDay() : null)
                     ->disabled(!$isAdminOrManager)
                     ->seconds(false)
                     ->native(false)

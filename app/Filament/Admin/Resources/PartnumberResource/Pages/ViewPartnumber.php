@@ -28,6 +28,7 @@ class ViewPartnumber extends ViewRecord
             // Section 1: Part Number Summary
             Section::make('Part Number Summary')
                 ->collapsible()
+                ->columnSpanFull()
                 ->schema([
                     TextEntry::make('work_order_summary')
                         ->label('')
@@ -195,6 +196,7 @@ class ViewPartnumber extends ViewRecord
 
             Section::make('View Part Number')
                 ->collapsible()
+                ->columnSpanFull()
                 ->schema([
                     TextEntry::make('View PartNumber')
                         ->label('')

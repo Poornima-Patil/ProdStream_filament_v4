@@ -44,6 +44,11 @@ class WorkOrderGroup extends Model
                 $workOrderGroup->unique_id = static::generateUniqueId($workOrderGroup->factory_id);
             }
         });
+
+        static::deleting(function ($workOrderGroup) {
+            // Delete all associated work orders when the group is deleted
+            $workOrderGroup->workOrders()->delete();
+        });
     }
 
     public static function generateUniqueId(int $factoryId): string
@@ -71,6 +76,11 @@ class WorkOrderGroup extends Model
     public function workOrders(): HasMany
     {
         return $this->hasMany(WorkOrder::class)->orderBy('sequence_order');
+    }
+
+    public function workOrderGroupLogs(): HasMany
+    {
+        return $this->hasMany(WorkOrderGroupLog::class)->orderBy('created_at', 'desc');
     }
 
     public function dependencies(): HasMany

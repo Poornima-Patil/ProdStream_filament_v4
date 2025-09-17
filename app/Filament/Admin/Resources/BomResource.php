@@ -143,7 +143,7 @@ DatePicker::make('lead_time')
             return 'PO Delivery Date: ' . Carbon::parse($po->delivery_target_date)->format('d M Y');
         }
     })
-     ->minDate(now()->startOfDay()) // <-- Only allow today or future dates
+     ->minDate(fn (string $operation): ?Carbon => $operation === 'create' ? now()->startOfDay() : null) // Only allow today or future dates during creation
     ->required()
     ->reactive(),
 

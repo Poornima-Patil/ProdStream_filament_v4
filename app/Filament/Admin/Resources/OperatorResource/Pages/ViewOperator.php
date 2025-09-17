@@ -30,6 +30,7 @@ class ViewOperator extends ViewRecord
             // Operator Summary Section
             Section::make('Operator Summary')
                 ->collapsible()
+                ->columnSpanFull()
                 ->schema([
                     TextEntry::make('operator_summary')
                         ->label('')
@@ -193,6 +194,7 @@ class ViewOperator extends ViewRecord
             Section::make('Operator Information')
                 ->hiddenLabel()
                 ->collapsible()
+                ->columnSpanFull()
                 ->schema([
                     TextEntry::make('View Operator')
                         ->label('')
@@ -259,6 +261,7 @@ class ViewOperator extends ViewRecord
                 ]),
 
             Section::make('Operator Schedule Gantt Chart')
+                ->columnSpanFull()
                 ->schema([
                     Livewire::make(OperatorScheduleCalendar::class, ['operator' => $this->record])
                         ->key('operator-calendar-'.$this->record->id),

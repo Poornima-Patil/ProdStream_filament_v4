@@ -761,6 +761,15 @@ class WorkOrder extends Model
     }
 
     /**
+     * Get incoming dependencies (where this work order is the successor)
+     */
+    public function getIncomingDependencies()
+    {
+        return WorkOrderDependency::where('successor_work_order_id', $this->id)
+            ->where('work_order_group_id', $this->work_order_group_id);
+    }
+
+    /**
      * Update work order status based on dependency satisfaction
      *
      * @return bool Whether the status was changed
@@ -774,16 +783,41 @@ class WorkOrder extends Model
 
         // Check if dependencies are satisfied
         if ($this->areDependenciesSatisfied()) {
+            // Get details of which dependencies were satisfied for logging
+            $satisfiedDependencies = $this->getIncomingDependencies()
+                ->where('is_satisfied', true)
+                ->with(['predecessor'])
+                ->get();
+
+            $triggeringWorkOrders = $satisfiedDependencies->map(function ($dependency) {
+                return [
+                    'predecessor_id' => $dependency->predecessor_work_order_id,
+                    'predecessor_unique_id' => $dependency->predecessor->unique_id,
+                    'dependency_type' => $dependency->dependency_type,
+                    'required_quantity' => $dependency->required_quantity,
+                    'satisfied_at' => $dependency->satisfied_at,
+                ];
+            });
+
             $this->update([
                 'status' => 'Assigned',
                 'dependency_status' => 'ready'
             ]);
 
-            Log::info('Work order status updated from Waiting to Assigned', [
+            Log::info('Work order status updated from Waiting to Assigned due to dependency satisfaction', [
                 'work_order_id' => $this->id,
                 'unique_id' => $this->unique_id,
-                'group_id' => $this->work_order_group_id
+                'group_id' => $this->work_order_group_id,
+                'group_name' => $this->workOrderGroup?->name,
+                'triggering_work_orders' => $triggeringWorkOrders->toArray(),
+                'timestamp' => now()->toISOString(),
             ]);
+
+            // Create a work order log entry for this status change
+            $this->createWorkOrderLog('Assigned');
+
+            // Create a frontend-visible log entry
+            WorkOrderGroupLog::logDependencySatisfied($this, $triggeringWorkOrders->toArray());
 
             return true;
         }

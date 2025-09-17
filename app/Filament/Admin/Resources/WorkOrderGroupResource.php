@@ -185,6 +185,7 @@ class WorkOrderGroupResource extends Resource
         return [
             RelationManagers\WorkOrdersRelationManager::class,
             RelationManagers\DependenciesRelationManager::class,
+            RelationManagers\WorkOrderGroupLogsRelationManager::class,
         ];
     }
 
