@@ -6,11 +6,13 @@ use Illuminate\Database\Seeder;
 use App\Models\User;
 use App\Models\Department;
 use Illuminate\Support\Facades\Hash;
+use Faker\Factory as Faker;
 
 class UsersTableSeeder extends Seeder
 {
     public function run(): void
     {
+        $faker = Faker::create();
         $factoryId   = env('SEED_FACTORY_ID', 1);
         $newOperators = env('NEW_OPERATORS_COUNT', 0);
 
@@ -73,8 +75,8 @@ class UsersTableSeeder extends Seeder
                     $manager = $managers[$managerIndex % $managers->count()];
 
                     $operator = User::create([
-                        'first_name'      => fake()->firstName,
-                        'last_name'       => fake()->lastName,
+                        'first_name'      => $faker->firstName,
+                        'last_name'       => $faker->lastName,
                         'emp_id'          => $empId,
                         'email'           => $email,
                         'password'        => Hash::make('password'),
