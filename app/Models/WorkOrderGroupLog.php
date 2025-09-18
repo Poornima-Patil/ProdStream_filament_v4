@@ -132,4 +132,43 @@ class WorkOrderGroupLog extends Model
             ],
         ]);
     }
+
+    /**
+     * Create a batch key consumption log entry
+     */
+    public static function logKeyConsumption(WorkOrder $consumerWorkOrder, array $consumedKeys, int $batchNumber): void
+    {
+        if (!$consumerWorkOrder->work_order_group_id) {
+            return;
+        }
+
+        $keyDetails = collect($consumedKeys)->map(function ($keyId) {
+            $key = \App\Models\WorkOrderBatchKey::with('workOrder')->find($keyId);
+            return [
+                'key_id' => $keyId,
+                'key_code' => $key?->key_code,
+                'from_work_order' => $key?->workOrder?->unique_id,
+                'quantity_produced' => $key?->quantity_produced,
+            ];
+        })->toArray();
+
+        $keyCount = count($consumedKeys);
+        $fromWorkOrders = collect($keyDetails)->pluck('from_work_order')->unique()->join(', ');
+
+        self::create([
+            'work_order_group_id' => $consumerWorkOrder->work_order_group_id,
+            'factory_id' => $consumerWorkOrder->factory_id,
+            'event_type' => 'key_consumption',
+            'event_description' => "Work Order {$consumerWorkOrder->unique_id} Batch #{$batchNumber} consumed {$keyCount} keys from: {$fromWorkOrders}",
+            'triggered_work_order_id' => $consumerWorkOrder->id,
+            'user_id' => auth()->id(),
+            'metadata' => [
+                'batch_number' => $batchNumber,
+                'consumed_keys' => $keyDetails,
+                'key_count' => $keyCount,
+                'consumption_timestamp' => now(),
+                'key_codes' => collect($keyDetails)->pluck('key_code')->toArray(),
+            ],
+        ]);
+    }
 }

@@ -970,14 +970,24 @@ Select::make('operator_id')
 
                             if ($user->hasRole('Operator')) {
                                 if ($currentStatus === 'Assigned') {
-                                    return ['Start' => 'Start']; // Only "Start" should be visible
+                                    // For grouped work orders with dependencies, we'll handle 'Start' differently
+                                    if ($record->usesBatchSystem() && !empty($record->getIncomingDependencies()->get()->toArray())) {
+                                        // Don't show 'Start' option - it will be handled by custom action
+                                        return [];
+                                    }
+                                    return ['Start' => 'Start']; // Only "Start" should be visible for individual WOs
                                 } elseif ($currentStatus === 'Start') {
                                     return [
                                         'Hold' => 'Hold',
                                         'Completed' => 'Completed',
                                     ]; // Show "Hold" and "Completed"
                                 } elseif ($currentStatus === 'Hold') {
-                                    return ['Start' => 'Start']; // Only "Start" should be visible
+                                    // For grouped work orders with dependencies, we'll handle 'Start' differently
+                                    if ($record->usesBatchSystem() && !empty($record->getIncomingDependencies()->get()->toArray())) {
+                                        // Don't show 'Start' option - it will be handled by custom action
+                                        return [];
+                                    }
+                                    return ['Start' => 'Start']; // Only "Start" should be visible for individual WOs
                                 } elseif ($currentStatus === 'Completed') {
                                     return ['Completed' => 'Completed']; // Only "Start" should be visible
                                 }
@@ -1034,6 +1044,29 @@ Select::make('operator_id')
                         if ($state && $get('machine_id')) {
                             self::validateMachineScheduling($get, $set);
                         }
+                    }),
+
+                // Custom Start Work Order Action for Grouped WOs with Dependencies
+                Placeholder::make('start_work_order_action')
+                    ->label('Start Work Order')
+                    ->content(function ($record) {
+                        if (!$record || !in_array($record->status, ['Assigned', 'Hold'])) {
+                            return '';
+                        }
+
+                        // Only show for grouped work orders with dependencies
+                        if ($record->usesBatchSystem() && !empty($record->getIncomingDependencies()->get()->toArray())) {
+                            return new HtmlString(view('components.start-work-order-action', ['workOrder' => $record])->render());
+                        }
+
+                        return '';
+                    })
+                    ->visible(function ($record) {
+                        if (!$record || !in_array($record->status, ['Assigned', 'Hold'])) {
+                            return false;
+                        }
+                        // Only show for grouped work orders with dependencies
+                        return $record->usesBatchSystem() && !empty($record->getIncomingDependencies()->get()->toArray());
                     }),
 
                 TextInput::make('material_batch')

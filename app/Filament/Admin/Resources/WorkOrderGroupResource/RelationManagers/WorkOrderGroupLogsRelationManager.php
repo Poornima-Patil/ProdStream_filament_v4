@@ -39,12 +39,14 @@ class WorkOrderGroupLogsRelationManager extends RelationManager
                         'dependency_satisfied' => 'heroicon-o-arrow-right-circle',
                         'status_change' => 'heroicon-o-arrow-path',
                         'work_order_triggered' => 'heroicon-o-play',
+                        'key_consumption' => 'heroicon-o-key',
                         default => 'heroicon-o-information-circle',
                     })
                     ->color(fn (string $state): string => match($state) {
                         'dependency_satisfied' => 'success',
                         'status_change' => 'warning',
                         'work_order_triggered' => 'primary',
+                        'key_consumption' => 'info',
                         default => 'gray',
                     })
                     ->size('sm'),
@@ -90,6 +92,7 @@ class WorkOrderGroupLogsRelationManager extends RelationManager
                         'dependency_satisfied' => 'Dependency Satisfied',
                         'status_change' => 'Status Change',
                         'work_order_triggered' => 'Work Order Triggered',
+                        'key_consumption' => 'Key Consumption',
                     ]),
             ])
             ->recordActions([
