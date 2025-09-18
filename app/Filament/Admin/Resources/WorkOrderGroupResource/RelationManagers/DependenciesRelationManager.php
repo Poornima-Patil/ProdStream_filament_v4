@@ -50,7 +50,7 @@ class DependenciesRelationManager extends RelationManager
                     ->placeholder('Select the work order that must be completed first')
                     ->helperText('Only work orders already in this group are shown'),
                 Select::make('successor_work_order_id')
-                    ->label('Successor Work Order')
+                    ->label('Successor Work Order (Dependent)')
                     ->options(function () {
                         // Only show work orders that are already in this group
                         return $this->getOwnerRecord()->workOrders()
@@ -65,7 +65,7 @@ class DependenciesRelationManager extends RelationManager
                     ->searchable()
                     ->required()
                     ->placeholder('Select the work order that depends on the predecessor')
-                    ->helperText('Only work orders already in this group are shown'),
+                    ->helperText('A work order can have MULTIPLE dependencies. Create separate entries for each prerequisite.'),
                 TextInput::make('required_quantity')
                     ->label('Required Quantity')
                     ->numeric()
@@ -192,6 +192,17 @@ class DependenciesRelationManager extends RelationManager
                         true => 'Satisfied',
                         false => 'Not Satisfied',
                     ]),
+                SelectFilter::make('successor_work_order_id')
+                    ->label('Successor Work Order')
+                    ->options(function () {
+                        return $this->getOwnerRecord()->workOrders()
+                            ->with(['bom.purchaseOrder.partNumber'])
+                            ->get()
+                            ->mapWithKeys(function ($workOrder) {
+                                $partNumber = $workOrder->bom?->purchaseOrder?->partNumber?->partnumber ?? 'Unknown';
+                                return [$workOrder->id => "{$workOrder->unique_id} - {$partNumber}"];
+                            });
+                    }),
             ])
             ->headerActions([
                 CreateAction::make()
@@ -245,6 +256,6 @@ class DependenciesRelationManager extends RelationManager
                     DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('created_at');
+            ->defaultSort('successor_work_order_id');
     }
 }

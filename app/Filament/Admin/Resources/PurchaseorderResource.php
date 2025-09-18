@@ -91,7 +91,6 @@ class PurchaseorderResource extends Resource
                     ->required()
                     ->label('Delivery Target Date')
                     ->minDate(fn (string $operation): ?Carbon => $operation === 'create' ? now()->startOfDay() : null)
-
                     ->hint('Select the delivery target date')
                     ->displayFormat('Y-m-d'), // You can adjust the date format
 

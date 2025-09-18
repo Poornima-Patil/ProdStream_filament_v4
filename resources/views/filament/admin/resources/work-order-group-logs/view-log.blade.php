@@ -41,31 +41,6 @@
         <p class="text-sm text-gray-700 dark:text-gray-300">{{ $record->event_description }}</p>
     </div>
 
-    @if($record->triggered_work_order_id || $record->triggering_work_order_id)
-    <div class="border rounded-lg p-4">
-        <h4 class="text-md font-semibold mb-3 text-gray-900 dark:text-gray-100">Work Orders Involved</h4>
-
-        <div class="grid grid-cols-2 gap-4">
-            @if($record->triggering_work_order_id)
-            <div>
-                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Triggering Work Order:</span>
-                <p class="text-sm text-gray-900 dark:text-gray-100 mt-1 font-mono">
-                    {{ $record->triggeringWorkOrder?->unique_id ?? 'N/A' }}
-                </p>
-            </div>
-            @endif
-
-            @if($record->triggered_work_order_id)
-            <div>
-                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Triggered Work Order:</span>
-                <p class="text-sm text-gray-900 dark:text-gray-100 mt-1 font-mono">
-                    {{ $record->triggeredWorkOrder?->unique_id ?? 'N/A' }}
-                </p>
-            </div>
-            @endif
-        </div>
-    </div>
-    @endif
 
     @if($record->previous_status || $record->new_status)
     <div class="border rounded-lg p-4">

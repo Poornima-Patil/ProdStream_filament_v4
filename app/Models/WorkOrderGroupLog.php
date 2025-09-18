@@ -4,12 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class WorkOrderGroupLog extends Model
 {
     protected $fillable = [
         'work_order_group_id',
+        'factory_id',
         'event_type',
         'event_description',
         'triggered_work_order_id',
@@ -49,10 +49,16 @@ class WorkOrderGroupLog extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function factory(): HasOneThrough
+    /**
+     * Get the factory as owner for Filament tenancy
+     * Direct relationship to Factory using factory_id column
+     */
+    public function owner(): BelongsTo
     {
-        return $this->hasOneThrough(Factory::class, WorkOrderGroup::class, 'id', 'id', 'work_order_group_id', 'factory_id');
+        return $this->belongsTo(Factory::class, 'factory_id');
     }
+
+
 
 
     /**
@@ -64,6 +70,7 @@ class WorkOrderGroupLog extends Model
 
         self::create([
             'work_order_group_id' => $triggeredWorkOrder->work_order_group_id,
+            'factory_id' => $triggeredWorkOrder->factory_id,
             'event_type' => 'dependency_satisfied',
             'event_description' => "Work Order {$triggeredWorkOrder->unique_id} moved from Waiting to Assigned after dependencies were satisfied by: {$triggeringList}",
             'triggered_work_order_id' => $triggeredWorkOrder->id,
@@ -88,6 +95,7 @@ class WorkOrderGroupLog extends Model
 
         self::create([
             'work_order_group_id' => $workOrder->work_order_group_id,
+            'factory_id' => $workOrder->factory_id,
             'event_type' => 'status_change',
             'event_description' => "Work Order {$workOrder->unique_id} status changed from {$previousStatus} to {$newStatus}",
             'triggered_work_order_id' => $workOrder->id,
@@ -114,6 +122,7 @@ class WorkOrderGroupLog extends Model
 
         self::create([
             'work_order_group_id' => $completedWorkOrder->work_order_group_id,
+            'factory_id' => $completedWorkOrder->factory_id,
             'event_type' => 'work_order_triggered',
             'event_description' => "Work Order {$completedWorkOrder->unique_id} completion triggered the following work orders: {$nextWorkOrdersList}",
             'triggering_work_order_id' => $completedWorkOrder->id,

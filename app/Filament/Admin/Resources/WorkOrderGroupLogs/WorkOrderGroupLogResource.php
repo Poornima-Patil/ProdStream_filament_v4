@@ -22,7 +22,6 @@ class WorkOrderGroupLogResource extends Resource
 
     protected static bool $shouldRegisterNavigation = false;
 
-    protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
     public static function form(Schema $schema): Schema
     {

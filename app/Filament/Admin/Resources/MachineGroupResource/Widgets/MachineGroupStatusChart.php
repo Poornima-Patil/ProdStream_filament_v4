@@ -2,19 +2,58 @@
 
 namespace App\Filament\Admin\Resources\MachineGroupResource\Widgets;
 
+use Carbon\Carbon;
 use Filament\Support\RawJs;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\On;
 
 class MachineGroupStatusChart extends ChartWidget
 {
     protected ?string $heading = 'Work Order Status Distribution';
+
+    public function getHeading(): ?string
+    {
+        $baseHeading = 'Work Order Status Distribution';
+
+        if ($this->dateFrom && $this->dateTo) {
+            $fromDate = Carbon::parse($this->dateFrom)->format('M j, Y');
+            $toDate = Carbon::parse($this->dateTo)->format('M j, Y');
+            return $baseHeading . ' (' . $fromDate . ' - ' . $toDate . ')';
+        }
+
+        return $baseHeading;
+    }
 
     protected static ?int $sort = 1;
 
     public ?\Illuminate\Database\Eloquent\Model $record = null;
 
     protected int|string|array $columnSpan = 'full';
+
+    public ?string $dateFrom = null;
+
+    public ?string $dateTo = null;
+
+    public function mount(): void
+    {
+        // Date range should be passed from parent component
+        // If not provided, default to last 30 days
+        if (!$this->dateFrom || !$this->dateTo) {
+            $this->dateTo = Carbon::now()->format('Y-m-d');
+            $this->dateFrom = Carbon::now()->subDays(30)->format('Y-m-d');
+        }
+    }
+
+    #[On('dateRangeUpdated')]
+    public function updateDateRange($dateFrom, $dateTo): void
+    {
+        $this->dateFrom = $dateFrom;
+        $this->dateTo = $dateTo;
+
+        // Force widget to refresh
+        $this->dispatch('$refresh');
+    }
 
     protected function getData(): array
     {
@@ -25,12 +64,21 @@ class MachineGroupStatusChart extends ChartWidget
             ];
         }
 
-        // Get work order status distribution for this machine group
-        $statusDistribution = DB::table('work_orders')
+        // Get work order status distribution for this machine group with date filtering
+        $query = DB::table('work_orders')
             ->join('machines', 'work_orders.machine_id', '=', 'machines.id')
             ->where('machines.machine_group_id', $this->record->id)
-            ->where('work_orders.factory_id', \Filament\Facades\Filament::getTenant()->id)
-            ->selectRaw('work_orders.status, COUNT(*) as count')
+            ->where('work_orders.factory_id', \Filament\Facades\Filament::getTenant()->id);
+
+        // Apply date range filter
+        if ($this->dateFrom && $this->dateTo) {
+            $query->whereBetween('work_orders.created_at', [
+                Carbon::parse($this->dateFrom)->startOfDay(),
+                Carbon::parse($this->dateTo)->endOfDay(),
+            ]);
+        }
+
+        $statusDistribution = $query->selectRaw('work_orders.status, COUNT(*) as count')
             ->groupBy('work_orders.status')
             ->get()
             ->keyBy('status');
