@@ -46,7 +46,7 @@ class UsersTableSeeder extends Seeder
             $managerEmpId = 'MGR' . str_pad($index + 1, 3, '0', STR_PAD_LEFT);
             $this->command->info("Processing department: {$department->name} -> Manager ID: {$managerEmpId}");
 
-            $existingManager = User::where('emp_id', $managerEmpId)->first();
+            $existingManager = User::where('emp_id', $managerEmpId)->where('factory_id', $factoryId)->first();
             if ($existingManager) {
                 $this->command->info("Manager {$managerEmpId} already exists (User ID: {$existingManager->id})");
             } else {
@@ -123,7 +123,7 @@ class UsersTableSeeder extends Seeder
                 $empId = 'OPR' . str_pad($nextIndex + $i, 3, '0', STR_PAD_LEFT);
                 $email = 'operator' . ($nextIndex + $i) . '@beta.com';
 
-                if (!User::where('emp_id', $empId)->exists()) {
+                if (!User::where('emp_id', $empId)->where('factory_id', $factoryId)->exists()) {
                     $manager = $managers[$managerIndex % $managers->count()];
 
                     $operator = User::create([
