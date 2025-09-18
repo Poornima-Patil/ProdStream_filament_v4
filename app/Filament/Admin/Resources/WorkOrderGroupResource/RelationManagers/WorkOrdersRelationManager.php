@@ -378,6 +378,150 @@ class WorkOrdersRelationManager extends RelationManager
                     ->visible($isAdminOrManager)
                     ->collapsible(),
 
+                // Operator Scheduling Information Section
+                Section::make('Operator Scheduling Information')
+                    ->schema([
+                        Placeholder::make('operator_status')
+                            ->label('Current Operator Status')
+                            ->content(function (callable $get) {
+                                $operatorId = $get('operator_id');
+                                $startTime = $get('start_time');
+                                $endTime = $get('end_time');
+                                $status = $get('status');
+                                $factoryId = $this->getOwnerRecord()->factory_id;
+
+                                if (!$operatorId || !$factoryId) {
+                                    return new HtmlString('<div class="text-gray-500 italic">Select an operator to see status</div>');
+                                }
+
+                                try {
+                                    // Get operator details and ensure it belongs to the same factory
+                                    $operator = Operator::where('id', $operatorId)
+                                        ->where('factory_id', $factoryId)
+                                        ->with(['user', 'shift'])
+                                        ->first();
+
+                                    if (!$operator) {
+                                        return new HtmlString('<div class="text-red-600">⚠️ Operator not found or belongs to different factory</div>');
+                                    }
+
+                                    $operatorName = "({$operator->user->first_name} {$operator->user->last_name})";
+                                    $shiftInfo = $operator->shift
+                                        ? " - Shift: {$operator->shift->name} ({$operator->shift->start_time} - {$operator->shift->end_time})"
+                                        : ' - No shift assigned';
+
+                                    // Check if operator is currently occupied
+                                    if ($operator->isCurrentlyOccupied($factoryId)) {
+                                        $currentWO = $operator->getCurrentRunningWorkOrder($factoryId);
+                                        // Don't show as occupied if it's the current work order being edited
+                                        if (!$get('id') || $currentWO->id !== $get('id')) {
+                                            $woLink = "#"; // Can't generate edit link in relation manager context
+                                            $estimatedCompletion = Carbon::parse($currentWO->end_time)->format('M d, H:i');
+
+                                            return new HtmlString(
+                                                '<div class="bg-red-50 border border-red-200 rounded-lg p-3">'.
+                                                    '<div class="flex items-center text-red-800 font-semibold mb-2">'.
+                                                    '<span class="text-lg mr-2">🔴</span>'.
+                                                    '<span>OCCUPIED '.htmlspecialchars($operatorName).'</span>'.
+                                                    '</div>'.
+                                                    '<div class="text-red-700 text-sm">'.
+                                                    'Working on WO #'.htmlspecialchars($currentWO->unique_id).'<br>'.
+                                                    '<span class="text-gray-600">Est. completion:</span> '.htmlspecialchars($estimatedCompletion).'<br>'.
+                                                    '<span class="text-gray-600">'.htmlspecialchars($shiftInfo).'</span>'.
+                                                    '</div>'.
+                                                    '</div>'
+                                            );
+                                        }
+                                    }
+
+                                    // If start and end times are provided, check for scheduling conflicts
+                                    if ($startTime && $endTime) {
+                                        $validation = WorkOrder::validateScheduling([
+                                            'machine_id' => $get('machine_id'),
+                                            'operator_id' => $operatorId,
+                                            'factory_id' => $factoryId,
+                                            'start_time' => $startTime,
+                                            'end_time' => $endTime,
+                                            'status' => $status,
+                                            'id' => $get('id'), // For edit mode
+                                        ]);
+
+                                        // Check for shift conflicts (warnings, not blocking)
+                                        if (!empty($validation['shift_conflicts'])) {
+                                            $shiftConflict = $validation['shift_conflicts'][0];
+
+                                            return new HtmlString(
+                                                '<div class="bg-orange-50 border border-orange-200 rounded-lg p-3">'.
+                                                    '<div class="flex items-center text-orange-800 font-semibold mb-2">'.
+                                                    '<span class="text-lg mr-2">⚠️</span>'.
+                                                    '<span>SHIFT CONFLICT '.htmlspecialchars($operatorName).'</span>'.
+                                                    '</div>'.
+                                                    '<div class="text-orange-700 text-sm">'.
+                                                    htmlspecialchars($shiftConflict['message']).'<br>'.
+                                                    '<span class="text-gray-600">'.htmlspecialchars($shiftInfo).'</span><br>'.
+                                                    '<span class="text-gray-600 italic">Work order is scheduled outside operator\'s shift hours.</span>'.
+                                                    '</div>'.
+                                                    '</div>'
+                                            );
+                                        }
+
+                                        // Check for operator availability conflicts (blocking)
+                                        if (!empty($validation['operator_conflicts'])) {
+                                            $operatorConflictCount = count(array_filter($validation['operator_conflicts'],
+                                                fn ($c) => $c['type'] === 'work_order_conflict'));
+
+                                            if ($operatorConflictCount > 0) {
+                                                return new HtmlString(
+                                                    '<div class="bg-red-50 border border-red-200 rounded-lg p-3">'.
+                                                        '<div class="flex items-center text-red-800 font-semibold mb-2">'.
+                                                        '<span class="text-lg mr-2">🚫</span>'.
+                                                        '<span>OPERATOR CONFLICTS '.htmlspecialchars($operatorName).'</span>'.
+                                                        '</div>'.
+                                                        '<div class="text-red-700 text-sm">'.
+                                                        htmlspecialchars($operatorConflictCount).' scheduling conflict(s) found<br>'.
+                                                        '<span class="text-gray-600">'.htmlspecialchars($shiftInfo).'</span><br>'.
+                                                        '<span class="text-gray-600 italic">Operator is already assigned to other work orders during this time.</span>'.
+                                                        '</div>'.
+                                                        '</div>'
+                                                );
+                                            }
+                                        }
+                                    }
+
+                                    return new HtmlString(
+                                        '<div class="bg-green-50 border border-green-200 rounded-lg p-3">'.
+                                            '<div class="flex items-center text-green-800 font-semibold mb-2">'.
+                                            '<span class="text-lg mr-2">🟢</span>'.
+                                            '<span>AVAILABLE '.htmlspecialchars($operatorName).'</span>'.
+                                            '</div>'.
+                                            '<div class="text-green-700 text-sm">'.
+                                            'Operator is ready for scheduling<br>'.
+                                            '<span class="text-gray-600">'.htmlspecialchars($shiftInfo).'</span>'.
+                                            '</div>'.
+                                            '</div>'
+                                    );
+                                } catch (Exception $e) {
+                                    Log::error('Operator status check failed: '.$e->getMessage(), [
+                                        'exception' => $e,
+                                        'operator_id' => $operatorId,
+                                        'factory_id' => $factoryId,
+                                        'status' => $status,
+                                    ]);
+
+                                    return new HtmlString(
+                                        '<div class="text-red-500 italic">Unable to check operator status<br>'.
+                                            '<small>Error: '.htmlspecialchars($e->getMessage()).'</small></div>'
+                                    );
+                                }
+                            })
+                            ->live(),
+                    ])
+                    ->visible(function (callable $get) use ($isAdminOrManager) {
+                        return $get('operator_id') && $isAdminOrManager;
+                    })
+                    ->collapsible()
+                    ->collapsed(),
+
                 TextInput::make('material_batch')
                     ->label('Material Batch ID')
                     ->helperText('Optional during creation, required when starting the work order')
@@ -504,21 +648,14 @@ class WorkOrdersRelationManager extends RelationManager
                         // If this is the first work order in the group, make it a root
                         if ($existingWorkOrders === 0) {
                             $data['is_dependency_root'] = true;
-                            $data['status'] = 'Assigned';
+                            // Root WO should start as Waiting until group is activated
+                            $data['status'] = 'Waiting';
                             $data['dependency_status'] = 'ready';
                         } else {
-                            // For subsequent work orders, check if group is active
+                            // For subsequent work orders, they should always start as Waiting
                             $data['is_dependency_root'] = false;
-
-                            if ($group->status === 'active') {
-                                // If group is already active, new work orders should wait for dependencies
-                                $data['status'] = 'Waiting';
-                                $data['dependency_status'] = 'blocked';
-                            } else {
-                                // If group is still draft, start as assigned (will be updated on activation)
-                                $data['status'] = 'Assigned';
-                                $data['dependency_status'] = 'assigned';
-                            }
+                            $data['status'] = 'Waiting';
+                            $data['dependency_status'] = 'blocked';
                         }
 
                         // Set default values if not provided
