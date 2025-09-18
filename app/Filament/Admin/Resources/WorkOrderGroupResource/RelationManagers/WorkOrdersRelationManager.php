@@ -618,8 +618,12 @@ class WorkOrdersRelationManager extends RelationManager
                         $bom = Bom::find($data['bom_id']);
                         $bomUniqueId = $bom ? $bom->unique_id : 'UNKNOWN';
 
-                        // Get the latest WorkOrder created in the current month to determine the next sequential number
+                        // Get factory_id from the work order group
+                        $factoryId = $this->getOwnerRecord()->factory_id;
+
+                        // Get the latest WorkOrder for this specific factory to determine the next sequential number
                         $lastWorkOrder = WorkOrder::withTrashed()
+                            ->where('factory_id', $factoryId) // Filter by factory
                             ->whereDate('created_at', 'like', $currentDate->format('Y-m').'%')
                             ->orderByDesc('unique_id')
                             ->first();

@@ -23,18 +23,20 @@ class CreateBom extends CreateRecord
         $currentDate = Carbon::now();
         $monthYear = $currentDate->format('mY'); // MMYY format
 
-        // Get the related PurchaseOrder's cust_id
-        $purchaseOrder = $data['purchase_order_id']; // Assuming `purchase_order_id` is passed
-        $custId = PurchaseOrder::find($purchaseOrder)->customer->customer_id;
+        // Get the related PurchaseOrder and its details
+        $purchaseOrder = PurchaseOrder::find($data['purchase_order_id']);
+        $custId = $purchaseOrder->customer->customer_id;
+        $factoryId = $purchaseOrder->factory_id; // Get factory_id from purchase order
 
         // Get the related PartNumber's part_number and revision
-        $partNumber = PurchaseOrder::find($purchaseOrder)->partNumber;
+        $partNumber = $purchaseOrder->partNumber;
         $partnumber = $partNumber->partnumber;
         $revision = $partNumber->revision;
 
-        // Get the latest Bom created in the current MMYY to determine the next sequential number
-        $lastBom = Bom::whereDate('created_at', 'like', $currentDate->format('Y-m').'%')
-            ->withTrashed() // Filter by year and month
+        // Get the latest Bom for this specific factory to determine the next sequential number
+        $lastBom = Bom::where('factory_id', $factoryId) // Filter by factory directly
+            ->whereDate('created_at', 'like', $currentDate->format('Y-m').'%') // Filter by year and month
+            ->withTrashed()
             ->orderByDesc('unique_id') // Sort by unique_id to get the last one
             ->first();
 
