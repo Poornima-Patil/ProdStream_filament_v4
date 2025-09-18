@@ -25,9 +25,9 @@ return new class extends Migration
             // Ensure unique consumption - one key can only be consumed once per batch
             $table->unique(['consumed_key_id', 'consumer_batch_id']);
 
-            // Index for performance
-            $table->index(['consumer_work_order_id', 'consumer_batch_number']);
-            $table->index(['consumed_key_id']);
+            // Index for performance with custom names to avoid MySQL length limit
+            $table->index(['consumer_work_order_id', 'consumer_batch_number'], 'bkc_consumer_wo_batch_idx');
+            $table->index(['consumed_key_id'], 'bkc_consumed_key_idx');
         });
     }
 

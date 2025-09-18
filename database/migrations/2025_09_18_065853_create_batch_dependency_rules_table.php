@@ -23,9 +23,9 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            // Index for performance
-            $table->index(['work_order_group_id', 'successor_work_order_id']);
-            $table->index(['successor_work_order_id', 'is_active']);
+            // Index for performance with custom names to avoid MySQL length limit
+            $table->index(['work_order_group_id', 'successor_work_order_id'], 'bdr_wog_successor_wo_idx');
+            $table->index(['successor_work_order_id', 'is_active'], 'bdr_successor_wo_active_idx');
         });
     }
 
