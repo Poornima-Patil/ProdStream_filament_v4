@@ -17,12 +17,11 @@ class CustomerInformationTableSeeder extends Seeder
         $startDate = Carbon::parse(env('SEED_WORK_START_DATE', now()->startOfMonth()));
         $endDate = $startDate->copy()->addDays(14); // 15 days including start
 
-        // Find the last customer_id for this factory
+        // Find the last customer_id globally (across all factories) to ensure uniqueness
         $lastCustomer = DB::table('customer_information')
-            ->where('factory_id', $factoryId)
             ->orderByDesc('customer_id')
             ->first();
-	$customerId = $lastCustomer ? ((int) $lastCustomer->customer_id + 10) : 2010;
+        $customerId = $lastCustomer ? ((int) $lastCustomer->customer_id + 10) : (2000 + ($factoryId * 1000));
 
         $added = 0;
         for ($customerIndex = 1; $customerIndex <= $customerCount; $customerIndex++) {
