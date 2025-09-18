@@ -6,13 +6,12 @@ use Illuminate\Database\Seeder;
 use App\Models\User;
 use App\Models\Department;
 use Illuminate\Support\Facades\Hash;
-use Faker\Factory as Faker;
 
 class UsersTableSeeder extends Seeder
 {
     public function run(): void
     {
-        $faker = Faker::create();
+        $faker = $this->faker;
         $factoryId   = env('SEED_FACTORY_ID', 1);
         $newOperators = env('NEW_OPERATORS_COUNT', 0);
 

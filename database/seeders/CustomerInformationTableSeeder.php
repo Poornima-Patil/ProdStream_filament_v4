@@ -5,13 +5,12 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
-use Faker\Factory as Faker;
 
 class CustomerInformationTableSeeder extends Seeder
 {
     public function run(): void
     {
-        $faker = Faker::create();
+        $faker = $this->faker;
         $factoryId = env('SEED_FACTORY_ID', 1);
         $customerCount = env('SEED_CUSTOMER_COUNT', 5); // Default to 5 if not set
         $startDate = Carbon::parse(env('SEED_WORK_START_DATE', now()->startOfMonth()));
