@@ -56,7 +56,7 @@ class UsersTableSeeder extends Seeder
                         'first_name'      => 'Manager',
                         'last_name'       => 'Dept' . $department->id,
                         'emp_id'          => $managerEmpId,
-                        'email'           => 'manager' . ($index + 1) . '@beta.com',
+                        'email'           => 'manager' . ($index + 1) . '.f' . $factoryId . '@beta.com',
                         'password'        => Hash::make('password'),
                         'factory_id'      => $factoryId,
                         'department_id'   => $department->id,
@@ -121,7 +121,7 @@ class UsersTableSeeder extends Seeder
 
             for ($i = 0; $i < $newOperators; $i++) {
                 $empId = 'OPR' . str_pad($nextIndex + $i, 3, '0', STR_PAD_LEFT);
-                $email = 'operator' . ($nextIndex + $i) . '@beta.com';
+                $email = 'operator' . ($nextIndex + $i) . '.f' . $factoryId . '@beta.com';
 
                 if (!User::where('emp_id', $empId)->where('factory_id', $factoryId)->exists()) {
                     $manager = $managers[$managerIndex % $managers->count()];
