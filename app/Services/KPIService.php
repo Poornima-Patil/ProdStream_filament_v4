@@ -341,8 +341,7 @@ class KPIService
 
             // Get work orders for this factory in the date range that are completed, hold, or closed
             $workOrders = WorkOrder::where('factory_id', $factoryId)
-                ->whereBetween('start_time', [$startDate, $endDate])
-                ->whereNotNull('start_time')
+                ->whereBetween('created_at', [$startDate, $endDate])
                 ->whereIn('status', ['Completed', 'Hold', 'Closed'])
                 ->get();
 
@@ -532,9 +531,10 @@ class KPIService
     }
 
     /**
-     * Calculate Production Throughput using time period from work order creation to completion
-     * Formula: Total Units Produced / Total Time Period (from created_at to work_order_logs.updated_at)
+     * Calculate Production Throughput using individual WO logic - same as ViewWorkOrder
+     * Formula: Average of individual WO throughputs (units/hour per WO)
      * Uses custom date range and work orders with status 'Completed' or 'Closed'
+     * Matches the exact logic from ViewWorkOrder.php
      */
     public function getProductionThroughputByTimeWithDateRange($factoryId, $fromDate, $toDate)
     {
@@ -544,10 +544,10 @@ class KPIService
             $startDate = Carbon::parse($fromDate)->startOfDay();
             $endDate = Carbon::parse($toDate)->endOfDay();
 
-            // Get completed/closed work orders with their completion logs
+            // Get work orders CREATED in the time range
             $workOrders = WorkOrder::where('factory_id', $factoryId)
                 ->whereBetween('created_at', [$startDate, $endDate])
-                ->whereIn('status', ['Completed', 'Closed'])
+                ->whereIn('status', ['Completed', 'Closed']) // Only completed/closed WOs
                 ->with(['workOrderLogs' => function($query) {
                     $query->whereIn('status', ['Completed', 'Closed'])
                           ->orderBy('updated_at', 'desc')
@@ -562,52 +562,78 @@ class KPIService
                     'units_per_hour' => 0,
                     'total_hours' => 0,
                     'orders_count' => 0,
+                    'average_throughput' => 0,
                     'trend' => 0,
                     'status' => 'neutral'
                 ];
             }
 
+            $individualThroughputs = [];
             $totalUnits = 0;
             $totalHours = 0;
             $ordersProcessed = 0;
 
             foreach ($workOrders as $workOrder) {
-                if ($workOrder->workOrderLogs->isNotEmpty()) {
-                    $log = $workOrder->workOrderLogs->first();
+                // Get the completion log for this work order
+                $completionLog = $workOrder->workOrderLogs()
+                    ->whereIn('status', ['Completed', 'Closed'])
+                    ->orderBy('updated_at', 'desc')
+                    ->first();
+
+                if ($completionLog) {
+                    // Calculate time period (created_at to completion log created_at) - same as ViewWorkOrder
                     $createdAt = Carbon::parse($workOrder->created_at);
-                    $completedAt = Carbon::parse($log->updated_at);
-                    
-                    // Calculate hours between creation and completion
-                    $hours = $createdAt->diffInHours($completedAt);
-                    if ($hours > 0) {
-                        $totalUnits += $workOrder->ok_qtys ?? 0;
+                    $completedAt = Carbon::parse($completionLog->created_at);
+
+                    // Handle edge cases where completion time might be before creation time
+                    $hours = $createdAt->diffInHours($completedAt, false); // false = can be negative
+
+                    // If negative hours, use absolute value (data inconsistency)
+                    if ($hours <= 0) {
+                        $hours = abs($hours);
+                    }
+
+                    // Get units produced
+                    $units = $workOrder->ok_qtys ?? 0;
+
+                    // Calculate throughput for this individual WO
+                    if ($hours > 0 && $units > 0) {
+                        $throughputPerHour = round($units / $hours, 3);
+                        $individualThroughputs[] = $throughputPerHour;
+
+                        // Also track totals for summary
+                        $totalUnits += $units;
                         $totalHours += $hours;
                         $ordersProcessed++;
                     }
                 }
             }
 
-            if ($totalHours === 0) {
+            if (empty($individualThroughputs)) {
                 return [
                     'rate' => 0,
-                    'total_units' => $totalUnits,
+                    'total_units' => 0,
                     'units_per_hour' => 0,
                     'total_hours' => 0,
-                    'orders_count' => $ordersProcessed,
+                    'orders_count' => 0,
+                    'average_throughput' => 0,
                     'trend' => 0,
                     'status' => 'neutral'
                 ];
             }
 
-            $unitsPerHour = round($totalUnits / $totalHours, 2);
-            $status = $this->getProductionThroughputStatus($unitsPerHour);
+            // Calculate average throughput across all WOs
+            $averageThroughput = round(array_sum($individualThroughputs) / count($individualThroughputs), 3);
+            $status = $this->getProductionThroughputStatus($averageThroughput);
 
             return [
-                'rate' => $unitsPerHour,
+                'rate' => $averageThroughput, // This is now the average of individual WO throughputs
                 'total_units' => $totalUnits,
-                'units_per_hour' => $unitsPerHour,
+                'units_per_hour' => $averageThroughput,
                 'total_hours' => round($totalHours, 1),
                 'orders_count' => $ordersProcessed,
+                'average_throughput' => $averageThroughput,
+                'individual_throughputs_count' => count($individualThroughputs),
                 'trend' => 0, // Trend calculation disabled for custom date ranges
                 'status' => $status
             ];

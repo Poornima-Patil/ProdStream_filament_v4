@@ -97,11 +97,11 @@ class ViewWorkOrder extends ViewRecord
                                 ');
                             }
                             
-                            // Calculate time period (created_at to completion log updated_at)
+                            // Calculate time period (created_at to completion log created_at)
                             $createdAt = Carbon::parse($record->created_at);
-                            
-                            // Use updated_at as the end time
-                            $completedAt = Carbon::parse($completionLog->updated_at);
+
+                            // Use created_at as the end time (when completion log was created)
+                            $completedAt = Carbon::parse($completionLog->created_at);
                             
                             // Handle edge cases where completion time might be before creation time
                             $hours = $createdAt->diffInHours($completedAt, false); // false = can be negative
