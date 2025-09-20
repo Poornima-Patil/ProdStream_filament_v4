@@ -94,6 +94,9 @@ class WorkOrderBatch extends Model
                 // Create consumption record
                 BatchKeyConsumption::createConsumption($this, $key);
             }
+
+            // Log key consumption
+            WorkOrderGroupLog::logKeyConsumption($this->workOrder, $consumedKeys, $this->batch_number);
         }
 
         return $this->update([
@@ -133,7 +136,7 @@ class WorkOrderBatch extends Model
     {
         $keyCode = WorkOrderBatchKey::generateKeyCode($this->workOrder, $this->batch_number);
 
-        return WorkOrderBatchKey::create([
+        $batchKey = WorkOrderBatchKey::create([
             'work_order_id' => $this->work_order_id,
             'batch_id' => $this->id,
             'batch_number' => $this->batch_number,
@@ -141,6 +144,11 @@ class WorkOrderBatch extends Model
             'quantity_produced' => $quantity,
             'generated_at' => now(),
         ]);
+
+        // Log key generation
+        WorkOrderGroupLog::logKeyGeneration($this->workOrder, $keyCode, $this->batch_number, $quantity);
+
+        return $batchKey;
     }
 
     /**

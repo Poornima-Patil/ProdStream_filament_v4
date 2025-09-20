@@ -189,8 +189,32 @@ class WorkOrderGroupResource extends Resource
                         ->visible(fn (WorkOrderGroup $record) => $record->status === 'draft')
                         ->authorize('activate')
                         ->action(function (WorkOrderGroup $record) {
+                            // Check if the group can be activated
+                            if (!$record->canActivate()) {
+                                $errors = $record->getActivationValidationErrors();
+
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Cannot Activate WorkOrder Group')
+                                    ->body('Dependencies must be defined before activation: ' . implode('; ', $errors))
+                                    ->danger()
+                                    ->persistent()
+                                    ->send();
+
+                                return;
+                            }
+
                             // Update group status to active
-                            $record->update(['status' => 'active']);
+                            $updateResult = $record->update(['status' => 'active']);
+
+                            if (!$updateResult) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Activation Failed')
+                                    ->body('Failed to activate the WorkOrder Group. Please check dependencies.')
+                                    ->danger()
+                                    ->send();
+
+                                return;
+                            }
 
                             // Initialize work order statuses based on dependencies
                             $record->initializeWorkOrderStatuses();

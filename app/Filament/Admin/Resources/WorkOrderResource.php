@@ -39,6 +39,8 @@ use App\Models\Machine;
 use App\Models\Operator;
 use App\Models\User;
 use App\Models\WorkOrder;
+use App\Models\WorkOrderDependency;
+use App\Models\WorkOrderBatch;
 use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
@@ -970,9 +972,9 @@ Select::make('operator_id')
 
                             if ($user->hasRole('Operator')) {
                                 if ($currentStatus === 'Assigned') {
-                                    // For grouped work orders with dependencies, we'll handle 'Start' differently
-                                    if ($record->usesBatchSystem() && !empty($record->getIncomingDependencies()->get()->toArray())) {
-                                        // Don't show 'Start' option - it will be handled by custom action
+                                    // For grouped work orders (both root and non-root), force batch system usage
+                                    if ($record->work_order_group_id !== null && $record->usesBatchSystem()) {
+                                        // Don't show 'Start' option - must use batch actions
                                         return [];
                                     }
                                     return ['Start' => 'Start']; // Only "Start" should be visible for individual WOs
@@ -982,14 +984,14 @@ Select::make('operator_id')
                                         'Completed' => 'Completed',
                                     ]; // Show "Hold" and "Completed"
                                 } elseif ($currentStatus === 'Hold') {
-                                    // For grouped work orders with dependencies, we'll handle 'Start' differently
-                                    if ($record->usesBatchSystem() && !empty($record->getIncomingDependencies()->get()->toArray())) {
-                                        // Don't show 'Start' option - it will be handled by custom action
+                                    // For grouped work orders (both root and non-root), force batch system usage
+                                    if ($record->work_order_group_id !== null && $record->usesBatchSystem()) {
+                                        // Don't show 'Start' option - must use batch actions
                                         return [];
                                     }
                                     return ['Start' => 'Start']; // Only "Start" should be visible for individual WOs
                                 } elseif ($currentStatus === 'Completed') {
-                                    return ['Completed' => 'Completed']; // Only "Start" should be visible
+                                    return ['Completed' => 'Completed']; // Only "Completed" should be visible
                                 }
                             }
                         }
@@ -1046,28 +1048,6 @@ Select::make('operator_id')
                         }
                     }),
 
-                // Custom Start Work Order Action for Grouped WOs with Dependencies
-                Placeholder::make('start_work_order_action')
-                    ->label('Start Work Order')
-                    ->content(function ($record) {
-                        if (!$record || !in_array($record->status, ['Assigned', 'Hold'])) {
-                            return '';
-                        }
-
-                        // Only show for grouped work orders with dependencies
-                        if ($record->usesBatchSystem() && !empty($record->getIncomingDependencies()->get()->toArray())) {
-                            return new HtmlString(view('components.start-work-order-action', ['workOrder' => $record])->render());
-                        }
-
-                        return '';
-                    })
-                    ->visible(function ($record) {
-                        if (!$record || !in_array($record->status, ['Assigned', 'Hold'])) {
-                            return false;
-                        }
-                        // Only show for grouped work orders with dependencies
-                        return $record->usesBatchSystem() && !empty($record->getIncomingDependencies()->get()->toArray());
-                    }),
 
                 TextInput::make('material_batch')
                     ->label('Material Batch ID')
@@ -1371,6 +1351,193 @@ Select::make('operator_id')
                                 $isAdminOrManager
                         ),
                     ViewAction::make()->hiddenLabel(),
+
+                    // Batch Management Actions
+                    Action::make('start_batch')
+                        ->label('Start New Batch')
+                        ->icon('heroicon-o-play')
+                        ->color('success')
+                        ->visible(function (WorkOrder $record) {
+                            // Only show for WorkOrders that use batch system and can start new batch
+                            if (!$record->usesBatchSystem() || !$record->canStartNewBatch()) {
+                                return false;
+                            }
+
+                            // Only show for WorkOrders that are in a group
+                            return $record->work_order_group_id !== null;
+                        })
+                        ->form(function (WorkOrder $record) {
+                            $formFields = [
+                                TextInput::make('planned_quantity')
+                                    ->label('Planned Quantity for this Batch')
+                                    ->numeric()
+                                    ->required()
+                                    ->default(25)
+                                    ->minValue(1),
+                            ];
+
+                            // For non-root work orders, add key selection
+                            if (!$record->is_dependency_root) {
+                                $dependencies = \App\Models\WorkOrderDependency::where('successor_work_order_id', $record->id)
+                                    ->where('work_order_group_id', $record->work_order_group_id)
+                                    ->with('predecessor')
+                                    ->get();
+
+                                foreach ($dependencies as $dependency) {
+                                    $availableKeys = $dependency->predecessor->getAvailableKeys();
+
+                                    if ($availableKeys->isEmpty()) {
+                                        $formFields[] = \Filament\Forms\Components\Placeholder::make('no_keys_' . $dependency->predecessor_work_order_id)
+                                            ->label('Required Keys from ' . $dependency->predecessor->unique_id)
+                                            ->content('❌ No keys available from ' . $dependency->predecessor->unique_id . '. Complete predecessor work orders first to generate keys.');
+                                    } else {
+                                        $formFields[] = Select::make('selected_keys.' . $dependency->predecessor_work_order_id)
+                                            ->label('Select Key from ' . $dependency->predecessor->unique_id)
+                                            ->options(function () use ($dependency) {
+                                                // Always fetch fresh available keys to prevent stale data
+                                                $freshAvailableKeys = $dependency->predecessor->fresh()->getAvailableKeys();
+                                                return $freshAvailableKeys->mapWithKeys(function ($key) {
+                                                    return [$key->id => $key->key_code . ' (' . $key->quantity_produced . ' units) - Available'];
+                                                });
+                                            })
+                                            ->required()
+                                            ->helperText('Select a key to consume for this batch (only showing available/unconsumed keys)')
+                                            ->placeholder('Choose an available key...')
+                                            ->searchable();
+                                    }
+                                }
+                            }
+
+                            return $formFields;
+                        })
+                        ->action(function (array $data, WorkOrder $record) {
+                            try {
+                                // Get required keys for non-root work orders
+                                $keysRequired = [];
+                                $selectedKeys = [];
+
+                                if (!$record->is_dependency_root) {
+                                    $dependencies = \App\Models\WorkOrderDependency::where('successor_work_order_id', $record->id)
+                                        ->where('work_order_group_id', $record->work_order_group_id)
+                                        ->with('predecessor')
+                                        ->get();
+
+                                    foreach ($dependencies as $dependency) {
+                                        $keysRequired[] = [
+                                            'work_order_id' => $dependency->predecessor_work_order_id,
+                                            'dependency_type' => $dependency->dependency_type,
+                                            'quantity_needed' => 1, // One key per batch
+                                            'work_order_name' => $dependency->predecessor->unique_id
+                                        ];
+
+                                        // Get selected key for this dependency
+                                        if (isset($data['selected_keys'][$dependency->predecessor_work_order_id])) {
+                                            $selectedKeys[] = $data['selected_keys'][$dependency->predecessor_work_order_id];
+                                        }
+                                    }
+
+                                    // Validate that keys are available and not already consumed
+                                    foreach ($selectedKeys as $keyId) {
+                                        $key = \App\Models\WorkOrderBatchKey::find($keyId);
+                                        if (!$key || !$key->isAvailable()) {
+                                            throw new \Exception("Selected key is no longer available. Please refresh and try again.");
+                                        }
+                                    }
+                                }
+
+                                // Create the batch
+                                $batch = $record->createBatch($data['planned_quantity'], $keysRequired);
+
+                                if (!$batch) {
+                                    throw new \Exception('Failed to create batch');
+                                }
+
+                                // Start the batch immediately (which will consume the keys)
+                                $batchStarted = $batch->startBatch($selectedKeys);
+
+                                if (!$batchStarted) {
+                                    // If starting failed, delete the batch
+                                    $batch->delete();
+                                    throw new \Exception('Failed to start batch. Keys may no longer be available.');
+                                }
+
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Batch Started Successfully')
+                                    ->body("Batch #{$batch->batch_number} has been started and is now in progress." .
+                                           (!empty($selectedKeys) ? " Consumed " . count($selectedKeys) . " key(s)." : ""))
+                                    ->success()
+                                    ->send();
+
+                            } catch (\Exception $e) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Failed to Start Batch')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
+
+                    Action::make('complete_batch')
+                        ->label('Complete Batch')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('warning')
+                        ->visible(function (WorkOrder $record) {
+                            if (!$record->usesBatchSystem()) return false;
+                            $currentBatch = $record->getCurrentBatch();
+                            return $currentBatch && $currentBatch->status === 'in_progress';
+                        })
+                        ->form([
+                            TextInput::make('actual_quantity')
+                                ->label('Actual Quantity Produced')
+                                ->numeric()
+                                ->required()
+                                ->minValue(1)
+                                ->helperText(function (WorkOrder $record) {
+                                    $batch = $record->getCurrentBatch();
+                                    return $batch ? "Maximum: {$batch->planned_quantity} units" : '';
+                                })
+                                ->rules(function (WorkOrder $record) {
+                                    $batch = $record->getCurrentBatch();
+                                    $maxQty = $batch ? $batch->planned_quantity : 999;
+                                    return ["max:{$maxQty}"];
+                                }),
+                        ])
+                        ->action(function (array $data, WorkOrder $record) {
+                            try {
+                                $currentBatch = $record->getCurrentBatch();
+                                if (!$currentBatch || $currentBatch->status !== 'in_progress') {
+                                    throw new \Exception('No batch in progress to complete');
+                                }
+
+                                $success = $currentBatch->completeBatch($data['actual_quantity']);
+
+                                if ($success) {
+                                    // Check if a key was generated
+                                    $generatedKey = $currentBatch->fresh()->batchKey;
+                                    $keyMessage = $generatedKey ? " Key generated: {$generatedKey->key_code}" : "";
+
+                                    \Filament\Notifications\Notification::make()
+                                        ->title('Batch Completed Successfully')
+                                        ->body("Batch #{$currentBatch->batch_number} completed with {$data['actual_quantity']} units.{$keyMessage}")
+                                        ->success()
+                                        ->send();
+
+                                    // Update dependent work orders if in a group
+                                    if ($record->work_order_group_id) {
+                                        $record->workOrderGroup->updateWaitingWorkOrderStatuses();
+                                    }
+                                } else {
+                                    throw new \Exception('Failed to complete batch');
+                                }
+                            } catch (\Exception $e) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Failed to Complete Batch')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+                            }
+                        }),
+
                     Action::make('Alert Manager')
                         ->visible(fn () => Auth::check() && Auth::user()->hasRole('Operator'))
                         ->schema([

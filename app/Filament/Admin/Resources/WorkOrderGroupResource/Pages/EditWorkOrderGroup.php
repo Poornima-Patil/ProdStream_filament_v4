@@ -5,6 +5,7 @@ namespace App\Filament\Admin\Resources\WorkOrderGroupResource\Pages;
 use App\Filament\Admin\Resources\WorkOrderGroupResource;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
+use Filament\Notifications\Notification;
 
 class EditWorkOrderGroup extends EditRecord
 {
@@ -15,5 +16,23 @@ class EditWorkOrderGroup extends EditRecord
         return [
             DeleteAction::make(),
         ];
+    }
+
+    protected function afterSave(): void
+    {
+        // Check for validation errors stored in session
+        if (session()->has('workorder_group_validation_errors')) {
+            $errors = session()->get('workorder_group_validation_errors');
+
+            Notification::make()
+                ->title('Cannot Activate WorkOrder Group')
+                ->body('Dependencies must be defined before activation: ' . implode('; ', $errors))
+                ->danger()
+                ->persistent()
+                ->send();
+
+            // Clear the session data
+            session()->forget('workorder_group_validation_errors');
+        }
     }
 }

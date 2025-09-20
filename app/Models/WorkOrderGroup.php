@@ -47,6 +47,24 @@ class WorkOrderGroup extends Model
             }
         });
 
+        static::updating(function ($workOrderGroup) {
+            // Validate dependencies before allowing activation
+            if ($workOrderGroup->isDirty('status') && $workOrderGroup->status === 'active') {
+                if (!$workOrderGroup->canActivate()) {
+                    $errors = $workOrderGroup->getActivationValidationErrors();
+
+                    // Reset status to previous value to prevent activation
+                    $workOrderGroup->status = $workOrderGroup->getOriginal('status');
+
+                    // Store validation errors in session for Filament to show
+                    session()->flash('workorder_group_validation_errors', $errors);
+
+                    // Prevent the update from proceeding
+                    return false;
+                }
+            }
+        });
+
         static::deleting(function ($workOrderGroup) {
             // Delete all associated work orders when the group is deleted
             $workOrderGroup->workOrders()->delete();
@@ -116,6 +134,86 @@ class WorkOrderGroup extends Model
     public function canStart(): bool
     {
         return $this->status === 'active' && $this->workOrders()->where('is_dependency_root', true)->exists();
+    }
+
+    /**
+     * Check if the group can be activated (has proper dependencies set up)
+     */
+    public function canActivate(): bool
+    {
+        $workOrders = $this->workOrders()->get();
+
+        // Must have at least 2 work orders to require dependencies
+        if ($workOrders->count() < 2) {
+            return true; // Single work order groups don't need dependencies
+        }
+
+        // Must have at least one root work order
+        $rootWorkOrders = $workOrders->where('is_dependency_root', true);
+        if ($rootWorkOrders->isEmpty()) {
+            return false;
+        }
+
+        // Must have at least one non-root work order
+        $dependentWorkOrders = $workOrders->where('is_dependency_root', false);
+        if ($dependentWorkOrders->isEmpty()) {
+            return false;
+        }
+
+        // All non-root work orders must have dependencies defined
+        foreach ($dependentWorkOrders as $dependentWO) {
+            $hasDependency = $this->dependencies()
+                ->where('successor_work_order_id', $dependentWO->id)
+                ->exists();
+
+            if (!$hasDependency) {
+                return false; // Found a non-root WO without dependencies
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Get validation errors for group activation
+     */
+    public function getActivationValidationErrors(): array
+    {
+        $errors = [];
+        $workOrders = $this->workOrders()->get();
+
+        if ($workOrders->count() < 2) {
+            return $errors; // Single work order groups are always valid
+        }
+
+        $rootWorkOrders = $workOrders->where('is_dependency_root', true);
+        $dependentWorkOrders = $workOrders->where('is_dependency_root', false);
+
+        if ($rootWorkOrders->isEmpty()) {
+            $errors[] = 'Group must have at least one root work order (is_dependency_root = true)';
+        }
+
+        if ($dependentWorkOrders->isEmpty()) {
+            $errors[] = 'Group must have at least one dependent work order (is_dependency_root = false)';
+        }
+
+        // Check each dependent work order for missing dependencies
+        $missingDependencies = [];
+        foreach ($dependentWorkOrders as $dependentWO) {
+            $hasDependency = $this->dependencies()
+                ->where('successor_work_order_id', $dependentWO->id)
+                ->exists();
+
+            if (!$hasDependency) {
+                $missingDependencies[] = $dependentWO->unique_id;
+            }
+        }
+
+        if (!empty($missingDependencies)) {
+            $errors[] = 'The following work orders have no dependencies defined: ' . implode(', ', $missingDependencies);
+        }
+
+        return $errors;
     }
 
     public function markAsStarted(): void

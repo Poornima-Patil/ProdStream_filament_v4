@@ -198,6 +198,12 @@ class WorkOrder extends Model
 
             // Process dependency chain updates when quantities change
             if ($workOrder->isDirty(['ok_qtys', 'scrapped_qtys'])) {
+                // Auto-generate batch keys for root work orders in groups
+                if ($workOrder->work_order_group_id &&
+                    $workOrder->is_dependency_root &&
+                    $workOrder->isDirty('ok_qtys')) {
+                    $workOrder->autoGenerateBatchKeysFromQuantities();
+                }
                 $workOrder->processDependencyChainUpdates();
             }
         });
@@ -1057,5 +1063,65 @@ class WorkOrder extends Model
         }
 
         return ($this->ok_qtys ?? 0) >= $this->qty;
+    }
+
+    /**
+     * Auto-generate batch keys for root work orders when quantities are updated
+     * This ensures dependent work orders have keys available for consumption
+     */
+    public function autoGenerateBatchKeysFromQuantities(): void
+    {
+        // Only process if this is a root work order in a group
+        if (!$this->work_order_group_id || !$this->is_dependency_root) {
+            return;
+        }
+
+        // Get the configured batch size for this work order
+        $workOrderGroup = $this->workOrderGroup;
+        $batchSize = $workOrderGroup->getBatchSizeForWorkOrder($this->id);
+
+        if (!$batchSize) {
+            // No batch configuration set, use default batch size of 25
+            $batchSize = 25;
+        }
+
+        $currentOkQtys = $this->ok_qtys ?? 0;
+        $existingBatchQuantity = $this->getTotalBatchQuantity();
+
+        // Calculate how many new quantities need batch keys
+        $unbatchedQuantity = $currentOkQtys - $existingBatchQuantity;
+
+        if ($unbatchedQuantity <= 0) {
+            return; // No new quantities to process
+        }
+
+        // Create and complete batches for the unbatched quantities
+        while ($unbatchedQuantity > 0) {
+            $batchQuantity = min($batchSize, $unbatchedQuantity);
+
+            // Create a new batch
+            $batch = WorkOrderBatch::createBatch($this, $batchQuantity);
+
+            // Start the batch (no keys required for root work orders)
+            $batch->startBatch();
+
+            // Complete the batch immediately to generate a key
+            $batch->completeBatch($batchQuantity);
+
+            $unbatchedQuantity -= $batchQuantity;
+
+            \Illuminate\Support\Facades\Log::info('Auto-generated batch key for root work order', [
+                'work_order_id' => $this->id,
+                'work_order_unique_id' => $this->unique_id,
+                'batch_number' => $batch->batch_number,
+                'batch_quantity' => $batchQuantity,
+                'remaining_unbatched' => $unbatchedQuantity
+            ]);
+        }
+
+        // Update dependent work order statuses in case they can now proceed
+        if ($workOrderGroup) {
+            $workOrderGroup->updateWaitingWorkOrderStatuses();
+        }
     }
 }

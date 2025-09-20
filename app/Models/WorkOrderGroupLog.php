@@ -171,4 +171,29 @@ class WorkOrderGroupLog extends Model
             ],
         ]);
     }
+
+    /**
+     * Create a batch key generation log entry
+     */
+    public static function logKeyGeneration(WorkOrder $producerWorkOrder, string $keyCode, int $batchNumber, int $quantityProduced): void
+    {
+        if (!$producerWorkOrder->work_order_group_id) {
+            return;
+        }
+
+        self::create([
+            'work_order_group_id' => $producerWorkOrder->work_order_group_id,
+            'factory_id' => $producerWorkOrder->factory_id,
+            'event_type' => 'key_generation',
+            'event_description' => "Work Order {$producerWorkOrder->unique_id} Batch #{$batchNumber} generated key: {$keyCode} (Qty: {$quantityProduced})",
+            'triggering_work_order_id' => $producerWorkOrder->id,
+            'user_id' => auth()->id(),
+            'metadata' => [
+                'batch_number' => $batchNumber,
+                'key_code' => $keyCode,
+                'quantity_produced' => $quantityProduced,
+                'generation_timestamp' => now(),
+            ],
+        ]);
+    }
 }
