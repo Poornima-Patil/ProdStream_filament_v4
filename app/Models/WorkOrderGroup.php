@@ -24,6 +24,7 @@ class WorkOrderGroup extends Model
         'actual_start_date',
         'actual_completion_date',
         'metadata',
+        'batch_configuration',
     ];
 
     protected function casts(): array
@@ -34,6 +35,7 @@ class WorkOrderGroup extends Model
             'actual_start_date' => 'datetime',
             'actual_completion_date' => 'datetime',
             'metadata' => 'array',
+            'batch_configuration' => 'array',
         ];
     }
 
@@ -191,5 +193,95 @@ class WorkOrderGroup extends Model
             'group_id' => $this->id,
             'work_orders_count' => $workOrders->count()
         ]);
+    }
+
+    /**
+     * Get batch size for a specific work order
+     */
+    public function getBatchSizeForWorkOrder(int $workOrderId): ?int
+    {
+        if (!$this->batch_configuration) {
+            return null;
+        }
+
+        return $this->batch_configuration[$workOrderId] ?? null;
+    }
+
+    /**
+     * Set batch size for a specific work order
+     */
+    public function setBatchSizeForWorkOrder(int $workOrderId, int $batchSize): void
+    {
+        $config = $this->batch_configuration ?? [];
+        $config[$workOrderId] = $batchSize;
+        $this->update(['batch_configuration' => $config]);
+    }
+
+    /**
+     * Get all batch configurations for work orders in this group
+     */
+    public function getBatchConfigurations(): array
+    {
+        if (!$this->batch_configuration) {
+            return [];
+        }
+
+        $workOrders = $this->workOrders()->get()->keyBy('id');
+        $configurations = [];
+
+        foreach ($this->batch_configuration as $workOrderId => $batchSize) {
+            if (isset($workOrders[$workOrderId])) {
+                $configurations[] = [
+                    'work_order_id' => $workOrderId,
+                    'work_order_name' => $workOrders[$workOrderId]->unique_id,
+                    'batch_size' => $batchSize,
+                ];
+            }
+        }
+
+        return $configurations;
+    }
+
+    /**
+     * Check if a work order has completed enough quantity for a batch
+     */
+    public function hasWorkOrderCompletedBatch(WorkOrder $workOrder): bool
+    {
+        $batchSize = $this->getBatchSizeForWorkOrder($workOrder->id);
+
+        if (!$batchSize) {
+            return false; // No batch configuration set
+        }
+
+        // Get current in-progress batch
+        $currentBatch = $workOrder->batches()->where('status', 'in_progress')->first();
+
+        if (!$currentBatch) {
+            return false; // No active batch
+        }
+
+        // Calculate total OK quantities produced in current batch
+        $totalOkQtys = $workOrder->ok_qtys ?? 0;
+
+        return $totalOkQtys >= $batchSize;
+    }
+
+    /**
+     * Auto-complete batch if work order has reached batch size
+     */
+    public function autoCompleteBatchIfReady(WorkOrder $workOrder): bool
+    {
+        if (!$this->hasWorkOrderCompletedBatch($workOrder)) {
+            return false;
+        }
+
+        $currentBatch = $workOrder->batches()->where('status', 'in_progress')->first();
+
+        if ($currentBatch) {
+            $batchSize = $this->getBatchSizeForWorkOrder($workOrder->id);
+            return $currentBatch->completeBatch($batchSize);
+        }
+
+        return false;
     }
 }

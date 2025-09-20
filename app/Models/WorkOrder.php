@@ -80,6 +80,21 @@ class WorkOrder extends Model
         return $this->belongsTo(WorkOrderGroup::class);
     }
 
+    public function batches()
+    {
+        return $this->hasMany(WorkOrderBatch::class);
+    }
+
+    public function batchKeys()
+    {
+        return $this->hasMany(WorkOrderBatchKey::class);
+    }
+
+    public function keyConsumptions()
+    {
+        return $this->hasMany(BatchKeyConsumption::class, 'consumer_work_order_id');
+    }
+
     public function scrappedQuantities()
     {
         return $this->hasMany(WorkOrderQuantity::class);
@@ -897,5 +912,150 @@ class WorkOrder extends Model
             'group_id' => $group->id,
             'work_orders_count' => $workOrders->count()
         ]);
+    }
+
+    /**
+     * Check if this work order uses batch system (only for grouped work orders)
+     */
+    public function usesBatchSystem(): bool
+    {
+        return $this->work_order_group_id !== null;
+    }
+
+    /**
+     * Get available keys from this work order for consumption
+     */
+    public function getAvailableKeys()
+    {
+        if (!$this->usesBatchSystem()) {
+            return collect();
+        }
+
+        return $this->batchKeys()->where('is_consumed', false)->get();
+    }
+
+    /**
+     * Create a new batch for this work order
+     */
+    public function createBatch(int $plannedQuantity, array $keysRequired = []): ?WorkOrderBatch
+    {
+        if (!$this->usesBatchSystem()) {
+            return null; // Only grouped work orders use batches
+        }
+
+        return WorkOrderBatch::createBatch($this, $plannedQuantity, $keysRequired);
+    }
+
+    /**
+     * Get the current active batch for this work order
+     */
+    public function getCurrentBatch(): ?WorkOrderBatch
+    {
+        return $this->batches()
+            ->whereIn('status', ['planned', 'in_progress'])
+            ->orderBy('batch_number', 'desc')
+            ->first();
+    }
+
+    /**
+     * Get completed batches for this work order
+     */
+    public function getCompletedBatches()
+    {
+        return $this->batches()
+            ->where('status', 'completed')
+            ->orderBy('batch_number', 'asc')
+            ->get();
+    }
+
+    /**
+     * Calculate total quantity produced across all completed batches
+     */
+    public function getTotalBatchQuantity(): int
+    {
+        if (!$this->usesBatchSystem()) {
+            return $this->ok_qtys ?? 0; // Use traditional quantity for individual WOs
+        }
+
+        return $this->batches()
+            ->where('status', 'completed')
+            ->sum('actual_quantity');
+    }
+
+    /**
+     * Get batch progress summary
+     */
+    public function getBatchProgress(): array
+    {
+        if (!$this->usesBatchSystem()) {
+            return [
+                'total_planned' => $this->qty,
+                'total_completed' => $this->ok_qtys ?? 0,
+                'percentage' => $this->qty > 0 ? (($this->ok_qtys ?? 0) / $this->qty) * 100 : 0,
+                'batches_completed' => 0,
+                'batches_total' => 0,
+            ];
+        }
+
+        $totalPlanned = $this->batches()->sum('planned_quantity');
+        $totalCompleted = $this->batches()->where('status', 'completed')->sum('actual_quantity');
+        $batchesCompleted = $this->batches()->where('status', 'completed')->count();
+        $batchesTotal = $this->batches()->count();
+
+        return [
+            'total_planned' => $totalPlanned,
+            'total_completed' => $totalCompleted,
+            'percentage' => $totalPlanned > 0 ? ($totalCompleted / $totalPlanned) * 100 : 0,
+            'batches_completed' => $batchesCompleted,
+            'batches_total' => $batchesTotal,
+        ];
+    }
+
+    /**
+     * Check if this work order can start a new batch
+     */
+    public function canStartNewBatch(): bool
+    {
+        if (!$this->usesBatchSystem()) {
+            return false; // Individual work orders don't use batches
+        }
+
+        // Check if there's already a batch in progress
+        $currentBatch = $this->getCurrentBatch();
+        if ($currentBatch && $currentBatch->status === 'in_progress') {
+            return false; // Can't start new batch while one is in progress
+        }
+
+        // For dependency-based work orders, check if dependencies are satisfied
+        if ($this->work_order_group_id && !$this->is_dependency_root) {
+            return $this->areDependenciesSatisfied();
+        }
+
+        return true;
+    }
+
+    /**
+     * Override quantity methods to use batch system for grouped work orders
+     */
+    public function getOkQuantity(): int
+    {
+        if ($this->usesBatchSystem()) {
+            return $this->getTotalBatchQuantity();
+        }
+
+        return $this->ok_qtys ?? 0;
+    }
+
+    /**
+     * Check if work order is completed (all planned quantity produced)
+     */
+    public function isCompleted(): bool
+    {
+        if ($this->usesBatchSystem()) {
+            $progress = $this->getBatchProgress();
+            return $progress['total_completed'] >= $this->qty;
+        }
+
+        return ($this->ok_qtys ?? 0) >= $this->qty;
     }
 }

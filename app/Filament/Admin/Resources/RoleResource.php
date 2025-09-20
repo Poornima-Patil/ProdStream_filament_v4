@@ -30,6 +30,8 @@ class RoleResource extends Resource
 {
     protected static ?string $model = Role::class;
 
+    protected static string | \UnitEnum | null $navigationGroup = 'Admin Operations';
+
     protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-rectangle-stack';
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';

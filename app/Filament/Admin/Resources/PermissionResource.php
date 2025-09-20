@@ -29,6 +29,8 @@ class PermissionResource extends Resource
 {
     protected static ?string $model = Permission::class;
 
+    protected static string | \UnitEnum | null $navigationGroup = 'Admin Operations';
+
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
     protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-rectangle-stack';

@@ -74,6 +74,37 @@ class WorkOrderGroupResource extends Resource
                             ->label('Planned Completion Date'),
                     ])->columns(2),
 
+                Section::make('Batch Configuration')
+                    ->description('Configure batch sizes for work orders in this group')
+                    ->components([
+                        \Filament\Forms\Components\Placeholder::make('batch_config_info')
+                            ->label('Batch Configuration')
+                            ->content(function ($record) {
+                                if (!$record || !$record->workOrders()->exists()) {
+                                    return 'Save the group first and add work orders to configure batch sizes.';
+                                }
+
+                                $configurations = $record->getBatchConfigurations();
+                                if (empty($configurations)) {
+                                    return 'No batch configurations set. Use the edit form to configure batch sizes for each work order.';
+                                }
+
+                                $content = '<div class="space-y-2">';
+                                foreach ($configurations as $config) {
+                                    $content .= '<div class="flex items-center justify-between p-2 bg-gray-50 rounded">';
+                                    $content .= '<span class="font-medium">' . $config['work_order_name'] . '</span>';
+                                    $content .= '<span class="text-sm text-gray-600">' . $config['batch_size'] . ' units per batch</span>';
+                                    $content .= '</div>';
+                                }
+                                $content .= '</div>';
+
+                                return new \Illuminate\Support\HtmlString($content);
+                            })
+                            ->columnSpanFull(),
+                    ])
+                    ->visible(fn ($operation) => $operation === 'view')
+                    ->collapsible(),
+
                 Section::make('System Fields')
                     ->components([
                         TextInput::make('unique_id')
