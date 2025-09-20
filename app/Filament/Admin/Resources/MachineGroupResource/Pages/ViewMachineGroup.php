@@ -292,7 +292,7 @@ class ViewMachineGroup extends ViewRecord
                                 return '<div class="text-gray-500 dark:text-gray-400">No Machine Group Found</div>';
                             }
 
-                            $name = $record->name ?? '';
+                            $name = $record->group_name ?? '';
                             $description = $record->description ?? '';
                             $machineCount = $record->machines ? $record->machines->count() : 0;
 

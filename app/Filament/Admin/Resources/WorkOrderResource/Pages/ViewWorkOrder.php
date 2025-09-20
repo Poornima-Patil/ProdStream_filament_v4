@@ -182,7 +182,112 @@ class ViewWorkOrder extends ViewRecord
                                 </div>
                             ');
                         })->html(),
-            
+
+                    // Work Order Aging Section - exclude Hold status
+                    TextEntry::make('work_order_aging_section')
+                        ->label('')
+                        ->columnSpan([
+                            'sm' => 'full',
+                            'md' => 1,
+                        ])
+                        ->visible(fn($record) => strtolower($record->status ?? '') !== 'hold')
+                        ->getStateUsing(function ($record) {
+                            $currentDate = Carbon::now();
+                            $status = $record->status;
+
+                            // Determine the reference date based on work order status
+                            if ($status === 'Assigned') {
+                                // For Assigned status, use work_orders table created_at
+                                $referenceDate = Carbon::parse($record->created_at);
+                                $referenceText = 'Work Order Created';
+                            } elseif ($status === 'Start') {
+                                // For Start status, get the FIRST Start status log for this work order
+                                $statusLog = $record->workOrderLogs()
+                                    ->where('status', 'Start')
+                                    ->orderBy('created_at', 'asc')
+                                    ->first();
+
+                                if ($statusLog) {
+                                    $referenceDate = Carbon::parse($statusLog->created_at);
+                                    $referenceText = 'First Start Status';
+                                } else {
+                                    // Fallback to work order created_at if no Start log found
+                                    $referenceDate = Carbon::parse($record->created_at);
+                                    $referenceText = 'Work Order Created (No Start Log)';
+                                }
+                            } elseif (in_array($status, ['Completed', 'Closed'])) {
+                                // For Completed/Closed status, get the created_at from work_order_logs
+                                $statusLog = $record->workOrderLogs()
+                                    ->where('status', $status)
+                                    ->orderBy('created_at', 'desc')
+                                    ->first();
+
+                                if ($statusLog) {
+                                    $referenceDate = Carbon::parse($statusLog->created_at);
+                                    $referenceText = 'Status Changed to ' . $status;
+                                } else {
+                                    // Fallback to work order created_at if no status log found
+                                    $referenceDate = Carbon::parse($record->created_at);
+                                    $referenceText = 'Work Order Created (No ' . $status . ' Log)';
+                                }
+                            } else {
+                                // For any other statuses, get the created_at from work_order_logs when status changed
+                                $statusLog = $record->workOrderLogs()
+                                    ->where('status', $status)
+                                    ->orderBy('created_at', 'asc')
+                                    ->first();
+
+                                if ($statusLog) {
+                                    $referenceDate = Carbon::parse($statusLog->created_at);
+                                    $referenceText = 'Status Changed to ' . $status;
+                                } else {
+                                    // Fallback to work order created_at if no status log found
+                                    $referenceDate = Carbon::parse($record->created_at);
+                                    $referenceText = 'Work Order Created (No Status Log)';
+                                }
+                            }
+
+                            // Calculate aging and round to nearest hour
+                            $agingInHours = round($referenceDate->diffInHours($currentDate));
+                            $agingInDays = round($referenceDate->diffInDays($currentDate));
+
+                            // Format aging display
+                            $agingText = '';
+                            if ($agingInDays > 0) {
+                                $remainingHours = round($agingInHours % 24);
+                                $agingText = $agingInDays . ' day' . ($agingInDays > 1 ? 's' : '') .
+                                           ($remainingHours > 0 ? ', ' . $remainingHours . ' hr' . ($remainingHours > 1 ? 's' : '') : '');
+                            } else {
+                                $agingText = $agingInHours . ' hr' . ($agingInHours > 1 ? 's' : '');
+                            }
+
+                            // Remove aging status classification - no status display needed
+
+                            return new HtmlString('
+                                <div class="mt-4">
+                                    <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
+                                        <h4 class="font-bold text-black dark:text-white">Work Order Aging</h4>
+                                    </div>
+                                    <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
+                                        <div class="space-y-3">
+                                            <div class="flex justify-between items-center">
+                                                <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Age:</span>
+                                                <span class="text-sm font-bold text-gray-700 dark:text-gray-300">' . $agingText . '</span>
+                                            </div>
+
+                                            <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                                                <div class="text-xs text-gray-500 dark:text-gray-500">
+                                                    <div>Reference: ' . $referenceText . '</div>
+                                                    <div>Since: ' . $referenceDate->format('Y-m-d H:i:s') . '</div>
+                                                    <div>Current Status: ' . ucfirst($status) . '</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ');
+                        })->html(),
+
                 ]),
 
             // Section 2: General Information
