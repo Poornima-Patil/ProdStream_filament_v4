@@ -14,9 +14,9 @@ class OperatorsTableSeeder extends Seeder
     {
         $factoryId = env('SEED_FACTORY_ID', 1);
 
-        // Get all users with 'operator' role in this factory
+        // Get all users with 'Operator' role in this factory
         $operatorUsers = User::whereHas('roles', function ($query) {
-                $query->where('name', 'operator');
+                $query->where('name', 'Operator');
             })
             ->where('factory_id', $factoryId)
             ->get();

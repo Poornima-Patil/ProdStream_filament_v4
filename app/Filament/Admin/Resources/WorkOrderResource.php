@@ -962,37 +962,143 @@ Select::make('operator_id')
                     ->collapsible()
                     ->collapsed(),
 
+                // Batch Status Information Section
+                Section::make('Batch Status & Key Information')
+                    ->schema([
+                        Placeholder::make('batch_status')
+                            ->label('Current Batch Status')
+                            ->content(function ($record) {
+                                if (!$record || !$record->usesBatchSystem()) {
+                                    return new HtmlString('<div class="text-gray-500 italic">Individual work order - no batch system</div>');
+                                }
+
+                                $currentBatch = $record->getCurrentBatch();
+                                $batchProgress = $record->getBatchProgress();
+
+                                if (!$currentBatch) {
+                                    return new HtmlString(
+                                        '<div class="bg-blue-50 border border-blue-200 rounded-lg p-3">'.
+                                            '<div class="flex items-center text-blue-800 font-semibold mb-2">'.
+                                            '<span class="text-lg mr-2">📋</span>'.
+                                            '<span>NO ACTIVE BATCH</span>'.
+                                            '</div>'.
+                                            '<div class="text-blue-700 text-sm">'.
+                                            'Start a new batch to begin production<br>'.
+                                            '<span class="text-gray-600">Total Progress:</span> '.$batchProgress['batches_completed'].'/'.$batchProgress['batches_total'].' batches completed<br>'.
+                                            '<span class="text-gray-600">Total Production:</span> '.$batchProgress['total_completed'].' units completed'.
+                                            '</div>'.
+                                            '</div>'
+                                    );
+                                }
+
+                                $statusIcon = match ($currentBatch->status) {
+                                    'planned' => '📋',
+                                    'in_progress' => '⚡',
+                                    'completed' => '✅',
+                                    default => '❓'
+                                };
+
+                                $statusColor = match ($currentBatch->status) {
+                                    'planned' => 'blue',
+                                    'in_progress' => 'green',
+                                    'completed' => 'gray',
+                                    default => 'gray'
+                                };
+
+                                return new HtmlString(
+                                    '<div class="bg-'.$statusColor.'-50 border border-'.$statusColor.'-200 rounded-lg p-3">'.
+                                        '<div class="flex items-center text-'.$statusColor.'-800 font-semibold mb-2">'.
+                                        '<span class="text-lg mr-2">'.$statusIcon.'</span>'.
+                                        '<span>BATCH #'.htmlspecialchars($currentBatch->batch_number).' - '.strtoupper($currentBatch->status).'</span>'.
+                                        '</div>'.
+                                        '<div class="text-'.$statusColor.'-700 text-sm">'.
+                                        '<span class="text-gray-600">Planned Quantity:</span> '.htmlspecialchars($currentBatch->planned_quantity).' units<br>'.
+                                        '<span class="text-gray-600">Actual Quantity:</span> '.htmlspecialchars($currentBatch->actual_quantity ?? 0).' units<br>'.
+                                        '<span class="text-gray-600">Progress:</span> '.round($currentBatch->getProgressPercentage(), 1).'%<br>'.
+                                        '<span class="text-gray-600">Started:</span> '.($currentBatch->started_at ? htmlspecialchars($currentBatch->started_at->format('M d, H:i')) : 'Not started').
+                                        '</div>'.
+                                        '</div>'
+                                );
+                            })
+                            ->live(),
+
+                        Placeholder::make('key_status')
+                            ->label('Key Requirements & Availability')
+                            ->content(function ($record) {
+                                if (!$record || !$record->usesBatchSystem()) {
+                                    return new HtmlString('<div class="text-gray-500 italic">No key system for individual work orders</div>');
+                                }
+
+                                if ($record->is_dependency_root) {
+                                    $generatedKeys = $record->batchKeys()->count();
+                                    $availableKeys = $record->getAvailableKeys()->count();
+
+                                    return new HtmlString(
+                                        '<div class="bg-green-50 border border-green-200 rounded-lg p-3">'.
+                                            '<div class="flex items-center text-green-800 font-semibold mb-2">'.
+                                            '<span class="text-lg mr-2">🔑</span>'.
+                                            '<span>ROOT WORK ORDER - GENERATES KEYS</span>'.
+                                            '</div>'.
+                                            '<div class="text-green-700 text-sm">'.
+                                            '<span class="text-gray-600">Total Keys Generated:</span> '.htmlspecialchars($generatedKeys).'<br>'.
+                                            '<span class="text-gray-600">Available Keys:</span> '.htmlspecialchars($availableKeys).'<br>'.
+                                            '<span class="text-gray-600 italic">Complete batches to generate keys for dependent work orders</span>'.
+                                            '</div>'.
+                                            '</div>'
+                                    );
+                                }
+
+                                $keysInfo = $record->getRequiredKeysInfo();
+                                if (empty($keysInfo)) {
+                                    return new HtmlString('<div class="text-gray-500 italic">No key requirements found</div>');
+                                }
+
+                                $content = '<div class="space-y-2">';
+                                foreach ($keysInfo as $keyInfo) {
+                                    $statusIcon = $keyInfo['is_satisfied'] ? '✅' : '❌';
+                                    $statusColor = $keyInfo['is_satisfied'] ? 'green' : 'red';
+                                    $statusText = $keyInfo['is_satisfied'] ? 'AVAILABLE' : 'NOT AVAILABLE';
+
+                                    $content .= '<div class="bg-'.$statusColor.'-50 border border-'.$statusColor.'-200 rounded-lg p-3">'.
+                                        '<div class="flex items-center text-'.$statusColor.'-800 font-semibold mb-2">'.
+                                        '<span class="text-lg mr-2">'.$statusIcon.'</span>'.
+                                        '<span>KEYS FROM '.htmlspecialchars($keyInfo['predecessor_name']).' - '.$statusText.'</span>'.
+                                        '</div>'.
+                                        '<div class="text-'.$statusColor.'-700 text-sm">'.
+                                        '<span class="text-gray-600">Dependency Type:</span> '.htmlspecialchars($keyInfo['dependency_type']).'<br>'.
+                                        '<span class="text-gray-600">Available Keys:</span> '.htmlspecialchars($keyInfo['available_keys_count']).'<br>';
+
+                                    if ($keyInfo['is_satisfied'] && count($keyInfo['available_keys']) > 0) {
+                                        $content .= '<span class="text-gray-600">Latest Key:</span> '.htmlspecialchars($keyInfo['available_keys'][0]['key_code']).' ('.htmlspecialchars($keyInfo['available_keys'][0]['quantity_produced']).' units)<br>';
+                                    }
+
+                                    if (!$keyInfo['is_satisfied']) {
+                                        $content .= '<span class="text-gray-600 italic">Wait for '.htmlspecialchars($keyInfo['predecessor_name']).' to complete batches</span><br>';
+                                    }
+
+                                    $content .= '</div></div>';
+                                }
+                                $content .= '</div>';
+
+                                return new HtmlString($content);
+                            })
+                            ->live(),
+                    ])
+                    ->visible(function ($record) {
+                        return $record && $record->usesBatchSystem() && Auth::user()->hasRole('Operator');
+                    })
+                    ->collapsible()
+                    ->collapsed(false), // Keep this section expanded by default for operators
+
                 Select::make('status')
                     ->label('Status')
                     ->required()
                     ->options(function ($record) {
                         if ($record) {
                             $user = Auth::user(); // Get the logged-in user
-                            $currentStatus = $record->status; // Get the current status
 
                             if ($user->hasRole('Operator')) {
-                                if ($currentStatus === 'Assigned') {
-                                    // For grouped work orders (both root and non-root), force batch system usage
-                                    if ($record->work_order_group_id !== null && $record->usesBatchSystem()) {
-                                        // Don't show 'Start' option - must use batch actions
-                                        return [];
-                                    }
-                                    return ['Start' => 'Start']; // Only "Start" should be visible for individual WOs
-                                } elseif ($currentStatus === 'Start') {
-                                    return [
-                                        'Hold' => 'Hold',
-                                        'Completed' => 'Completed',
-                                    ]; // Show "Hold" and "Completed"
-                                } elseif ($currentStatus === 'Hold') {
-                                    // For grouped work orders (both root and non-root), force batch system usage
-                                    if ($record->work_order_group_id !== null && $record->usesBatchSystem()) {
-                                        // Don't show 'Start' option - must use batch actions
-                                        return [];
-                                    }
-                                    return ['Start' => 'Start']; // Only "Start" should be visible for individual WOs
-                                } elseif ($currentStatus === 'Completed') {
-                                    return ['Completed' => 'Completed']; // Only "Completed" should be visible
-                                }
+                                return $record->getOperatorStatusOptions();
                             }
                         }
 
@@ -1002,16 +1108,57 @@ Select::make('operator_id')
                             'Start' => 'Start',
                             'Hold' => 'Hold',
                             'Completed' => 'Completed',
+                            'Waiting' => 'Waiting',
                         ];
+                    })
+                    ->disabled(function ($record) {
+                        if (!$record || !$record->usesBatchSystem()) {
+                            return false; // Individual work orders - allow status changes
+                        }
+
+                        // For grouped work orders, check if there's an active batch
+                        $currentBatch = $record->getCurrentBatch();
+
+                        // Disable if no active batch in progress (applies to ALL users including Super Admin)
+                        return !$currentBatch || $currentBatch->status !== 'in_progress';
                     })
                     ->rules([
                         function (callable $get) {
                             return function (string $attribute, $value, Closure $fail) use ($get) {
-                                // Only validate when trying to transition to 'Start' status
+                                $recordId = $get('id');
+                                if (!$recordId) {
+                                    return; // Skip validation for new records
+                                }
+
+                                $record = WorkOrder::find($recordId);
+                                if (!$record) {
+                                    return;
+                                }
+
+                                // For grouped work orders, validate batch requirements
+                                if ($record->usesBatchSystem()) {
+                                    $canChange = $record->canOperatorChangeStatus($value);
+
+                                    if (!$canChange['can_change']) {
+                                        $message = $canChange['reason'];
+
+                                        if ($canChange['required_action'] === 'start_new_batch') {
+                                            $message .= '. Use the "Start New Batch" action button instead.';
+                                        } elseif ($canChange['required_action'] === 'wait_for_keys') {
+                                            $keysInfo = $record->getRequiredKeysInfo();
+                                            $missingFromWOs = array_filter($keysInfo, fn($info) => !$info['is_satisfied']);
+                                            $woNames = array_map(fn($info) => $info['predecessor_name'], $missingFromWOs);
+                                            $message .= '. Wait for these work orders to complete batches: ' . implode(', ', $woNames);
+                                        }
+
+                                        $fail($message);
+                                    }
+                                }
+
+                                // Traditional machine validation for Start status
                                 if ($value === 'Start') {
                                     $machineId = $get('machine_id');
                                     $factoryId = Auth::user()->factory_id ?? null;
-                                    $recordId = $get('id');
 
                                     if ($machineId && $factoryId) {
                                         $startValidation = WorkOrder::validateStartStatusTransition($machineId, $factoryId, $recordId);
@@ -1024,6 +1171,22 @@ Select::make('operator_id')
                             };
                         },
                     ])
+                    ->helperText(function ($record) {
+                        if (!$record || !$record->usesBatchSystem()) {
+                            return null;
+                        }
+
+                        $currentBatch = $record->getCurrentBatch();
+                        if (!$currentBatch) {
+                            return '🎯 Grouped work order: Use "Start New Batch" action to begin production';
+                        }
+
+                        if ($currentBatch->status === 'in_progress') {
+                            return '⚡ Batch #' . $currentBatch->batch_number . ' is in progress - you can change status';
+                        }
+
+                        return '📋 No active batch - start a new batch to enable status changes';
+                    })
                     ->reactive()
                     ->afterStateUpdated(function ($set, $get, $livewire, $record, $state) {
                         $status = $get('status');
@@ -1354,17 +1517,85 @@ Select::make('operator_id')
 
                     // Batch Management Actions
                     Action::make('start_batch')
-                        ->label('Start New Batch')
+                        ->label(function (WorkOrder $record) {
+                            if (!$record->usesBatchSystem()) {
+                                return 'Start New Batch';
+                            }
+
+                            if (!$record->is_dependency_root && !$record->hasRequiredKeys()) {
+                                return 'Start New Batch (Keys Required)';
+                            }
+
+                            $currentBatch = $record->getCurrentBatch();
+                            if ($currentBatch && $currentBatch->status === 'in_progress') {
+                                return 'Batch In Progress';
+                            }
+
+                            return 'Start New Batch';
+                        })
                         ->icon('heroicon-o-play')
-                        ->color('success')
+                        ->color(function (WorkOrder $record) {
+                            if (!$record->usesBatchSystem()) {
+                                return 'success';
+                            }
+
+                            if (!$record->is_dependency_root && !$record->hasRequiredKeys()) {
+                                return 'warning'; // Yellow for waiting on keys
+                            }
+
+                            $currentBatch = $record->getCurrentBatch();
+                            if ($currentBatch && $currentBatch->status === 'in_progress') {
+                                return 'gray'; // Gray for already in progress
+                            }
+
+                            return 'success';
+                        })
+                        ->disabled(function (WorkOrder $record) {
+                            // Disable if batch is already in progress
+                            $currentBatch = $record->getCurrentBatch();
+                            if ($currentBatch && $currentBatch->status === 'in_progress') {
+                                return true;
+                            }
+
+                            // Disable if keys are required but not available
+                            if (!$record->is_dependency_root && !$record->hasRequiredKeys()) {
+                                return true;
+                            }
+
+                            return false;
+                        })
                         ->visible(function (WorkOrder $record) {
-                            // Only show for WorkOrders that use batch system and can start new batch
-                            if (!$record->usesBatchSystem() || !$record->canStartNewBatch()) {
+                            // Only show for WorkOrders that use batch system
+                            if (!$record->usesBatchSystem()) {
                                 return false;
                             }
 
-                            // Only show for WorkOrders that are in a group
+                            // Show for all grouped work orders
                             return $record->work_order_group_id !== null;
+                        })
+                        ->tooltip(function (WorkOrder $record) {
+                            if (!$record->usesBatchSystem()) {
+                                return null;
+                            }
+
+                            $currentBatch = $record->getCurrentBatch();
+                            if ($currentBatch && $currentBatch->status === 'in_progress') {
+                                return 'Complete current batch #' . $currentBatch->batch_number . ' before starting a new one';
+                            }
+
+                            if (!$record->is_dependency_root && !$record->hasRequiredKeys()) {
+                                $keysInfo = $record->getRequiredKeysInfo();
+                                $missingFromWOs = array_filter($keysInfo, fn($info) => !$info['is_satisfied']);
+                                $woNames = array_map(fn($info) => $info['predecessor_name'], $missingFromWOs);
+
+                                return 'Waiting for keys from: ' . implode(', ', $woNames);
+                            }
+
+                            if ($record->is_dependency_root) {
+                                return 'Root work order - no keys required. Start a batch to begin production.';
+                            }
+
+                            return 'All requirements satisfied - ready to start new batch';
                         })
                         ->form(function (WorkOrder $record) {
                             $formFields = [

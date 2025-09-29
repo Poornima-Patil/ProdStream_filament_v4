@@ -1034,10 +1034,178 @@ class WorkOrder extends Model
 
         // For dependency-based work orders, check if dependencies are satisfied
         if ($this->work_order_group_id && !$this->is_dependency_root) {
-            return $this->areDependenciesSatisfied();
+            return $this->areDependenciesSatisfied() && $this->hasRequiredKeys();
         }
 
         return true;
+    }
+
+    /**
+     * Check if this work order has all required keys available
+     */
+    public function hasRequiredKeys(): bool
+    {
+        if (!$this->usesBatchSystem() || $this->is_dependency_root) {
+            return true; // Root work orders don't need keys
+        }
+
+        $dependencies = WorkOrderDependency::where('successor_work_order_id', $this->id)
+            ->where('work_order_group_id', $this->work_order_group_id)
+            ->with('predecessor')
+            ->get();
+
+        foreach ($dependencies as $dependency) {
+            $availableKeys = $dependency->predecessor->getAvailableKeys();
+            if ($availableKeys->isEmpty()) {
+                return false; // No keys available from this predecessor
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if operator can change work order status
+     */
+    public function canOperatorChangeStatus(string $newStatus): array
+    {
+        $result = [
+            'can_change' => true,
+            'reason' => null,
+            'required_action' => null
+        ];
+
+        // For grouped work orders, enforce batch system
+        if ($this->usesBatchSystem()) {
+            $currentBatch = $this->getCurrentBatch();
+
+            if ($newStatus === 'Start') {
+                if (!$currentBatch || $currentBatch->status !== 'in_progress') {
+                    $result['can_change'] = false;
+                    $result['reason'] = 'No active batch in progress';
+                    $result['required_action'] = 'start_new_batch';
+                }
+            } elseif (in_array($newStatus, ['Hold', 'Completed'])) {
+                if (!$currentBatch || $currentBatch->status !== 'in_progress') {
+                    $result['can_change'] = false;
+                    $result['reason'] = 'No active batch to hold/complete';
+                    $result['required_action'] = 'start_new_batch';
+                }
+            }
+
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get status options available to operator
+     */
+    public function getOperatorStatusOptions(): array
+    {
+        $currentStatus = $this->status;
+        $options = [];
+
+        if ($this->usesBatchSystem()) {
+            $currentBatch = $this->getCurrentBatch();
+            $hasActiveBatch = $currentBatch && $currentBatch->status === 'in_progress';
+
+            switch ($currentStatus) {
+                case 'Assigned':
+                    if ($hasActiveBatch) {
+                        $options['Start'] = 'Start';
+                    } else {
+                        $options['Assigned'] = 'Assigned (Start new batch first)';
+                    }
+                    break;
+
+                case 'Start':
+                    if ($hasActiveBatch) {
+                        $options['Hold'] = 'Hold';
+                        $options['Completed'] = 'Completed';
+                    } else {
+                        $options['Start'] = 'Start (No active batch)';
+                    }
+                    break;
+
+                case 'Hold':
+                    if ($hasActiveBatch) {
+                        $options['Start'] = 'Start';
+                    } else {
+                        $options['Hold'] = 'Hold (Start new batch first)';
+                    }
+                    break;
+
+                case 'Completed':
+                    $options['Completed'] = 'Completed';
+                    break;
+
+                case 'Waiting':
+                    if ($this->areDependenciesSatisfied() && $this->hasRequiredKeys()) {
+                        $options['Assigned'] = 'Assigned';
+                    } else {
+                        $options['Waiting'] = 'Waiting (Dependencies not satisfied)';
+                    }
+                    break;
+            }
+        } else {
+            // Individual work orders - traditional status options
+            switch ($currentStatus) {
+                case 'Assigned':
+                    $options['Start'] = 'Start';
+                    break;
+                case 'Start':
+                    $options['Hold'] = 'Hold';
+                    $options['Completed'] = 'Completed';
+                    break;
+                case 'Hold':
+                    $options['Start'] = 'Start';
+                    break;
+                case 'Completed':
+                    $options['Completed'] = 'Completed';
+                    break;
+            }
+        }
+
+        return $options;
+    }
+
+    /**
+     * Get required keys information for this work order
+     */
+    public function getRequiredKeysInfo(): array
+    {
+        if (!$this->usesBatchSystem() || $this->is_dependency_root) {
+            return [];
+        }
+
+        $dependencies = WorkOrderDependency::where('successor_work_order_id', $this->id)
+            ->where('work_order_group_id', $this->work_order_group_id)
+            ->with('predecessor')
+            ->get();
+
+        $keysInfo = [];
+        foreach ($dependencies as $dependency) {
+            $availableKeys = $dependency->predecessor->getAvailableKeys();
+            $keysInfo[] = [
+                'predecessor_id' => $dependency->predecessor_work_order_id,
+                'predecessor_name' => $dependency->predecessor->unique_id,
+                'dependency_type' => $dependency->dependency_type,
+                'required_quantity' => $dependency->required_quantity,
+                'available_keys_count' => $availableKeys->count(),
+                'available_keys' => $availableKeys->map(function ($key) {
+                    return [
+                        'id' => $key->id,
+                        'key_code' => $key->key_code,
+                        'quantity_produced' => $key->quantity_produced,
+                        'generated_at' => $key->generated_at,
+                    ];
+                }),
+                'is_satisfied' => $availableKeys->isNotEmpty()
+            ];
+        }
+
+        return $keysInfo;
     }
 
     /**
@@ -1073,6 +1241,18 @@ class WorkOrder extends Model
     {
         // Only process if this is a root work order in a group
         if (!$this->work_order_group_id || !$this->is_dependency_root) {
+            return;
+        }
+
+        // Check if there are any manually created batches for this work order
+        // If manual batches exist, disable auto-generation to prevent conflicts
+        $hasManualBatches = $this->batches()->exists();
+        if ($hasManualBatches) {
+            \Illuminate\Support\Facades\Log::info('Skipping auto-generation - manual batches exist for work order', [
+                'work_order_id' => $this->id,
+                'work_order_unique_id' => $this->unique_id,
+                'manual_batches_count' => $this->batches()->count()
+            ]);
             return;
         }
 
