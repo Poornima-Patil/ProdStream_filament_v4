@@ -177,48 +177,6 @@ class WorkOrder extends Model
         return $log;
     }
 
-    protected static function booted()
-    {
-        static::created(function ($workOrder) {
-            // Create log with the work order's actual status, not hardcoded 'Assigned'
-            $workOrder->createWorkOrderLog($workOrder->status);
-        });
-
-        static::updated(function ($workOrder) {
-            // Only create a log if the status changed AND quantities are up-to-date
-            if ($workOrder->isDirty('status')) {
-                // Only create a log if this is not a "Start" status, or if there are quantities
-                if (
-                    $workOrder->status !== 'Start' ||
-                    $workOrder->quantities()->exists()
-                ) {
-                    $workOrder->createWorkOrderLog($workOrder->status);
-                }
-            }
-
-            // Process dependency chain updates when quantities change
-            if ($workOrder->isDirty(['ok_qtys', 'scrapped_qtys'])) {
-                // Auto-generate batch keys for root work orders in groups
-                if ($workOrder->work_order_group_id &&
-                    $workOrder->is_dependency_root &&
-                    $workOrder->isDirty('ok_qtys')) {
-                    $workOrder->autoGenerateBatchKeysFromQuantities();
-                }
-                $workOrder->processDependencyChainUpdates();
-            }
-        });
-
-        // Remove or comment out this block to avoid duplicate log creation:
-        /*
-        static::created(function ($workOrder) {
-            $latestLog = $workOrder->workOrderLogs()->latest()->first();
-            if (! $latestLog) {
-                $latestLog = $workOrder->createWorkOrderLog($workOrder->status);
-            }
-            $workOrder->quantities()->update(['work_order_log_id' => $latestLog->id]);
-        });
-        */
-    }
 
     // Define the relationship with InfoMessage
     public function infoMessages()
@@ -256,6 +214,206 @@ class WorkOrder extends Model
         // }
 
         return $query;
+    }
+
+    /**
+     * Performance-optimized query scopes for multi-tenancy
+     */
+
+    /**
+     * Scope to factory with optimized index usage
+     */
+    public function scopeForFactory($query, int $factoryId)
+    {
+        return $query->where('factory_id', $factoryId);
+    }
+
+    /**
+     * Scope for active work orders (uses optimized index)
+     */
+    public function scopeActive($query, int $factoryId)
+    {
+        return $query->where('factory_id', $factoryId)
+            ->whereIn('status', ['Assigned', 'Start', 'Hold']);
+    }
+
+    /**
+     * Scope for completed work orders with time range (uses KPI index)
+     */
+    public function scopeCompletedInRange($query, int $factoryId, Carbon $startDate, Carbon $endDate)
+    {
+        return $query->where('factory_id', $factoryId)
+            ->where('status', 'Completed')
+            ->whereBetween('updated_at', [$startDate, $endDate]);
+    }
+
+    /**
+     * Scope for today's work orders (uses created_status index)
+     */
+    public function scopeToday($query, int $factoryId)
+    {
+        return $query->where('factory_id', $factoryId)
+            ->whereDate('created_at', today());
+    }
+
+    /**
+     * Scope for machine schedule optimization
+     */
+    public function scopeForMachineSchedule($query, int $factoryId, int $machineId, ?string $status = null)
+    {
+        $query = $query->where('factory_id', $factoryId)
+            ->where('machine_id', $machineId);
+
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        return $query->whereNotNull('start_time')
+            ->orderBy('start_time');
+    }
+
+    /**
+     * Scope for operator workload (uses operator_status index)
+     */
+    public function scopeForOperator($query, int $factoryId, int $operatorId, ?string $status = null)
+    {
+        $query = $query->where('factory_id', $factoryId)
+            ->where('operator_id', $operatorId);
+
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Scope for dependency chain analysis
+     */
+    public function scopeInGroup($query, int $groupId, ?bool $isRoot = null)
+    {
+        $query = $query->where('work_order_group_id', $groupId);
+
+        if ($isRoot !== null) {
+            $query->where('is_dependency_root', $isRoot);
+        }
+
+        return $query->orderBy('sequence_order');
+    }
+
+    /**
+     * Scope for KPI calculations with optimized joins
+     */
+    public function scopeForKpiCalculation($query, int $factoryId, Carbon $startDate, Carbon $endDate)
+    {
+        return $query->where('work_orders.factory_id', $factoryId)
+            ->whereBetween('work_orders.created_at', [$startDate, $endDate])
+            ->select([
+                'work_orders.id',
+                'work_orders.status',
+                'work_orders.qty',
+                'work_orders.ok_qtys',
+                'work_orders.scrapped_qtys',
+                'work_orders.start_time',
+                'work_orders.end_time',
+                'work_orders.created_at',
+                'work_orders.updated_at'
+            ]);
+    }
+
+    /**
+     * Scope with optimized eager loading for dashboards
+     */
+    public function scopeWithDashboardData($query)
+    {
+        return $query->with([
+            'machine:id,name,assetId',
+            'operator.user:id,first_name,last_name',
+            'workOrderGroup:id,name,status'
+        ]);
+    }
+
+    /**
+     * Scope for batch system queries
+     */
+    public function scopeWithBatchData($query)
+    {
+        return $query->with([
+            'batches' => function ($q) {
+                $q->select('id', 'work_order_id', 'batch_number', 'status', 'planned_quantity', 'actual_quantity')
+                  ->orderBy('batch_number');
+            },
+            'batchKeys' => function ($q) {
+                $q->where('is_consumed', false)
+                  ->select('id', 'work_order_id', 'key_code', 'quantity_produced', 'is_consumed');
+            }
+        ]);
+    }
+
+
+    /**
+     * Cursor pagination for large datasets
+     */
+    public function scopeWithCursorPagination($query, ?string $cursor = null, int $perPage = 50)
+    {
+        if ($cursor) {
+            $query->where('id', '>', $cursor);
+        }
+
+        return $query->orderBy('id')->limit($perPage);
+    }
+
+    /**
+     * Get paginated work orders using cursor pagination for performance
+     */
+    public static function getCursorPaginated(int $factoryId, ?string $cursor = null, int $perPage = 50): array
+    {
+        $workOrders = self::forFactory($factoryId)
+            ->withCursorPagination($cursor, $perPage)
+            ->withDashboardData()
+            ->get();
+
+        $nextCursor = $workOrders->count() === $perPage ? $workOrders->last()->id : null;
+
+        return [
+            'data' => $workOrders,
+            'next_cursor' => $nextCursor,
+            'has_more' => $nextCursor !== null,
+        ];
+    }
+
+    protected static function booted()
+    {
+        parent::booted();
+
+        static::created(function ($workOrder) {
+            // Create log with the work order's actual status, not hardcoded 'Assigned'
+            $workOrder->createWorkOrderLog($workOrder->status);
+        });
+
+        static::updated(function ($workOrder) {
+            // Only create a log if the status changed AND quantities are up-to-date
+            if ($workOrder->isDirty('status')) {
+                // Only create a log if this is not a "Start" status, or if there are quantities
+                if (
+                    $workOrder->status !== 'Start' ||
+                    $workOrder->quantities()->exists()
+                ) {
+                    $workOrder->createWorkOrderLog($workOrder->status);
+                }
+            }
+
+            // Process dependency chain updates when quantities change
+            if ($workOrder->isDirty(['ok_qtys', 'scrapped_qtys'])) {
+                // Auto-generate batch keys for root work orders in groups
+                if ($workOrder->work_order_group_id &&
+                    $workOrder->is_dependency_root &&
+                    $workOrder->isDirty('ok_qtys')) {
+                    $workOrder->autoGenerateBatchKeysFromQuantities();
+                }
+                $workOrder->processDependencyChainUpdates();
+            }
+        });
     }
 
     /**
