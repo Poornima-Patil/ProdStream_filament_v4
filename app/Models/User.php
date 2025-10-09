@@ -91,6 +91,11 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
 
     public function canAccessPanel(Panel $panel): bool
     {
+        // Check if user has any factories assigned when panel requires tenancy
+        if ($panel->hasTenancy()) {
+            return $this->factories()->exists();
+        }
+
         return true;
     }
 

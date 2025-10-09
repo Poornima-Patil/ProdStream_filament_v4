@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use Filament\Pages\Dashboard;
 use Filament\Widgets\AccountWidget;
 use App\Filament\Admin\Pages\WorkOrderWidgets;
+use App\Filament\Admin\Pages\Auth\Login;
 use App\Filament\Pages\Tenancy\EditFactoryProfile;
 use App\Filament\Pages\Tenancy\RegisterFactory;
 use App\Models\Factory;
@@ -31,7 +32,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->login()
+            ->login(Login::class)
             ->profile()
             ->darkMode() // Enable dark mode toggle
             ->globalSearch(false) // Disable global search that can cause blue patches
