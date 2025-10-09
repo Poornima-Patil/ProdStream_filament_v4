@@ -64,7 +64,11 @@ class UsersTableSeeder extends Seeder
                     ]);
 
                     $this->command->info("User created with ID: {$manager->id}. Assigning role...");
-                    $manager->assignRole('manager');
+                    $manager->assignRole('Manager');
+
+                    // Add manager to factory relationship (pivot table)
+                    $manager->factories()->syncWithoutDetaching([$factoryId]);
+
                     $this->command->info("Created Manager {$managerEmpId} successfully");
                 } catch (\Exception $e) {
                     $this->command->error("Failed to create manager {$managerEmpId}: " . $e->getMessage());
@@ -96,15 +100,15 @@ class UsersTableSeeder extends Seeder
             $this->command->info("Users with MGR emp_id pattern: " . $mgrUsers->count());
 
             // Check users with manager role
-            $managers = User::where('factory_id', $factoryId)->role('manager')->get();
-            $this->command->info("Users with 'manager' role: " . $managers->count());
+            $managers = User::where('factory_id', $factoryId)->role('Manager')->get();
+            $this->command->info("Users with 'Manager' role: " . $managers->count());
 
             if ($managers->isEmpty()) {
                 $this->command->error("No managers found to assign new operators.");
                 $this->command->info("Checking if 'manager' role exists...");
 
                 try {
-                    $managerRole = \Spatie\Permission\Models\Role::where('name', 'manager')->first();
+                    $managerRole = \Spatie\Permission\Models\Role::where('name', 'Manager')->first();
                     if ($managerRole) {
                         $this->command->info("Manager role exists (ID: {$managerRole->id})");
                     } else {
@@ -136,7 +140,11 @@ class UsersTableSeeder extends Seeder
                         'department_id'   => $manager->department_id,
                         'email_verified_at' => now(),
                     ]);
-                    $operator->assignRole('operator');
+                    $operator->assignRole('Operator');
+
+                    // Add operator to factory relationship (pivot table)
+                    $operator->factories()->syncWithoutDetaching([$factoryId]);
+
                     $this->command->info("Added Operator {$empId} under Manager {$manager->emp_id}");
                 }
 
