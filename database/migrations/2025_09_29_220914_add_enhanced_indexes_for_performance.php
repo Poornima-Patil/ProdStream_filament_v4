@@ -12,7 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         // Work Orders performance indexes
-        Schema::table('work_orders', function (Blueprint $table) {
+        Schema::table('work_orders
+
+
+        ', function (Blueprint $table) {
             // KPI and reporting optimized indexes
             $table->index(['factory_id', 'status', 'created_at', 'updated_at'], 'work_orders_kpi_reporting_idx');
             $table->index(['factory_id', 'machine_id', 'status', 'start_time'], 'work_orders_machine_schedule_idx');

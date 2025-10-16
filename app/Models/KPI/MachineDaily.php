@@ -16,6 +16,7 @@ class MachineDaily extends Model
         'machine_id',
         'summary_date',
         'utilization_rate',
+        'active_utilization_rate',
         'uptime_hours',
         'downtime_hours',
         'planned_downtime_hours',
@@ -40,6 +41,7 @@ class MachineDaily extends Model
         return [
             'summary_date' => 'date',
             'utilization_rate' => 'decimal:2',
+            'active_utilization_rate' => 'decimal:2',
             'uptime_hours' => 'decimal:2',
             'downtime_hours' => 'decimal:2',
             'planned_downtime_hours' => 'decimal:2',

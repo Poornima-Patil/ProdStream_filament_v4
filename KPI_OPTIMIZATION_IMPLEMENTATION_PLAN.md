@@ -1,9 +1,10 @@
 # KPI Performance Optimization - Complete Implementation Plan
 
 **Project:** ProdStream Manufacturing KPI System
-**Version:** 1.0
-**Date:** October 8, 2025
+**Version:** 3.0
+**Date:** October 13, 2025
 **Target:** 90+ KPIs with Multi-Tenancy Support
+**Architecture:** Flexible (Shared DB → Database-Per-Factory as you scale)
 
 ---
 
@@ -12,18 +13,20 @@
 1. [Executive Summary](#executive-summary)
 2. [Current State Analysis](#current-state-analysis)
 3. [Proposed Architecture](#proposed-architecture)
-4. [Database Schema Design](#database-schema-design)
-5. [Redis Cache Configuration](#redis-cache-configuration)
-6. [Implementation Roadmap](#implementation-roadmap)
-7. [Code Structure & Design Patterns](#code-structure--design-patterns)
-8. [Performance Optimization Techniques](#performance-optimization-techniques)
-9. [Multi-Tenancy Strategy](#multi-tenancy-strategy)
-10. [Report Generation System](#report-generation-system)
-11. [Testing Strategy](#testing-strategy)
-12. [Deployment Plan](#deployment-plan)
-13. [Monitoring & Maintenance](#monitoring--maintenance)
-14. [Performance Projections](#performance-projections)
-15. [Risk Mitigation](#risk-mitigation)
+4. [Scalability Strategy: Shared DB to Database-Per-Factory](#scalability-strategy)
+5. [Database Schema Design](#database-schema-design)
+6. [Redis Cache Configuration](#redis-cache-configuration)
+7. [Implementation Roadmap](#implementation-roadmap)
+8. [Code Structure & Design Patterns](#code-structure--design-patterns)
+9. [Performance Optimization Techniques](#performance-optimization-techniques)
+10. [Multi-Tenancy Strategy](#multi-tenancy-strategy)
+11. [Report Generation System](#report-generation-system)
+12. [Testing Strategy](#testing-strategy)
+13. [Deployment Plan](#deployment-plan)
+14. [Monitoring & Maintenance](#monitoring--maintenance)
+15. [Performance Projections](#performance-projections)
+16. [Risk Mitigation](#risk-mitigation)
+17. [Migration Path: Shared to Separate Databases](#migration-path)
 
 ---
 
@@ -44,7 +47,7 @@ Transform the current KPI system to support **90+ manufacturing KPIs** across mu
 ### Approach
 
 **3-Tier Hybrid Architecture:**
-- **Tier 1:** 18 real-time KPIs (1-5 min cache)
+- **Tier 1:** 18 real-time KPIs (manual refresh on-demand, with cache bypass)
 - **Tier 2:** 28 shift-based KPIs (calculated after each shift)
 - **Tier 3:** 44 report-based KPIs (scheduled generation)
 
@@ -64,6 +67,7 @@ Transform the current KPI system to support **90+ manufacturing KPIs** across mu
 | Cache hit rate | 60-70% | 95-99% | **40% improvement** |
 | Concurrent users | 10-15 | 100+ | **10x capacity** |
 | Server load | Very High | Low | **80% reduction** |
+| Storage growth (5yr) | 32M rows | 2.4M rows | **92% reduction** |
 
 ---
 
@@ -198,7 +202,273 @@ Raw Data (work_orders, machines, operators)
 
 ---
 
+## Scalability Strategy: Shared DB to Database-Per-Factory
+
+### Overview
+
+**Start Simple, Scale Smart:** Begin with a shared database for initial factories (1-10), then migrate to database-per-factory as you grow. This approach balances simplicity and scalability.
+
+### Phase 1: Shared Database (1-10 Factories)
+
+**Architecture:**
+```
+┌─────────────────────────────────────────┐
+│     Single Shared Database              │
+│     (prodstream_main)                   │
+├─────────────────────────────────────────┤
+│  Tables with factory_id column:         │
+│  • work_orders (factory_id)             │
+│  • machines (factory_id)                │
+│  • operators (factory_id)               │
+│  • kpi_machine_daily (factory_id)       │
+│  • kpi_operator_daily (factory_id)      │
+│  • kpi_part_daily (factory_id)          │
+└─────────────────────────────────────────┘
+```
+
+**Benefits:**
+- ✅ Simple initial setup
+- ✅ Easy cross-factory queries
+- ✅ Single migration/backup process
+- ✅ Lower hosting costs
+
+**Trade-offs:**
+- ⚠️ All factories share DB resources
+- ⚠️ Must always filter by factory_id
+- ⚠️ Risk of data leaks if scope forgotten
+
+**When to use:**
+- Starting out with 1-10 factories
+- All factories roughly same size
+- Limited DevOps resources
+- Need cross-factory reporting
+
+### Phase 2: Database-Per-Factory (10+ Factories)
+
+**Architecture:**
+```
+┌──────────────────────────────────────────┐
+│   Central Database (prodstream_central)  │
+│   • users, factories, roles, permissions │
+└──────────────────────────────────────────┘
+                ↓
+    ┌───────────┼───────────┐
+    ↓           ↓           ↓
+┌─────────┐ ┌─────────┐ ┌─────────┐
+│Factory 1│ │Factory 2│ │Factory 3│
+│Database │ │Database │ │Database │
+├─────────┤ ├─────────┤ ├─────────┤
+│• work_  │ │• work_  │ │• work_  │
+│  orders │ │  orders │ │  orders │
+│• KPIs   │ │• KPIs   │ │• KPIs   │
+│(NO      │ │(NO      │ │(NO      │
+│factory  │ │factory  │ │factory  │
+│_id!)    │ │_id!)    │ │_id!)    │
+└─────────┘ └─────────┘ └─────────┘
+
+Same code, different DB connection per request
+```
+
+**Benefits:**
+- ✅ Complete data isolation
+- ✅ No factory_id columns needed
+- ✅ Smaller, faster queries
+- ✅ Can scale individual factories
+- ✅ Better security
+
+**Trade-offs:**
+- ⚠️ More complex migrations
+- ⚠️ No easy cross-factory queries
+- ⚠️ More backup/maintenance
+
+**When to migrate:**
+- Growing beyond 10 factories
+- Individual factories have different sizes
+- Need maximum data isolation
+- Performance issues in shared DB
+
+### Decision Matrix
+
+| Factor | Shared DB (Phase 1) | Database-Per-Factory (Phase 2) |
+|--------|---------------------|----------------------------------|
+| **Factories** | 1-10 | 10+ |
+| **Setup Complexity** | Low ✅ | Medium |
+| **Query Performance** | Good (with indexes) | Excellent ✅ |
+| **Data Isolation** | Requires careful scoping | Perfect ✅ |
+| **Maintenance** | Simple ✅ | Complex |
+| **Scalability** | Limited | Excellent ✅ |
+| **Cost** | Lower ✅ | Higher |
+
+### Code Abstraction Strategy
+
+**Write code that works for BOTH architectures:**
+
+```php
+// app/Support/DatabaseManager.php
+class DatabaseManager
+{
+    /**
+     * Check if using database-per-factory
+     */
+    public static function usingTenantDatabases(): bool
+    {
+        return config('app.tenant_mode') === 'database_per_factory';
+    }
+
+    /**
+     * Set connection for current factory
+     */
+    public static function setFactoryConnection(?int $factoryId = null): void
+    {
+        $factoryId = $factoryId ?? Auth::user()?->factory_id;
+
+        if (!$factoryId) {
+            return;
+        }
+
+        if (static::usingTenantDatabases()) {
+            // Phase 2: Switch to factory-specific database
+            Config::set('database.default', "factory_{$factoryId}");
+            DB::purge("factory_{$factoryId}");
+            DB::reconnect("factory_{$factoryId}");
+        } else {
+            // Phase 1: Use shared database (global scope handles factory_id)
+            // No action needed
+        }
+    }
+}
+
+// Models work in BOTH modes
+class WorkOrder extends Model
+{
+    // Phase 1: Global scope filters by factory_id
+    protected static function booted()
+    {
+        if (!DatabaseManager::usingTenantDatabases()) {
+            static::addGlobalScope('factory', function (Builder $builder) {
+                if (Auth::check() && Auth::user()->factory_id) {
+                    $builder->where('factory_id', Auth::user()->factory_id);
+                }
+            });
+        }
+        // Phase 2: No scope needed, DB connection IS the boundary
+    }
+}
+```
+
+### Migration Timeline
+
+**When you hit 10-15 factories:**
+
+```
+Week 1: Preparation
+├─ Audit code for factory_id dependencies
+├─ Create migration scripts
+└─ Test on staging environment
+
+Week 2: Pilot Migration (1-2 factories)
+├─ Migrate 2 smaller factories
+├─ Test thoroughly
+└─ Monitor performance
+
+Week 3-4: Gradual Migration
+├─ Migrate 3-5 factories per week
+├─ Keep shared DB as fallback
+└─ Monitor stability
+
+Week 5: Complete Migration
+├─ Migrate remaining factories
+├─ Update config: tenant_mode = 'database_per_factory'
+└─ Decommission shared operational DB
+```
+
+### Storage Growth Comparison
+
+**Shared DB (10 Factories):**
+```
+After 1 year:
+- kpi_machine_daily: 180,000 rows (10 factories × 90 days × 200 machines)
+- kpi_operator_daily: 360,000 rows
+- Total: ~1.3M rows in shared DB
+```
+
+**Database-Per-Factory (10 Factories):**
+```
+After 1 year:
+- Factory 1 DB: ~65,000 rows
+- Factory 2 DB: ~65,000 rows
+- ...
+- Factory 10 DB: ~65,000 rows
+- Total: Still 650K rows, but isolated! ✅
+```
+
+### Configuration Management
+
+**.env configuration:**
+```env
+# Phase 1: Shared Database
+TENANT_MODE=shared_database
+DB_CONNECTION=mysql
+DB_DATABASE=prodstream_main
+
+# Phase 2: Database-Per-Factory
+TENANT_MODE=database_per_factory
+DB_CONNECTION=mysql
+# Central DB for users/factories
+DB_CENTRAL_DATABASE=prodstream_central
+# Factory DBs created dynamically: prodstream_factory_1, etc.
+```
+
+**config/app.php:**
+```php
+return [
+    // ...
+    'tenant_mode' => env('TENANT_MODE', 'shared_database'),
+    // Options: 'shared_database' or 'database_per_factory'
+];
+```
+
+### Recommended Thresholds for Migration
+
+| Trigger | Threshold | Action |
+|---------|-----------|--------|
+| **Factory Count** | 10-15 factories | Start planning migration |
+| **DB Size** | >10 GB | Consider splitting |
+| **Query Time** | >500ms average | Investigate migration |
+| **Concurrent Users** | >100 per factory | Definitely migrate |
+| **Different Factory Sizes** | 10x variance | Migrate large ones first |
+
+---
+
 ## Database Schema Design
+
+### Storage Strategy: Hybrid Granularity with Data Lifecycle
+
+**Key Principle:** Store granular data for recent periods only, then automatically aggregate to coarser granularities for long-term storage.
+
+#### Storage Tiers
+
+| Tier | Granularity | Retention Period | Purpose | Growth Rate |
+|------|-------------|------------------|---------|-------------|
+| **Daily** | Machine/Operator/Part per day | Last 90 days | Detailed analysis | 354 rows/day/factory |
+| **Weekly** | Machine/Operator/Part per week | 91 days - 1 year | Medium-term trends | 52 rows/year/machine |
+| **Monthly** | Machine/Operator/Part per month | 1+ years | Long-term archive | 12 rows/year/machine |
+
+#### Storage Growth Projection (1 Factory, 5 Years)
+
+| Approach | Year 1 | Year 3 | Year 5 | Total (50 factories) |
+|----------|--------|--------|--------|----------------------|
+| **All Daily Forever** | 129K | 387K | 645K | **32M rows** ❌ |
+| **Hybrid Lifecycle** | 35K | 42K | 48K | **2.4M rows** ✅ |
+| **Savings** | 73% | 89% | 92% | **92% reduction** |
+
+#### Why This Approach Works
+
+1. **Recent data is detailed** - Last 90 days at daily granularity for precise analysis
+2. **Historical data is summarized** - Older data aggregated to weekly/monthly
+3. **Automatic archival** - Scheduled jobs handle lifecycle management
+4. **Flexible queries** - Users can request any time period with user-selectable date ranges
+5. **Manageable storage** - Linear growth instead of exponential
 
 ### Summary Tables Architecture
 
@@ -498,9 +768,192 @@ CREATE TABLE kpi_part_daily (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
-#### 6. kpi_monthly_aggregates
+#### 6. kpi_machine_weekly
 
-**Purpose:** Historical monthly data (immutable after month ends)
+**Purpose:** Weekly aggregated machine metrics (for data 91 days - 1 year old)
+
+```sql
+CREATE TABLE kpi_machine_weekly (
+    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    factory_id BIGINT UNSIGNED NOT NULL,
+    machine_id BIGINT UNSIGNED NOT NULL,
+    week_start_date DATE NOT NULL,  -- Monday of the week
+    week_end_date DATE NOT NULL,    -- Sunday of the week
+
+    -- Aggregated Metrics (averaged or summed from daily)
+    total_units_produced INT UNSIGNED DEFAULT 0,
+    avg_utilization_rate DECIMAL(5,2) DEFAULT 0,
+    avg_quality_rate DECIMAL(5,2) DEFAULT 0,
+    total_uptime_hours DECIMAL(10,2) DEFAULT 0,
+    total_downtime_hours DECIMAL(10,2) DEFAULT 0,
+    days_in_week TINYINT UNSIGNED DEFAULT 7,
+
+    -- Metadata
+    calculated_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    -- Indexes
+    UNIQUE KEY unique_factory_machine_week (factory_id, machine_id, week_start_date),
+    INDEX idx_factory_week (factory_id, week_start_date),
+    INDEX idx_week_start (week_start_date),
+
+    -- Foreign Keys
+    FOREIGN KEY (factory_id) REFERENCES factories(id) ON DELETE CASCADE,
+    FOREIGN KEY (machine_id) REFERENCES machines(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+#### 7. kpi_operator_weekly
+
+**Purpose:** Weekly aggregated operator metrics
+
+```sql
+CREATE TABLE kpi_operator_weekly (
+    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    factory_id BIGINT UNSIGNED NOT NULL,
+    operator_id BIGINT UNSIGNED NOT NULL,
+    week_start_date DATE NOT NULL,
+    week_end_date DATE NOT NULL,
+
+    total_work_orders_completed INT UNSIGNED DEFAULT 0,
+    total_units_produced INT UNSIGNED DEFAULT 0,
+    avg_efficiency_rate DECIMAL(5,2) DEFAULT 0,
+    avg_quality_rate DECIMAL(5,2) DEFAULT 0,
+    total_hours_worked DECIMAL(10,2) DEFAULT 0,
+    days_worked TINYINT UNSIGNED DEFAULT 0,
+
+    calculated_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE KEY unique_factory_operator_week (factory_id, operator_id, week_start_date),
+    INDEX idx_factory_week (factory_id, week_start_date),
+
+    FOREIGN KEY (factory_id) REFERENCES factories(id) ON DELETE CASCADE,
+    FOREIGN KEY (operator_id) REFERENCES operators(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+#### 8. kpi_part_weekly
+
+**Purpose:** Weekly aggregated part metrics
+
+```sql
+CREATE TABLE kpi_part_weekly (
+    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    factory_id BIGINT UNSIGNED NOT NULL,
+    part_number_id BIGINT UNSIGNED NOT NULL,
+    week_start_date DATE NOT NULL,
+    week_end_date DATE NOT NULL,
+
+    total_units_produced INT UNSIGNED DEFAULT 0,
+    avg_quality_rate DECIMAL(5,2) DEFAULT 0,
+    avg_scrap_rate DECIMAL(5,2) DEFAULT 0,
+    total_work_orders INT UNSIGNED DEFAULT 0,
+    days_in_week TINYINT UNSIGNED DEFAULT 0,
+
+    calculated_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE KEY unique_factory_part_week (factory_id, part_number_id, week_start_date),
+    INDEX idx_factory_week (factory_id, week_start_date),
+
+    FOREIGN KEY (factory_id) REFERENCES factories(id) ON DELETE CASCADE,
+    FOREIGN KEY (part_number_id) REFERENCES part_numbers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+#### 9. kpi_machine_monthly
+
+**Purpose:** Monthly aggregated machine metrics (for data 1+ year old)
+
+```sql
+CREATE TABLE kpi_machine_monthly (
+    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    factory_id BIGINT UNSIGNED NOT NULL,
+    machine_id BIGINT UNSIGNED NOT NULL,
+    year INT UNSIGNED NOT NULL,
+    month TINYINT UNSIGNED NOT NULL,
+
+    total_units_produced INT UNSIGNED DEFAULT 0,
+    avg_utilization_rate DECIMAL(5,2) DEFAULT 0,
+    avg_quality_rate DECIMAL(5,2) DEFAULT 0,
+    total_uptime_hours DECIMAL(10,2) DEFAULT 0,
+    total_downtime_hours DECIMAL(10,2) DEFAULT 0,
+    days_in_month TINYINT UNSIGNED DEFAULT 0,
+
+    calculated_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE KEY unique_factory_machine_month (factory_id, machine_id, year, month),
+    INDEX idx_factory_month (factory_id, year, month),
+
+    FOREIGN KEY (factory_id) REFERENCES factories(id) ON DELETE CASCADE,
+    FOREIGN KEY (machine_id) REFERENCES machines(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+#### 10. kpi_operator_monthly
+
+**Purpose:** Monthly aggregated operator metrics
+
+```sql
+CREATE TABLE kpi_operator_monthly (
+    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    factory_id BIGINT UNSIGNED NOT NULL,
+    operator_id BIGINT UNSIGNED NOT NULL,
+    year INT UNSIGNED NOT NULL,
+    month TINYINT UNSIGNED NOT NULL,
+
+    total_work_orders_completed INT UNSIGNED DEFAULT 0,
+    total_units_produced INT UNSIGNED DEFAULT 0,
+    avg_efficiency_rate DECIMAL(5,2) DEFAULT 0,
+    avg_quality_rate DECIMAL(5,2) DEFAULT 0,
+    total_hours_worked DECIMAL(10,2) DEFAULT 0,
+    days_worked TINYINT UNSIGNED DEFAULT 0,
+
+    calculated_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE KEY unique_factory_operator_month (factory_id, operator_id, year, month),
+    INDEX idx_factory_month (factory_id, year, month),
+
+    FOREIGN KEY (factory_id) REFERENCES factories(id) ON DELETE CASCADE,
+    FOREIGN KEY (operator_id) REFERENCES operators(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+#### 11. kpi_part_monthly
+
+**Purpose:** Monthly aggregated part metrics
+
+```sql
+CREATE TABLE kpi_part_monthly (
+    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    factory_id BIGINT UNSIGNED NOT NULL,
+    part_number_id BIGINT UNSIGNED NOT NULL,
+    year INT UNSIGNED NOT NULL,
+    month TINYINT UNSIGNED NOT NULL,
+
+    total_units_produced INT UNSIGNED DEFAULT 0,
+    avg_quality_rate DECIMAL(5,2) DEFAULT 0,
+    avg_scrap_rate DECIMAL(5,2) DEFAULT 0,
+    total_work_orders INT UNSIGNED DEFAULT 0,
+    days_in_month TINYINT UNSIGNED DEFAULT 0,
+
+    calculated_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE KEY unique_factory_part_month (factory_id, part_number_id, year, month),
+    INDEX idx_factory_month (factory_id, year, month),
+
+    FOREIGN KEY (factory_id) REFERENCES factories(id) ON DELETE CASCADE,
+    FOREIGN KEY (part_number_id) REFERENCES part_numbers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+#### 12. kpi_monthly_aggregates
+
+**Purpose:** Factory-level monthly aggregates (immutable after month ends)
 
 ```sql
 CREATE TABLE kpi_monthly_aggregates (
@@ -606,13 +1059,209 @@ CREATE TABLE kpi_reports (
 Create migrations in order:
 
 ```bash
+# Daily granularity tables (recent data - 90 days)
 php artisan make:migration create_kpi_shift_summaries_table
 php artisan make:migration create_kpi_daily_summaries_table
 php artisan make:migration create_kpi_machine_daily_table
 php artisan make:migration create_kpi_operator_daily_table
 php artisan make:migration create_kpi_part_daily_table
+
+# Weekly granularity tables (91 days - 1 year)
+php artisan make:migration create_kpi_machine_weekly_table
+php artisan make:migration create_kpi_operator_weekly_table
+php artisan make:migration create_kpi_part_weekly_table
+
+# Monthly granularity tables (1+ years)
+php artisan make:migration create_kpi_machine_monthly_table
+php artisan make:migration create_kpi_operator_monthly_table
+php artisan make:migration create_kpi_part_monthly_table
 php artisan make:migration create_kpi_monthly_aggregates_table
+
+# Reports metadata
 php artisan make:migration create_kpi_reports_table
+```
+
+### Data Lifecycle Management Strategy
+
+#### Automatic Data Archival Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   DATA LIFECYCLE                             │
+└─────────────────────────────────────────────────────────────┘
+
+Day 1-90: DAILY tables (detailed granularity)
+  ├─ kpi_machine_daily
+  ├─ kpi_operator_daily
+  └─ kpi_part_daily
+           ↓
+    [Monthly Job: Aggregate to Weekly]
+           ↓
+Day 91-365: WEEKLY tables (medium granularity)
+  ├─ kpi_machine_weekly
+  ├─ kpi_operator_weekly
+  └─ kpi_part_weekly
+           ↓
+    [Monthly Job: Aggregate to Monthly]
+           ↓
+Year 1+: MONTHLY tables (coarse granularity)
+  ├─ kpi_machine_monthly
+  ├─ kpi_operator_monthly
+  └─ kpi_part_monthly
+```
+
+#### Archive Job Implementation
+
+Create `app/Console/Commands/KPI/ArchiveKPIDataCommand.php`:
+
+```php
+<?php
+
+namespace App\Console\Commands\KPI;
+
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
+
+class ArchiveKPIDataCommand extends Command
+{
+    protected $signature = 'kpi:archive {--factory=}';
+    protected $description = 'Archive old KPI data to weekly/monthly tables';
+
+    public function handle(): int
+    {
+        $this->info('Starting KPI data archival...');
+
+        // Step 1: Aggregate daily → weekly (data older than 90 days)
+        $this->aggregateDailyToWeekly();
+
+        // Step 2: Aggregate weekly → monthly (data older than 1 year)
+        $this->aggregateWeeklyToMonthly();
+
+        // Step 3: Delete archived daily data
+        $this->deleteDailyOlderThan90Days();
+
+        // Step 4: Delete archived weekly data
+        $this->deleteWeeklyOlderThan1Year();
+
+        $this->info('✅ KPI data archival completed successfully');
+
+        return Command::SUCCESS;
+    }
+
+    protected function aggregateDailyToWeekly(): void
+    {
+        $cutoffDate = Carbon::now()->subDays(90);
+
+        $this->info("Aggregating daily data to weekly (older than {$cutoffDate->toDateString()})...");
+
+        // Aggregate machine daily → weekly
+        DB::statement("
+            INSERT INTO kpi_machine_weekly (
+                factory_id, machine_id, week_start_date, week_end_date,
+                total_units_produced, avg_utilization_rate, avg_quality_rate,
+                total_uptime_hours, total_downtime_hours, days_in_week, calculated_at
+            )
+            SELECT
+                factory_id,
+                machine_id,
+                DATE(DATE_SUB(summary_date, INTERVAL WEEKDAY(summary_date) DAY)) as week_start,
+                DATE(DATE_ADD(DATE_SUB(summary_date, INTERVAL WEEKDAY(summary_date) DAY), INTERVAL 6 DAY)) as week_end,
+                SUM(units_produced) as total_units,
+                AVG(utilization_rate) as avg_utilization,
+                AVG(quality_rate) as avg_quality,
+                SUM(uptime_hours) as total_uptime,
+                SUM(downtime_hours) as total_downtime,
+                COUNT(*) as days_in_week,
+                NOW()
+            FROM kpi_machine_daily
+            WHERE summary_date < ?
+            GROUP BY factory_id, machine_id, week_start
+            ON DUPLICATE KEY UPDATE
+                total_units_produced = VALUES(total_units_produced),
+                avg_utilization_rate = VALUES(avg_utilization_rate),
+                avg_quality_rate = VALUES(avg_quality_rate),
+                total_uptime_hours = VALUES(total_uptime_hours),
+                total_downtime_hours = VALUES(total_downtime_hours),
+                days_in_week = VALUES(days_in_week),
+                calculated_at = VALUES(calculated_at)
+        ", [$cutoffDate]);
+
+        // Repeat for operator and part tables...
+        $this->info('✓ Daily → Weekly aggregation complete');
+    }
+
+    protected function aggregateWeeklyToMonthly(): void
+    {
+        $cutoffDate = Carbon::now()->subYear();
+
+        $this->info("Aggregating weekly data to monthly (older than {$cutoffDate->toDateString()})...");
+
+        DB::statement("
+            INSERT INTO kpi_machine_monthly (
+                factory_id, machine_id, year, month,
+                total_units_produced, avg_utilization_rate, avg_quality_rate,
+                total_uptime_hours, total_downtime_hours, days_in_month, calculated_at
+            )
+            SELECT
+                factory_id,
+                machine_id,
+                YEAR(week_start_date) as year,
+                MONTH(week_start_date) as month,
+                SUM(total_units_produced) as total_units,
+                AVG(avg_utilization_rate) as avg_utilization,
+                AVG(avg_quality_rate) as avg_quality,
+                SUM(total_uptime_hours) as total_uptime,
+                SUM(total_downtime_hours) as total_downtime,
+                SUM(days_in_week) as days_in_month,
+                NOW()
+            FROM kpi_machine_weekly
+            WHERE week_start_date < ?
+            GROUP BY factory_id, machine_id, year, month
+            ON DUPLICATE KEY UPDATE
+                total_units_produced = VALUES(total_units_produced),
+                avg_utilization_rate = VALUES(avg_utilization_rate),
+                avg_quality_rate = VALUES(avg_quality_rate),
+                total_uptime_hours = VALUES(total_uptime_hours),
+                total_downtime_hours = VALUES(total_downtime_hours),
+                days_in_month = VALUES(days_in_month),
+                calculated_at = VALUES(calculated_at)
+        ", [$cutoffDate]);
+
+        $this->info('✓ Weekly → Monthly aggregation complete');
+    }
+
+    protected function deleteDailyOlderThan90Days(): void
+    {
+        $cutoffDate = Carbon::now()->subDays(90);
+
+        $deleted = DB::table('kpi_machine_daily')
+            ->where('summary_date', '<', $cutoffDate)
+            ->delete();
+
+        $this->info("✓ Deleted {$deleted} old machine daily records");
+
+        // Repeat for operator and part tables...
+    }
+
+    protected function deleteWeeklyOlderThan1Year(): void
+    {
+        $cutoffDate = Carbon::now()->subYear();
+
+        $deleted = DB::table('kpi_machine_weekly')
+            ->where('week_start_date', '<', $cutoffDate)
+            ->delete();
+
+        $this->info("✓ Deleted {$deleted} old machine weekly records");
+    }
+}
+```
+
+Schedule the archival job monthly:
+
+```php
+// In routes/console.php or bootstrap/app.php
+Schedule::command('kpi:archive')->monthlyOn(1, '01:00');
 ```
 
 ---
@@ -1227,7 +1876,7 @@ abstract class BaseKPIService
     }
 
     /**
-     * Format date range for queries
+     * Format date range for queries with smart table selection
      */
     protected function getDateRange(string $period): array
     {
@@ -1246,11 +1895,51 @@ abstract class BaseKPIService
             case '90d':
                 $startDate = Carbon::now()->subDays(90);
                 break;
+            case 'mtd': // Month to date
+                $startDate = Carbon::now()->startOfMonth();
+                break;
+            case 'ytd': // Year to date
+                $startDate = Carbon::now()->startOfYear();
+                break;
             default:
-                $startDate = Carbon::now()->subDays(30);
+                $startDate = Carbon::now()->subDays(7);
         }
 
         return [$startDate, $endDate];
+    }
+
+    /**
+     * Get optimal table to query based on date range
+     * Daily table: last 90 days
+     * Weekly table: 91 days - 1 year
+     * Monthly table: 1+ years
+     */
+    protected function getOptimalTable(string $baseTable, Carbon $startDate): string
+    {
+        $daysSinceStart = Carbon::now()->diffInDays($startDate);
+
+        if ($daysSinceStart <= 90) {
+            return $baseTable . '_daily';
+        } elseif ($daysSinceStart <= 365) {
+            return $baseTable . '_weekly';
+        } else {
+            return $baseTable . '_monthly';
+        }
+    }
+
+    /**
+     * Get appropriate cache TTL based on period
+     */
+    protected function getCacheTTL(string $period): int
+    {
+        return match($period) {
+            'today' => 300,        // 5 minutes
+            '7d' => 900,          // 15 minutes
+            '30d' => 1800,        // 30 minutes
+            '90d', 'mtd' => 3600, // 1 hour
+            'ytd' => 7200,        // 2 hours
+            default => 1800
+        };
     }
 
     /**
@@ -1267,6 +1956,594 @@ abstract class BaseKPIService
     abstract public function getKPIs(array $options = []): array;
 }
 ```
+
+### Universal Dual-Mode KPI Architecture
+
+**Design Philosophy:** Every KPI has two complementary views to serve different user needs.
+
+#### The Two Modes
+
+**Dashboard Mode (Real-Time Tier 1)**
+- Shows current snapshot of KPI "right now"
+- No date filtering - current state only
+- 60-second cache (1-minute refresh)
+- Lightweight queries (active/current data)
+- Auto-refresh with polling
+- Use case: "What's happening NOW?"
+
+**Analytics Mode (Historical Tier 2/3)**
+- Shows historical trends and comparisons
+- Rich date range filtering (presets + custom)
+- 5-15 minute cache
+- Queries pre-aggregated summary tables
+- Comparison with previous periods
+- Use case: "How has this changed over time?"
+
+#### User Experience Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  KPI Name                       [Dashboard] [Analytics]      │
+├─────────────────────────────────────────────────────────────┤
+│  Dashboard Mode: Real-time snapshot                          │
+│  - Auto-refreshes every minute                               │
+│  - Shows current status/values                               │
+│  - No date controls                                          │
+│                                                               │
+│  Analytics Mode: Historical analysis                         │
+│  - Date range selector (Today, 7d, 30d, 90d, Custom)        │
+│  - Comparison toggle (vs previous period)                    │
+│  - Charts, trends, breakdown tables                          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Analytics Mode Features
+
+**1. Time Period Selector**
+```php
+// Preset options + custom date range
+$timePeriodOptions = [
+    'today' => 'Today',
+    'yesterday' => 'Yesterday',
+    'this_week' => 'This Week',
+    'last_week' => 'Last Week',
+    'this_month' => 'This Month',
+    'last_month' => 'Last Month',
+    '7d' => 'Last 7 Days',
+    '14d' => 'Last 14 Days',
+    '30d' => 'Last 30 Days (Default)',
+    '60d' => 'Last 60 Days',
+    '90d' => 'Last 90 Days',
+    'this_quarter' => 'This Quarter',
+    'this_year' => 'This Year',
+    'custom' => 'Custom Date Range',
+];
+```
+
+**2. Comparison Options**
+```php
+$comparisonTypes = [
+    'previous_period' => 'Previous Period (same duration)',
+    'previous_week' => 'Previous Week',
+    'previous_month' => 'Previous Month',
+    'previous_quarter' => 'Previous Quarter',
+    'previous_year' => 'Same Period Last Year',
+    'custom' => 'Custom Comparison Period',
+];
+```
+
+**3. Visualization Components**
+- Time-series line/area charts
+- Summary cards with comparison indicators
+- Side-by-side bar charts
+- Heatmap calendar views
+- Per-entity breakdown tables (machine/operator/part)
+
+**4. Data Structure for Analytics**
+```php
+[
+    'primary_period' => [
+        'start_date' => '2025-09-13',
+        'end_date' => '2025-10-13',
+        'label' => 'Last 30 Days',
+        'daily_breakdown' => [
+            '2025-10-13' => ['metric_value' => 85.5, ...],
+            // ... daily data points
+        ],
+        'summary' => [
+            'average' => 82.3,
+            'peak' => 95.2,
+            'lowest' => 68.4,
+            // ... aggregated metrics
+        ],
+    ],
+    'comparison_period' => [
+        // Same structure for comparison period
+    ],
+    'comparison_analysis' => [
+        'metric_name' => [
+            'current' => 82.3,
+            'previous' => 75.8,
+            'difference' => +6.5,
+            'percentage_change' => +8.6,
+            'trend' => 'up',
+            'status' => 'improved',
+        ],
+    ],
+]
+```
+
+#### BaseKPIWidget Abstract Class
+
+All KPI widgets extend this base class for consistent UX:
+
+```php
+<?php
+
+namespace App\Filament\Widgets;
+
+use Filament\Widgets\Widget;
+use Filament\Forms;
+
+abstract class BaseKPIWidget extends Widget
+{
+    // Mode toggle
+    public string $mode = 'dashboard'; // or 'analytics'
+
+    // Analytics filters (state variables)
+    public string $timePeriod = '30d';
+    public ?string $dateFrom = null;
+    public ?string $dateTo = null;
+    public bool $enableComparison = false;
+    public string $comparisonType = 'previous_period';
+
+    // Widget title
+    protected string $title = 'KPI Widget';
+
+    /**
+     * Switch between dashboard and analytics mode
+     */
+    public function setMode(string $mode): void
+    {
+        $this->mode = $mode;
+        $this->dispatch('modeChanged', mode: $mode);
+    }
+
+    /**
+     * Get data based on current mode
+     */
+    public function getKPIData(): array
+    {
+        if ($this->mode === 'dashboard') {
+            return $this->getDashboardData();
+        }
+
+        return $this->getAnalyticsData();
+    }
+
+    /**
+     * Child classes must implement these methods
+     */
+    abstract protected function getDashboardData(): array;
+    abstract protected function getAnalyticsData(): array;
+
+    /**
+     * Shared form schema for analytics filters
+     */
+    protected function getAnalyticsFiltersSchema(): array
+    {
+        return [
+            Forms\Components\Select::make('timePeriod')
+                ->label('Time Period')
+                ->options([
+                    'today' => 'Today',
+                    'yesterday' => 'Yesterday',
+                    'this_week' => 'This Week',
+                    'last_week' => 'Last Week',
+                    'this_month' => 'This Month',
+                    'last_month' => 'Last Month',
+                    '7d' => 'Last 7 Days',
+                    '14d' => 'Last 14 Days',
+                    '30d' => 'Last 30 Days',
+                    '60d' => 'Last 60 Days',
+                    '90d' => 'Last 90 Days',
+                    'this_quarter' => 'This Quarter',
+                    'this_year' => 'This Year',
+                    'custom' => 'Custom Date Range',
+                ])
+                ->default('30d')
+                ->live()
+                ->reactive(),
+
+            Forms\Components\DatePicker::make('dateFrom')
+                ->label('From Date')
+                ->visible(fn($get) => $get('timePeriod') === 'custom')
+                ->maxDate(now()),
+
+            Forms\Components\DatePicker::make('dateTo')
+                ->label('To Date')
+                ->visible(fn($get) => $get('timePeriod') === 'custom')
+                ->maxDate(now()),
+
+            Forms\Components\Toggle::make('enableComparison')
+                ->label('Compare with previous period')
+                ->default(false)
+                ->live()
+                ->reactive(),
+
+            Forms\Components\Select::make('comparisonType')
+                ->label('Comparison Type')
+                ->options([
+                    'previous_period' => 'Previous Period (same duration)',
+                    'previous_week' => 'Previous Week',
+                    'previous_month' => 'Previous Month',
+                    'previous_quarter' => 'Previous Quarter',
+                    'previous_year' => 'Same Period Last Year',
+                ])
+                ->visible(fn($get) => $get('enableComparison'))
+                ->default('previous_period')
+                ->live(),
+        ];
+    }
+
+    /**
+     * Form for analytics filters
+     */
+    protected function getFormSchema(): array
+    {
+        if ($this->mode === 'analytics') {
+            return $this->getAnalyticsFiltersSchema();
+        }
+
+        return [];
+    }
+}
+```
+
+#### Shared Blade Template
+
+```blade
+<!-- resources/views/filament/widgets/base-kpi-widget.blade.php -->
+
+<x-filament-widgets::widget>
+    <x-filament::card>
+        {{-- Header with mode toggle --}}
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold dark:text-white">{{ $title }}</h2>
+
+            <x-filament::tabs>
+                <x-filament::tabs.item
+                    wire:click="setMode('dashboard')"
+                    :active="$mode === 'dashboard'"
+                    icon="heroicon-o-chart-bar">
+                    Dashboard
+                </x-filament::tabs.item>
+
+                <x-filament::tabs.item
+                    wire:click="setMode('analytics')"
+                    :active="$mode === 'analytics'"
+                    icon="heroicon-o-chart-pie">
+                    Analytics
+                </x-filament::tabs.item>
+            </x-filament::tabs>
+        </div>
+
+        {{-- Dashboard Mode Content --}}
+        @if($mode === 'dashboard')
+            <div wire:poll.60s>
+                {{ $dashboardContent }}
+            </div>
+        @endif
+
+        {{-- Analytics Mode Content --}}
+        @if($mode === 'analytics')
+            {{-- Analytics Filters --}}
+            <div class="mb-6">
+                <x-filament::form wire:submit.prevent="$refresh">
+                    {{ $this->form }}
+
+                    <div class="mt-4">
+                        <x-filament::button type="submit" wire:loading.attr="disabled">
+                            <x-filament::loading-indicator class="h-4 w-4 mr-2" wire:loading wire:target="$refresh" />
+                            Apply Filters
+                        </x-filament::button>
+                    </div>
+                </x-filament::form>
+            </div>
+
+            {{-- Analytics Content --}}
+            <div wire:loading.remove wire:target="$refresh">
+                {{ $analyticsContent }}
+            </div>
+
+            {{-- Loading State --}}
+            <div wire:loading wire:target="$refresh" class="flex justify-center py-12">
+                <x-filament::loading-indicator class="h-12 w-12" />
+                <span class="ml-3 text-gray-500 dark:text-gray-400">Loading analytics...</span>
+            </div>
+        @endif
+    </x-filament::card>
+</x-filament-widgets::widget>
+```
+
+#### Service Layer Structure
+
+**RealTimeKPIService** - All dashboard mode methods:
+```php
+<?php
+
+namespace App\Services\KPI;
+
+use App\Models\Factory;
+
+class RealTimeKPIService extends BaseKPIService
+{
+    public function __construct(Factory $factory)
+    {
+        parent::__construct($factory, 'tier_1');
+    }
+
+    // Dashboard mode methods (60s cache)
+    public function getCurrentMachineStatus(): array { }
+    public function getCurrentThroughputRate(): array { }
+    public function getCurrentOperatorPerformance(): array { }
+    public function getCurrentQualityRate(): array { }
+    public function getCurrentOEE(): array { }
+    // ... all 18 Tier 1 KPIs
+}
+```
+
+**OperationalKPIService** - All analytics mode methods:
+```php
+<?php
+
+namespace App\Services\KPI;
+
+use App\Models\Factory;
+use Carbon\Carbon;
+
+class OperationalKPIService extends BaseKPIService
+{
+    public function __construct(Factory $factory)
+    {
+        parent::__construct($factory, 'tier_2');
+    }
+
+    // Analytics mode methods (5-15min cache)
+    public function getMachineStatusAnalytics(array $options): array
+    {
+        $period = $options['time_period'] ?? '30d';
+        $enableComparison = $options['enable_comparison'] ?? false;
+
+        [$startDate, $endDate] = $this->getDateRange(
+            $period,
+            $options['date_from'] ?? null,
+            $options['date_to'] ?? null
+        );
+
+        $cacheKey = "machine_status_analytics_{$period}_" . md5(json_encode($options));
+
+        return $this->getCachedKPI($cacheKey, function() use ($startDate, $endDate, $enableComparison, $options) {
+            // Fetch primary period data
+            $primaryData = $this->fetchMachineStatusHistory($startDate, $endDate);
+
+            $result = [
+                'primary_period' => $primaryData,
+            ];
+
+            // Add comparison if enabled
+            if ($enableComparison) {
+                [$compStart, $compEnd] = $this->getComparisonDateRange(
+                    $startDate,
+                    $endDate,
+                    $options['comparison_type'] ?? 'previous_period'
+                );
+
+                $comparisonData = $this->fetchMachineStatusHistory($compStart, $compEnd);
+                $result['comparison_period'] = $comparisonData;
+                $result['comparison_analysis'] = $this->calculateComparison(
+                    $primaryData['summary'],
+                    $comparisonData['summary']
+                );
+            }
+
+            return $result;
+        }, $this->getCacheTTL($period));
+    }
+
+    public function getProductionThroughputAnalytics(array $options): array { }
+    public function getOperatorPerformanceAnalytics(array $options): array { }
+    public function getQualityRateAnalytics(array $options): array { }
+    // ... all KPIs with historical analysis
+
+    /**
+     * Calculate comparison date range
+     */
+    protected function getComparisonDateRange(Carbon $start, Carbon $end, string $type): array
+    {
+        $duration = $start->diffInDays($end);
+
+        return match($type) {
+            'previous_period' => [
+                $start->copy()->subDays($duration + 1),
+                $start->copy()->subDay(),
+            ],
+            'previous_week' => [
+                $start->copy()->subWeek()->startOfWeek(),
+                $start->copy()->subWeek()->endOfWeek(),
+            ],
+            'previous_month' => [
+                $start->copy()->subMonth()->startOfMonth(),
+                $start->copy()->subMonth()->endOfMonth(),
+            ],
+            'previous_quarter' => [
+                $start->copy()->subQuarter()->startOfQuarter(),
+                $start->copy()->subQuarter()->endOfQuarter(),
+            ],
+            'previous_year' => [
+                $start->copy()->subYear(),
+                $end->copy()->subYear(),
+            ],
+            default => [$start, $end],
+        };
+    }
+}
+```
+
+#### Example Implementation: Machine Status KPI
+
+**MachineStatusWidget.php:**
+```php
+<?php
+
+namespace App\Filament\Widgets;
+
+use App\Services\KPI\RealTimeKPIService;
+use App\Services\KPI\OperationalKPIService;
+use Illuminate\Support\Facades\Auth;
+
+class MachineStatusWidget extends BaseKPIWidget
+{
+    protected static string $view = 'filament.widgets.machine-status-widget';
+    protected string $title = 'Machine Status';
+
+    /**
+     * Dashboard mode: Current machine status snapshot
+     */
+    protected function getDashboardData(): array
+    {
+        $factory = Auth::user()->factory;
+        $service = new RealTimeKPIService($factory);
+
+        return $service->getCurrentMachineStatus();
+
+        // Returns:
+        // [
+        //     'running' => ['count' => 5, 'machines' => [...]],
+        //     'hold' => ['count' => 2, 'machines' => [...]],
+        //     'scheduled' => ['count' => 3, 'machines' => [...]],
+        //     'idle' => ['count' => 1, 'machines' => [...]],
+        //     'total_machines' => 11,
+        //     'updated_at' => '2025-10-13 10:30:00'
+        // ]
+    }
+
+    /**
+     * Analytics mode: Historical machine status trends
+     */
+    protected function getAnalyticsData(): array
+    {
+        $factory = Auth::user()->factory;
+        $service = new OperationalKPIService($factory);
+
+        return $service->getMachineStatusAnalytics([
+            'time_period' => $this->timePeriod,
+            'date_from' => $this->dateFrom,
+            'date_to' => $this->dateTo,
+            'enable_comparison' => $this->enableComparison,
+            'comparison_type' => $this->comparisonType,
+        ]);
+
+        // Returns time-series data with comparisons
+    }
+}
+```
+
+#### KPI Coverage Matrix
+
+| KPI Category | Dashboard View | Analytics View | Data Source |
+|--------------|---------------|----------------|-------------|
+| Machine Status | Current state (Running/Idle/Hold) | Utilization trends, downtime analysis | kpi_machine_daily |
+| Production Throughput | Today's rate (units/hour) | Daily/weekly trends, capacity planning | kpi_daily_summaries |
+| Operator Performance | Current shift efficiency | Performance over time, training impact | kpi_operator_daily |
+| Quality Rate | Today's quality % | Defect trends, root cause patterns | kpi_daily_summaries |
+| OEE | Current OEE score | OEE trends, breakdown by component | kpi_machine_daily |
+| Work Order Status | Current WO distribution | Completion rate trends, bottleneck analysis | kpi_shift_summaries |
+| Scrap Rate | Today's scrap % | Scrap trends by part/machine/operator | kpi_part_daily |
+| Downtime | Active downtime events | Downtime patterns, MTBF/MTTR trends | kpi_machine_daily |
+| Inventory Levels | Current stock levels | Inventory turnover, stockout analysis | Custom queries |
+| Cost Metrics | Today's costs | Cost trends, budget variance analysis | kpi_daily_summaries |
+
+**All 90 KPIs follow this dual-mode pattern for consistency!**
+
+#### Performance Optimization
+
+**Query Strategy:**
+```php
+protected function fetchMachineStatusHistory(Carbon $start, Carbon $end): array
+{
+    $days = $start->diffInDays($end);
+
+    // Smart table selection based on date range
+    if ($days <= 90) {
+        // Use daily table (fast, detailed)
+        $data = KpiMachineDaily::where('factory_id', $this->factory->id)
+            ->whereBetween('summary_date', [$start, $end])
+            ->orderBy('summary_date')
+            ->get();
+    } elseif ($days <= 365) {
+        // Use weekly aggregation (future)
+        $data = KpiMachineWeekly::where('factory_id', $this->factory->id)
+            ->whereBetween('week_start_date', [$start, $end])
+            ->get();
+    } else {
+        // Use monthly aggregation
+        $data = KpiMonthlyAggregates::where('factory_id', $this->factory->id)
+            ->where('year', '>=', $start->year)
+            ->where('year', '<=', $end->year)
+            ->get();
+    }
+
+    return $this->transformToAnalyticsFormat($data);
+}
+```
+
+**Performance Benchmarks:**
+
+| Scenario | Query Time | Cache Hit | Total Load |
+|----------|-----------|-----------|------------|
+| Dashboard mode (real-time) | 50-100ms | 5-10ms | **60-160ms** ✅ |
+| Analytics 7d (no comparison) | 100-200ms | 10ms | **200-300ms** ✅ |
+| Analytics 30d (no comparison) | 150-300ms | 15ms | **250-400ms** ✅ |
+| Analytics 90d (no comparison) | 200-400ms | 20ms | **300-500ms** ✅ |
+| Analytics 30d + comparison | 300-600ms | 30ms | **400-700ms** ✅ |
+| Analytics 90d + comparison | 400-800ms | 40ms | **500-900ms** ⚠️ |
+| Analytics 1yr + comparison | 500-1000ms | 50ms | **600-1.1s** ⚠️ |
+
+**Optimization Techniques:**
+1. Aggressive caching (60s dashboard, 5-15min analytics)
+2. Pre-aggregated summary tables
+3. Smart table selection based on date range
+4. Lazy loading for charts and heavy components
+5. Downsampling for large date ranges (show weekly instead of daily for 90+ days)
+6. Progressive enhancement (load summary first, details later)
+
+#### Benefits of Universal Dual-Mode
+
+✅ **Consistency** - Same UX pattern across all 90 KPIs
+✅ **Code Reusability** - BaseKPIWidget handles mode switching
+✅ **Maintainability** - Update filters once, affects all KPIs
+✅ **Performance** - Shared caching logic, optimized queries
+✅ **Flexibility** - Easy to customize per KPI
+✅ **Scalability** - Minimal performance impact at scale
+
+#### Implementation Rollout
+
+**Phase 1: Foundation**
+- Create BaseKPIWidget
+- Create shared Blade template
+- Update BaseKPIService with analytics helpers
+- Add comparison calculation methods
+
+**Phase 2: First Complete KPI**
+- Implement Machine Status KPI with both modes
+- Test thoroughly
+- Use as template for remaining KPIs
+
+**Phase 3: Incremental Rollout**
+- Implement 3-5 KPIs at a time
+- Follow the established pattern
+- Reuse components and logic
 
 ### Example: OperationalKPIService
 
@@ -1575,6 +2852,209 @@ class AggregateShiftKPIs implements ShouldQueue
     }
 }
 ```
+
+---
+
+## Smart Query Strategy: Time-Bounded with User-Selectable Ranges
+
+### The Problem with Querying All Historical Data
+
+After 1 year of operation, querying all work orders becomes:
+- **Slow:** 5-10+ seconds per KPI
+- **Not actionable:** Too much historical data overwhelms users
+- **Expensive:** Millions of rows scanned unnecessarily
+
+### Solution: Default Time Windows + User Selection
+
+Instead of storing multiple period values for each KPI, we:
+1. **Store atomic daily metrics** (once per entity per day)
+2. **Let users select time ranges** via UI dropdowns
+3. **Cache the calculated results** for each period
+4. **Use optimal table granularity** based on date range
+
+### Default Time Windows by KPI Tier
+
+| Tier | Default Window | Rationale |
+|------|----------------|-----------|
+| **Tier 1 (Real-Time)** | Today or Current Shift | Immediate, actionable data |
+| **Tier 2 (Shift-Based)** | Last 7 days | Weekly performance trends |
+| **Tier 3 (Reports)** | Last 30 days or MTD/YTD | Strategic insights |
+
+### User-Selectable Time Range UI Example
+
+```blade
+{{-- Dashboard Time Range Selector --}}
+<div class="kpi-dashboard">
+    <div class="time-range-selector">
+        <label>Time Period:</label>
+        <select wire:model.live="timeRange">
+            <option value="today">Today</option>
+            <option value="7d" selected>Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+            <option value="90d">Last 90 Days</option>
+            <option value="mtd">Month to Date</option>
+            <option value="ytd">Year to Date</option>
+        </select>
+    </div>
+
+    {{-- KPI Widgets update automatically when timeRange changes --}}
+    <div class="kpi-grid">
+        @foreach($kpis as $kpi)
+            <x-kpi-widget :kpi="$kpi" :period="$timeRange" />
+        @endforeach
+    </div>
+</div>
+```
+
+### Smart Table Selection Logic
+
+The system automatically selects the optimal table based on the requested date range:
+
+```php
+public function getMachineThroughput(int $machineId, string $period = '7d'): array
+{
+    $dateRange = $this->getDateRange($period);
+    $startDate = $dateRange[0];
+    $cacheKey = "machine_{$machineId}_throughput_{$period}";
+    $cacheTTL = $this->getCacheTTL($period);
+
+    return Cache::remember($cacheKey, $cacheTTL, function () use ($machineId, $startDate, $dateRange) {
+        // Automatically select optimal table
+        $table = $this->getOptimalTable('kpi_machine', $startDate);
+
+        // Query the appropriate table
+        if ($table === 'kpi_machine_daily') {
+            // Last 90 days - use daily table
+            return $this->queryDailyTable($machineId, $dateRange);
+        } elseif ($table === 'kpi_machine_weekly') {
+            // 91 days - 1 year - use weekly table
+            return $this->queryWeeklyTable($machineId, $dateRange);
+        } else {
+            // 1+ years - use monthly table
+            return $this->queryMonthlyTable($machineId, $dateRange);
+        }
+    });
+}
+
+protected function queryDailyTable(int $machineId, array $dateRange): array
+{
+    $summary = DB::table('kpi_machine_daily')
+        ->where('machine_id', $machineId)
+        ->where('factory_id', $this->factory->id)
+        ->whereBetween('summary_date', [
+            $dateRange[0]->format('Y-m-d'),
+            $dateRange[1]->format('Y-m-d')
+        ])
+        ->selectRaw('
+            SUM(units_produced) as total_units,
+            SUM(uptime_hours) as total_hours,
+            AVG(utilization_rate) as avg_utilization
+        ')
+        ->first();
+
+    $throughput = $summary->total_hours > 0
+        ? round($summary->total_units / $summary->total_hours, 2)
+        : 0;
+
+    return [
+        'throughput_per_hour' => $throughput,
+        'total_units' => $summary->total_units ?? 0,
+        'avg_utilization' => round($summary->avg_utilization ?? 0, 2),
+        'data_source' => 'daily',
+    ];
+}
+
+protected function queryWeeklyTable(int $machineId, array $dateRange): array
+{
+    $summary = DB::table('kpi_machine_weekly')
+        ->where('machine_id', $machineId)
+        ->where('factory_id', $this->factory->id)
+        ->whereBetween('week_start_date', [
+            $dateRange[0]->format('Y-m-d'),
+            $dateRange[1]->format('Y-m-d')
+        ])
+        ->selectRaw('
+            SUM(total_units_produced) as total_units,
+            SUM(total_uptime_hours) as total_hours,
+            AVG(avg_utilization_rate) as avg_utilization
+        ')
+        ->first();
+
+    $throughput = $summary->total_hours > 0
+        ? round($summary->total_units / $summary->total_hours, 2)
+        : 0;
+
+    return [
+        'throughput_per_hour' => $throughput,
+        'total_units' => $summary->total_units ?? 0,
+        'avg_utilization' => round($summary->avg_utilization ?? 0, 2),
+        'data_source' => 'weekly',
+    ];
+}
+```
+
+### Cross-Dimensional KPIs: On-Demand Calculation
+
+For rarely-used cross-dimensional queries (e.g., "Throughput by Machine for Part X"), calculate on-demand from raw work_orders with short time windows and aggressive caching:
+
+```php
+public function getThroughputByMachineForPart(int $partId, string $period = '7d'): array
+{
+    $dateRange = $this->getDateRange($period);
+    $cacheKey = "throughput_machine_part_{$partId}_{$period}";
+
+    // Cache for 30 minutes since this is a rare query
+    return Cache::remember($cacheKey, 1800, function () use ($partId, $dateRange) {
+        // Query raw work_orders for this specific combination
+        // Limit to recent data only (last 30 days max)
+        $maxRange = Carbon::now()->subDays(30);
+        $startDate = $dateRange[0]->gt($maxRange) ? $dateRange[0] : $maxRange;
+
+        return DB::table('work_orders')
+            ->join('machines', 'work_orders.machine_id', '=', 'machines.id')
+            ->join('boms', 'work_orders.bom_id', '=', 'boms.id')
+            ->where('boms.part_number_id', $partId)
+            ->where('work_orders.factory_id', $this->factory->id)
+            ->whereBetween('work_orders.start_time', [$startDate, $dateRange[1]])
+            ->groupBy('work_orders.machine_id', 'machines.name')
+            ->selectRaw('
+                work_orders.machine_id,
+                machines.name as machine_name,
+                SUM(work_orders.ok_qtys) as total_units,
+                SUM(TIMESTAMPDIFF(HOUR, start_time, end_time)) as total_hours
+            ')
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'machine_id' => $row->machine_id,
+                    'machine_name' => $row->machine_name,
+                    'throughput' => $row->total_hours > 0
+                        ? round($row->total_units / $row->total_hours, 2)
+                        : 0,
+                ];
+            })
+            ->toArray();
+    });
+}
+```
+
+### Performance Comparison
+
+| Query Type | Approach | Query Time | Storage Overhead |
+|------------|----------|-----------|------------------|
+| **Machine throughput (7d)** | Daily summary table | 10ms | Minimal |
+| **Machine throughput (6 months)** | Weekly summary table | 15ms | Minimal |
+| **Machine throughput (2 years)** | Monthly summary table | 20ms | Minimal |
+| **Machine × Part (7d)** | On-demand from work_orders | 50-100ms | None |
+| **All historical (naive)** | Work orders | 5000ms+ ❌ | None |
+
+### Key Benefits
+
+1. ✅ **No redundant storage** - Store atomic metrics once, calculate any period on-demand
+2. ✅ **Fast queries** - Optimal table selection ensures fast response times
+3. ✅ **Flexible** - Users can request any time period
+4. ✅ **Cache-friendly** - Popular periods (7d, 30d) cached for instant access
+5. ✅ **Scalable** - Storage grows linearly, not exponentially
 
 ---
 
@@ -2161,8 +3641,13 @@ Setup alerts for:
 - **Mitigation:** Set Redis maxmemory policy, monitor usage, implement cache key expiration
 
 **2. Summary Table Growth**
-- **Risk:** Summary tables grow too large
-- **Mitigation:** Archive old data (>1 year), partition tables, implement data retention policy
+- **Risk:** Summary tables grow too large (without lifecycle management: 32M rows in 5 years for 50 factories)
+- **Mitigation:**
+  - Implement hybrid granularity strategy (daily/weekly/monthly)
+  - Automatic archival via monthly scheduled job
+  - Keep only 90 days of daily data
+  - Aggregate to weekly (91 days - 1 year) and monthly (1+ years)
+  - Expected: 92% storage reduction (2.4M rows vs 32M rows)
 
 **3. Report Generation Failures**
 - **Risk:** PDF/Excel generation times out or fails
@@ -2277,8 +3762,19 @@ php artisan queue:work --queue=kpi,reports --tries=3 --timeout=300
 php artisan schedule:list
 php artisan schedule:run
 
-# Database maintenance
-php artisan kpi:archive --older-than=365days
+# Database maintenance & archival
+php artisan kpi:archive                    # Run full archival process
+php artisan kpi:archive --factory=1        # Archive specific factory only
+
+# Check table sizes
+SELECT
+    table_name,
+    ROUND((data_length + index_length) / 1024 / 1024, 2) AS size_mb,
+    table_rows
+FROM information_schema.tables
+WHERE table_schema = DATABASE()
+AND table_name LIKE 'kpi_%'
+ORDER BY (data_length + index_length) DESC;
 ```
 
 ---
@@ -2302,7 +3798,441 @@ This implementation plan provides a comprehensive roadmap for optimizing the KPI
 
 ---
 
-**Document Version:** 1.0
+---
+
+## Migration Path: Shared to Separate Databases
+
+### Overview
+
+This section provides a complete migration guide from shared database to database-per-factory architecture when you're ready to scale beyond 10 factories.
+
+### Pre-Migration Checklist
+
+- [ ] Current factory count: 10-15+
+- [ ] Query performance degrading (>500ms)
+- [ ] Database size >10 GB
+- [ ] Different factory sizes require isolation
+- [ ] Team ready for increased maintenance complexity
+
+### Migration Script
+
+Create `app/Console/Commands/MigrateToTenantDatabases.php`:
+
+```php
+<?php
+
+namespace App\Console\Commands;
+
+use App\Models\Factory;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
+
+class MigrateToTenantDatabases extends Command
+{
+    protected $signature = 'migrate:to-tenant-databases
+                            {factory? : Specific factory ID to migrate}
+                            {--dry-run : Preview without executing}';
+
+    protected $description = 'Migrate from shared DB to database-per-factory';
+
+    public function handle(): int
+    {
+        if ($this->option('dry-run')) {
+            $this->warn('DRY RUN MODE - No changes will be made');
+        }
+
+        $factoryId = $this->argument('factory');
+        $factories = $factoryId
+            ? Factory::where('id', $factoryId)->get()
+            : Factory::all();
+
+        $this->info("Migrating {$factories->count()} factory(ies)...");
+
+        foreach ($factories as $factory) {
+            $this->migrateFactory($factory);
+        }
+
+        $this->info('✅ Migration complete!');
+        $this->info('');
+        $this->info('Next steps:');
+        $this->info('1. Update .env: TENANT_MODE=database_per_factory');
+        $this->info('2. Test thoroughly on staging');
+        $this->info('3. Deploy to production');
+        $this->info('4. Monitor for 24-48 hours');
+        $this->info('5. Once stable, drop factory_id columns from old DB');
+
+        return Command::SUCCESS;
+    }
+
+    protected function migrateFactory(Factory $factory): void
+    {
+        $this->info("Migrating: {$factory->name} (ID: {$factory->id})");
+
+        // Step 1: Create new database
+        $this->createFactoryDatabase($factory);
+
+        // Step 2: Run migrations
+        $this->runFactoryMigrations($factory);
+
+        // Step 3: Copy data
+        $this->copyFactoryData($factory);
+
+        // Step 4: Verify data integrity
+        $this->verifyDataIntegrity($factory);
+
+        $this->info("  ✓ {$factory->name} migrated successfully");
+    }
+
+    protected function createFactoryDatabase(Factory $factory): void
+    {
+        $dbName = "prodstream_factory_{$factory->id}";
+
+        if ($this->option('dry-run')) {
+            $this->line("  [DRY RUN] Would create database: {$dbName}");
+            return;
+        }
+
+        try {
+            DB::statement("CREATE DATABASE IF NOT EXISTS `{$dbName}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+            $this->line("  ✓ Database created: {$dbName}");
+        } catch (\Exception $e) {
+            $this->error("  ✗ Failed to create database: {$e->getMessage()}");
+            throw $e;
+        }
+    }
+
+    protected function runFactoryMigrations(Factory $factory): void
+    {
+        if ($this->option('dry-run')) {
+            $this->line("  [DRY RUN] Would run migrations");
+            return;
+        }
+
+        $connection = "factory_{$factory->id}";
+
+        // Register connection
+        config(["database.connections.{$connection}" => [
+            'driver' => 'mysql',
+            'host' => env('DB_HOST'),
+            'database' => "prodstream_factory_{$factory->id}",
+            'username' => env('DB_USERNAME'),
+            'password' => env('DB_PASSWORD'),
+        ]]);
+
+        Artisan::call('migrate', [
+            '--database' => $connection,
+            '--force' => true,
+            '--path' => 'database/migrations/tenant'  // Tenant-specific migrations
+        ]);
+
+        $this->line("  ✓ Migrations complete");
+    }
+
+    protected function copyFactoryData(Factory $factory): void
+    {
+        $this->line("  Copying data for factory {$factory->id}...");
+
+        $tables = [
+            'work_orders',
+            'machines',
+            'operators',
+            'boms',
+            'kpi_machine_daily',
+            'kpi_operator_daily',
+            'kpi_part_daily',
+            'kpi_machine_weekly',
+            'kpi_operator_weekly',
+            'kpi_part_weekly',
+            'kpi_machine_monthly',
+            'kpi_operator_monthly',
+            'kpi_part_monthly',
+            // ... add all tables
+        ];
+
+        $connection = "factory_{$factory->id}";
+        $sourceDb = env('DB_DATABASE');
+        $targetDb = "prodstream_factory_{$factory->id}";
+
+        foreach ($tables as $table) {
+            if ($this->option('dry-run')) {
+                $count = DB::table($table)->where('factory_id', $factory->id)->count();
+                $this->line("  [DRY RUN] Would copy {$count} rows from {$table}");
+                continue;
+            }
+
+            $this->copyTable($table, $factory->id, $sourceDb, $targetDb);
+        }
+
+        $this->line("  ✓ Data copied");
+    }
+
+    protected function copyTable(string $table, int $factoryId, string $sourceDb, string $targetDb): void
+    {
+        // Copy data in chunks to avoid memory issues
+        DB::table("$sourceDb.$table")
+            ->where('factory_id', $factoryId)
+            ->orderBy('id')
+            ->chunk(1000, function ($rows) use ($table, $targetDb) {
+                $data = $rows->map(function ($row) {
+                    $array = (array) $row;
+                    // Remove factory_id column (not needed in tenant DB)
+                    unset($array['factory_id']);
+                    return $array;
+                })->toArray();
+
+                DB::table("$targetDb.$table")->insert($data);
+            });
+
+        $count = DB::table("$targetDb.$table")->count();
+        $this->line("    ✓ {$table}: {$count} rows copied");
+    }
+
+    protected function verifyDataIntegrity(Factory $factory): void
+    {
+        $connection = "factory_{$factory->id}";
+        $sourceDb = env('DB_DATABASE');
+        $targetDb = "prodstream_factory_{$factory->id}";
+
+        $this->line("  Verifying data integrity...");
+
+        $tables = ['work_orders', 'machines', 'operators'];
+
+        foreach ($tables as $table) {
+            $sourceCount = DB::table("$sourceDb.$table")
+                ->where('factory_id', $factory->id)
+                ->count();
+
+            $targetCount = DB::connection($connection)
+                ->table($table)
+                ->count();
+
+            if ($sourceCount !== $targetCount) {
+                $this->error("    ✗ {$table}: Mismatch! Source: {$sourceCount}, Target: {$targetCount}");
+                throw new \Exception("Data integrity check failed for {$table}");
+            }
+
+            $this->line("    ✓ {$table}: {$targetCount} rows verified");
+        }
+
+        $this->line("  ✓ Data integrity verified");
+    }
+}
+```
+
+### Migration Steps
+
+#### Step 1: Preparation (Week 1)
+
+```bash
+# 1. Backup current database
+mysqldump prodstream_main > backup_before_migration_$(date +%Y%m%d).sql
+
+# 2. Create staging environment
+php artisan env --staging
+
+# 3. Test migration on staging with one factory
+php artisan migrate:to-tenant-databases 1 --dry-run
+php artisan migrate:to-tenant-databases 1
+```
+
+#### Step 2: Pilot Migration (Week 2)
+
+```bash
+# Migrate 1-2 smaller factories
+php artisan migrate:to-tenant-databases 1
+php artisan migrate:to-tenant-databases 2
+
+# Update config for these factories only
+php artisan cache:clear
+```
+
+#### Step 3: Gradual Rollout (Weeks 3-4)
+
+```bash
+# Migrate 3-5 factories per week
+php artisan migrate:to-tenant-databases 3
+php artisan migrate:to-tenant-databases 4
+php artisan migrate:to-tenant-databases 5
+
+# Monitor performance daily
+```
+
+#### Step 4: Complete Migration (Week 5)
+
+```bash
+# Migrate remaining factories
+php artisan migrate:to-tenant-databases
+
+# Update environment configuration
+# .env: TENANT_MODE=database_per_factory
+
+# Clear all caches
+php artisan cache:clear
+php artisan config:clear
+
+# Restart queue workers
+php artisan queue:restart
+```
+
+#### Step 5: Cleanup (Week 6)
+
+```bash
+# After 1-2 weeks of stable operation:
+
+# 1. Create migrations to drop factory_id columns
+php artisan make:migration drop_factory_id_columns_from_shared_db
+
+# 2. Execute cleanup
+php artisan migrate --force
+
+# 3. Vacuum/optimize old shared DB
+mysql prodstream_main -e "OPTIMIZE TABLE work_orders, machines, operators"
+```
+
+### Rollback Plan
+
+If issues arise during migration:
+
+```bash
+# 1. Revert .env
+TENANT_MODE=shared_database
+
+# 2. Clear caches
+php artisan cache:clear
+php artisan config:clear
+
+# 3. Restart services
+php artisan queue:restart
+
+# 4. The shared DB is still intact as source of truth
+# New tenant databases can be dropped if needed
+```
+
+### Post-Migration Verification
+
+```sql
+-- Verify data consistency
+-- Run for each migrated factory
+
+-- Source (shared DB)
+SELECT COUNT(*) FROM prodstream_main.work_orders WHERE factory_id = 1;
+
+-- Target (tenant DB)
+SELECT COUNT(*) FROM prodstream_factory_1.work_orders;
+
+-- Should match!
+```
+
+### Performance Monitoring
+
+Monitor these metrics post-migration:
+
+```php
+// In AppServiceProvider
+DB::listen(function ($query) {
+    if ($query->time > 500) {
+        Log::warning('Slow query after migration', [
+            'sql' => $query->sql,
+            'time' => $query->time,
+            'connection' => $query->connectionName,
+        ]);
+    }
+});
+```
+
+Track:
+- Query response times per factory
+- Cache hit rates
+- Queue processing times
+- User-reported issues
+
+---
+
+**Document Version:** 3.0
 **Status:** Ready for Implementation
-**Estimated Timeline:** 7-8 weeks
-**Last Updated:** October 8, 2025
+**Estimated Timeline:** 7-8 weeks (initial) + Migration as needed
+**Last Updated:** October 13, 2025
+
+### Version 3.0 Updates
+
+**Key Enhancements:**
+1. **Flexible Architecture** - Start with shared DB, migrate to database-per-factory as you scale
+2. **Hybrid Granularity Storage Strategy** - Daily/Weekly/Monthly tables with automatic lifecycle management
+3. **User-Selectable Time Ranges** - Flexible period selection with smart table routing
+4. **Storage Optimization** - 92% reduction in long-term storage (2.4M vs 32M rows over 5 years)
+5. **On-Demand Cross-Dimensional Queries** - Rare KPI combinations calculated dynamically with caching
+6. **Automatic Data Archival** - Monthly jobs to aggregate and purge old data
+7. **Complete Migration Path** - Detailed guide from shared to separate databases
+
+**Impact:**
+- Start simple with shared database for 1-10 factories
+- Scale smoothly to database-per-factory for 10+ factories
+- Single codebase works for both architectures
+- Provides clear migration path with minimal downtime
+- Solves the storage explosion problem for multi-tenant deployments
+- Maintains fast query performance through smart table selection
+- Reduces storage costs by 92% over 5 years while preserving data integrity
+
+
+## Recent Performance Improvements (October 2025)
+
+### Manual Refresh Implementation for Dashboard Mode
+
+**Change:** Replaced automatic 5-minute polling with user-controlled manual refresh button.
+
+**Implementation Details:**
+- Dashboard Mode now includes a **Refresh button** in the header
+- Button bypasses cache completely to fetch fresh data
+- Shows spinning icon and loading state during refresh
+- Updates "Last Updated" timestamp with each refresh
+- Cache is retained for regular page loads (5-minute TTL)
+
+**Performance Benefits:**
+1. **Reduced Server Load**: Eliminates continuous polling every 5 minutes for all active users
+2. **Lower Database Load**: Only fetches fresh data when users explicitly request it
+3. **Better User Control**: Users decide when they need the latest data
+4. **Improved Cache Efficiency**: Cache remains useful for page loads, bypassed only on manual refresh
+5. **Bandwidth Savings**: Reduces unnecessary network traffic
+
+**Impact Calculation:**
+- **Before**: 20 users × 12 refreshes/hour = 240 database queries/hour
+- **After**: 20 users × 2-3 manual refreshes/hour = 40-60 database queries/hour
+- **Reduction**: 75-83% fewer queries for Dashboard Mode
+
+**User Experience:**
+- Clear visual feedback with spinning icon
+- Timestamp shows when data was last refreshed
+- Button disabled during refresh to prevent duplicate requests
+- Intuitive placement next to "Machine Status" heading
+
+**Technical Implementation:**
+```php
+// KPIAnalyticsDashboard.php
+public bool $skipCache = false;
+
+public function refreshData(): void
+{
+    $this->skipCache = true;
+}
+
+// RealTimeKPIService.php
+public function getCurrentMachineStatus(bool $skipCache = false): array
+{
+    if ($skipCache) {
+        return $callback(); // Bypass cache
+    }
+    return $this->getCachedKPI('current_machine_status', $callback, 300);
+}
+```
+
+**Documentation Updates:**
+- ✅ MACHINE_STATUS_ANALYTICS.md - Updated Dashboard Mode refresh strategy
+- ✅ KPI_DASHBOARD_DESIGN.md - Added manual refresh to performance considerations
+- ✅ KPI_OPTIMIZATION_IMPLEMENTATION_PLAN.md - Updated Tier 1 description
+
+**Next Steps:**
+- Monitor user refresh patterns to validate 75-83% reduction
+- Consider adding optional auto-refresh toggle for power users who want it
+- Apply same pattern to other real-time KPIs as they're implemented
+
