@@ -77,6 +77,18 @@ return [
             'lock_connection' => env('REDIS_CACHE_LOCK_CONNECTION', 'default'),
         ],
 
+        'kpi_cache' => [
+            'driver' => 'redis',
+            'connection' => 'kpi',
+            'lock_connection' => 'default',
+        ],
+
+        'realtime_cache' => [
+            'driver' => 'redis',
+            'connection' => 'realtime',
+            'lock_connection' => 'default',
+        ],
+
         'dynamodb' => [
             'driver' => 'dynamodb',
             'key' => env('AWS_ACCESS_KEY_ID'),
