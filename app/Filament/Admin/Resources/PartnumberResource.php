@@ -46,7 +46,8 @@ class PartnumberResource extends Resource
                     'required',
                     Rule::unique('part_numbers', 'partnumber')
                         ->where(function ($query) {
-                            $query->where('revision', request()->input('revision'));
+                            $query->where('revision', request()->input('revision'))
+                                  ->where('factory_id', auth()->user()->factory_id);
                         })
                         ->ignore(request()->route('record')), // Exclude current record during editing
                 ])->reactive(),
@@ -59,7 +60,8 @@ class PartnumberResource extends Resource
                     'required',
                     Rule::unique('part_numbers', 'revision')
                         ->where(function ($query) {
-                            $query->where('partnumber', request()->input('partnumber'));
+                            $query->where('partnumber', request()->input('partnumber'))
+                                  ->where('factory_id', auth()->user()->factory_id);
                         })
                         ->ignore(request()->route('record')), // Exclude current record during editing
                 ])->reactive(),
@@ -100,9 +102,9 @@ class PartnumberResource extends Resource
             ])
             ->recordActions([
                 ActionGroup::make([
-                    EditAction::make()->label('Edit'),
-                    ViewAction::make()->label('View'),
-                ])
+                    EditAction::make()->label('Edit')->size('sm'),
+                    ViewAction::make()->label('View')->size('sm'),
+                ])->size('sm')->tooltip('Action')->dropdownPlacement('right')
             ], position: RecordActionsPosition::BeforeColumns)
             ->toolbarActions([
                 BulkActionGroup::make([

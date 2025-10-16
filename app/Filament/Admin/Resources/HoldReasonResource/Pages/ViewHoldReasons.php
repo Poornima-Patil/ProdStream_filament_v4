@@ -21,11 +21,12 @@ class ViewHoldReasons extends ViewRecord
     public function infolist(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('View Hold Reason')
+            Section::make('Hold Reason details')
                 ->hiddenLabel()
                 ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('View Hold Reason')
+                    ->hiddenLabel()
                         ->label('')
                         ->getStateUsing(function ($record) {
                             if (!$record) {

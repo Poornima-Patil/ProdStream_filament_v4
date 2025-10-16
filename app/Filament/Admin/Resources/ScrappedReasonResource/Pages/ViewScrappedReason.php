@@ -21,11 +21,12 @@ class ViewScrappedReason extends ViewRecord
     public function infolist(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('View Scrapped Reason')
+            Section::make('Scrapped Reason details')
                 ->hiddenLabel()
                 ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('View Scrapped Reason')
+                    ->hiddenLabel()
                         ->label('')
                         ->getStateUsing(function ($record) {
                             if (!$record) {

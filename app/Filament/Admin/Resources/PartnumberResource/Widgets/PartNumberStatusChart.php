@@ -55,6 +55,13 @@ class PartNumberStatusChart extends ChartWidget
         $this->dispatch('$refresh');
     }
 
+    #[On('kpi-date-type-changed')]
+    public function refreshChart(): void
+    {
+        // Force widget to refresh when KPI date type changes
+        $this->dispatch('$refresh');
+    }
+
     protected function getData(): array
     {
         \Log::info('PartNumberStatusChart getData called with record ID: ' . ($this->record?->id ?? 'null'));
@@ -67,6 +74,9 @@ class PartNumberStatusChart extends ChartWidget
             ];
         }
 
+        // Get KPI date filter type from settings
+        $kpiDateType = session('kpi_date_type', 'created_at');
+
         // Get work order status distribution for this part number with date filtering
         $query = DB::table('part_numbers')
             ->join('purchase_orders', 'part_numbers.id', '=', 'purchase_orders.part_number_id')
@@ -75,12 +85,29 @@ class PartNumberStatusChart extends ChartWidget
             ->where('part_numbers.id', $this->record->id)
             ->where('work_orders.factory_id', \Filament\Facades\Filament::getTenant()->id);
 
-        // Apply date range filter
+        // Apply date range filter based on KPI date type
         if ($this->dateFrom && $this->dateTo) {
-            $query->whereBetween('work_orders.created_at', [
-                Carbon::parse($this->dateFrom)->startOfDay(),
-                Carbon::parse($this->dateTo)->endOfDay(),
-            ]);
+            if ($kpiDateType === 'start_time') {
+                // Only include work orders that have a Start log entry
+                $query->whereExists(function ($subQuery) {
+                    $subQuery->select(DB::raw(1))
+                        ->from('work_order_logs')
+                        ->whereColumn('work_order_logs.work_order_id', 'work_orders.id')
+                        ->where('work_order_logs.status', 'Start')
+                        ->whereBetween('work_order_logs.created_at', [
+                            Carbon::parse($this->dateFrom)->startOfDay(),
+                            Carbon::parse($this->dateTo)->endOfDay(),
+                        ])
+                        ->orderBy('work_order_logs.created_at', 'asc')
+                        ->limit(1);
+                });
+            } else {
+                // Default: use created_at
+                $query->whereBetween('work_orders.created_at', [
+                    Carbon::parse($this->dateFrom)->startOfDay(),
+                    Carbon::parse($this->dateTo)->endOfDay(),
+                ]);
+            }
         }
 
         $statusDistribution = $query->selectRaw('work_orders.status, COUNT(*) as count')

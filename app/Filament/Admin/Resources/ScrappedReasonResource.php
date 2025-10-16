@@ -58,9 +58,9 @@ class ScrappedReasonResource extends Resource
             ])
             ->recordActions([
                 ActionGroup::make([
-                    EditAction::make()->label('Edit'),
-                    ViewAction::make()->label('View'),
-                ])
+                    EditAction::make()->label('Edit')->size('sm'),
+                    ViewAction::make()->label('View')->size('sm'),
+                ])->size('sm')->tooltip('Action')->dropdownPlacement('right')
             ], position: RecordActionsPosition::BeforeColumns)
             ->toolbarActions([
                 BulkActionGroup::make([

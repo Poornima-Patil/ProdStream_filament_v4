@@ -118,13 +118,13 @@
                 </div>
             @endif
 
-            {{-- Production Throughput - Real KPI --}}
+            {{-- Net Production Throughput (Efficiency Oriented) 1 - Real KPI --}}
             @if(isset($kpis['quality_rate']))
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 hover:shadow-md dark:hover:shadow-lg hover:shadow-gray-200 dark:hover:shadow-gray-900/50 transition-shadow cursor-pointer"
                      wire:click="viewKPIDetails('quality_rate')">
                     {{-- Status Indicator --}}
                     <div class="flex items-center justify-between mb-3 sm:mb-4">
-                        <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white leading-tight">Production Throughput</h3>
+                        <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white leading-tight">Net Production Throughput (Efficiency Oriented) 1</h3>
                         <div class="w-3 h-3 rounded-full {{ $this->getStatusColor($kpis['quality_rate']['status']) }} flex-shrink-0"></div>
                     </div>
 

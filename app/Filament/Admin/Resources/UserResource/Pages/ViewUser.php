@@ -21,11 +21,12 @@ class ViewUser extends ViewRecord
     public function infolist(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('View User')
+            Section::make('User details')
                 ->hiddenLabel()
                 ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('View User')
+                    ->hiddenLabel()
                         ->label('')
                         ->getStateUsing(function ($record) {
                             if (!$record) {

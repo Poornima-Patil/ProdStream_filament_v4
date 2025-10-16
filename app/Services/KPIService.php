@@ -547,12 +547,8 @@ class KPIService
             // Get work orders CREATED in the time range
             $workOrders = WorkOrder::where('factory_id', $factoryId)
                 ->whereBetween('created_at', [$startDate, $endDate])
-                ->whereIn('status', ['Completed', 'Closed']) // Only completed/closed WOs
-                ->with(['workOrderLogs' => function($query) {
-                    $query->whereIn('status', ['Completed', 'Closed'])
-                          ->orderBy('updated_at', 'desc')
-                          ->limit(1);
-                }])
+                ->whereIn('status', ['Completed', 'Closed', 'Hold']) // Include Hold status
+                ->with(['workOrderLogs'])
                 ->get();
 
             if ($workOrders->isEmpty()) {
@@ -574,37 +570,57 @@ class KPIService
             $ordersProcessed = 0;
 
             foreach ($workOrders as $workOrder) {
-                // Get the completion log for this work order
-                $completionLog = $workOrder->workOrderLogs()
-                    ->whereIn('status', ['Completed', 'Closed'])
-                    ->orderBy('updated_at', 'desc')
-                    ->first();
+                $endLog = null;
 
-                if ($completionLog) {
-                    // Calculate time period (created_at to completion log created_at) - same as ViewWorkOrder
-                    $createdAt = Carbon::parse($workOrder->created_at);
-                    $completedAt = Carbon::parse($completionLog->created_at);
+                // Determine end log based on work order status
+                if ($workOrder->status === 'Hold') {
+                    // For Hold status: get the LAST Hold log entry
+                    $endLog = $workOrder->workOrderLogs()
+                        ->where('status', 'Hold')
+                        ->orderBy('created_at', 'desc')
+                        ->first();
+                } else {
+                    // For Completed/Closed: get the latest Completed or Closed log
+                    $endLog = $workOrder->workOrderLogs()
+                        ->whereIn('status', ['Completed', 'Closed'])
+                        ->orderBy('created_at', 'desc')
+                        ->first();
+                }
 
-                    // Handle edge cases where completion time might be before creation time
-                    $hours = $createdAt->diffInHours($completedAt, false); // false = can be negative
+                if ($endLog) {
+                    // Get the first Start log entry for this work order
+                    $startLog = $workOrder->workOrderLogs()
+                        ->where('status', 'Start')
+                        ->orderBy('created_at', 'asc')
+                        ->first();
 
-                    // If negative hours, use absolute value (data inconsistency)
-                    if ($hours <= 0) {
-                        $hours = abs($hours);
-                    }
+                    // Only calculate throughput if Start log exists
+                    if ($startLog) {
+                        // Calculate time period (first Start log to end log)
+                        $startedAt = Carbon::parse($startLog->created_at);
+                        $endedAt = Carbon::parse($endLog->created_at);
 
-                    // Get units produced
-                    $units = $workOrder->ok_qtys ?? 0;
+                        // Handle edge cases where end time might be before start time
+                        $hours = $startedAt->diffInHours($endedAt, false); // false = can be negative
 
-                    // Calculate throughput for this individual WO
-                    if ($hours > 0 && $units > 0) {
-                        $throughputPerHour = round($units / $hours, 3);
-                        $individualThroughputs[] = $throughputPerHour;
+                        // If negative hours, use absolute value (data inconsistency)
+                        if ($hours <= 0) {
+                            $hours = abs($hours);
+                        }
 
-                        // Also track totals for summary
-                        $totalUnits += $units;
-                        $totalHours += $hours;
-                        $ordersProcessed++;
+                        // Get units produced from work_orders table
+                        $units = $workOrder->ok_qtys ?? 0;
+
+                        // Calculate throughput for this individual WO
+                        if ($hours > 0 && $units > 0) {
+                            $throughputPerHour = round($units / $hours, 3);
+                            $individualThroughputs[] = $throughputPerHour;
+
+                            // Also track totals for summary
+                            $totalUnits += $units;
+                            $totalHours += $hours;
+                            $ordersProcessed++;
+                        }
                     }
                 }
             }
@@ -641,6 +657,123 @@ class KPIService
     }
 
     /**
+     * Calculate Production Throughput V2 - Excludes Hold Periods (Net Production Time)
+     * Formula: Total Units / Net Production Time (sum of Start-to-Hold/Completed/Closed periods)
+     * Uses custom date range and work orders with status 'Completed', 'Closed', or 'Hold'
+     */
+    public function getProductionThroughputByTimeWithDateRange_V2($factoryId, $fromDate, $toDate)
+    {
+        $cacheKey = "kpi_production_throughput_time_v2_factory_{$factoryId}_{$fromDate}_{$toDate}";
+
+        return Cache::remember($cacheKey, 300, function () use ($factoryId, $fromDate, $toDate) {
+            $startDate = Carbon::parse($fromDate)->startOfDay();
+            $endDate = Carbon::parse($toDate)->endOfDay();
+
+            // Get work orders CREATED in the time range
+            $workOrders = WorkOrder::where('factory_id', $factoryId)
+                ->whereBetween('created_at', [$startDate, $endDate])
+                ->whereIn('status', ['Completed', 'Closed', 'Hold'])
+                ->with(['workOrderLogs'])
+                ->get();
+
+            if ($workOrders->isEmpty()) {
+                return [
+                    'rate' => 0,
+                    'total_units' => 0,
+                    'units_per_hour' => 0,
+                    'total_net_hours' => 0,
+                    'orders_count' => 0,
+                    'average_throughput' => 0,
+                    'trend' => 0,
+                    'status' => 'neutral'
+                ];
+            }
+
+            $individualThroughputs = [];
+            $totalUnits = 0;
+            $totalNetHours = 0;
+            $ordersProcessed = 0;
+
+            foreach ($workOrders as $workOrder) {
+                // Get all Start, Hold, Completed, and Closed logs in chronological order
+                $logs = $workOrder->workOrderLogs()
+                    ->whereIn('status', ['Start', 'Hold', 'Completed', 'Closed'])
+                    ->orderBy('created_at', 'asc')
+                    ->get();
+
+                if ($logs->isEmpty()) {
+                    continue;
+                }
+
+                // Calculate net production time (sum of all Start-to-Hold/Completed/Closed periods)
+                $netProductionHours = 0;
+                $lastStartTime = null;
+
+                foreach ($logs as $log) {
+                    if ($log->status === 'Start') {
+                        // Mark the start of a production period
+                        $lastStartTime = Carbon::parse($log->created_at);
+                    }
+                    elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
+                        // End of a production period - calculate duration
+                        $endTime = Carbon::parse($log->created_at);
+                        $periodHours = $lastStartTime->diffInHours($endTime, true);
+
+                        // Add this production period to the total
+                        $netProductionHours += $periodHours;
+
+                        // Reset start time (production paused/ended)
+                        $lastStartTime = null;
+                    }
+                }
+
+                // Get units produced from work_orders table
+                $units = $workOrder->ok_qtys ?? 0;
+
+                // Calculate throughput for this individual WO
+                if ($netProductionHours > 0 && $units > 0) {
+                    $throughputPerHour = round($units / $netProductionHours, 3);
+                    $individualThroughputs[] = $throughputPerHour;
+
+                    // Also track totals for summary
+                    $totalUnits += $units;
+                    $totalNetHours += $netProductionHours;
+                    $ordersProcessed++;
+                }
+            }
+
+            if (empty($individualThroughputs)) {
+                return [
+                    'rate' => 0,
+                    'total_units' => 0,
+                    'units_per_hour' => 0,
+                    'total_net_hours' => 0,
+                    'orders_count' => 0,
+                    'average_throughput' => 0,
+                    'trend' => 0,
+                    'status' => 'neutral'
+                ];
+            }
+
+            // Calculate average throughput across all WOs
+            $averageThroughput = round(array_sum($individualThroughputs) / count($individualThroughputs), 3);
+            $status = $this->getProductionThroughputStatus($averageThroughput);
+
+            return [
+                'rate' => $averageThroughput,
+                'total_units' => $totalUnits,
+                'units_per_hour' => $averageThroughput,
+                'total_net_hours' => round($totalNetHours, 1),
+                'orders_count' => $ordersProcessed,
+                'average_throughput' => $averageThroughput,
+                'individual_throughputs_count' => count($individualThroughputs),
+                'trend' => 0,
+                'status' => $status
+            ];
+        });
+    }
+
+    /**
      * Calculate Production Throughput using time period from work order creation to completion
      * Formula: Total Units Produced / Total Time Period (from created_at to work_order_logs.updated_at)
      * Uses period and work orders with status 'Completed' or 'Closed'
@@ -652,15 +785,11 @@ class KPIService
         return Cache::remember($cacheKey, 300, function () use ($factoryId, $period) {
             $dateRange = $this->getDateRange($period);
 
-            // Get completed/closed work orders with their completion logs
+            // Get completed/closed/hold work orders with their logs
             $workOrders = WorkOrder::where('factory_id', $factoryId)
                 ->whereBetween('created_at', $dateRange)
-                ->whereIn('status', ['Completed', 'Closed'])
-                ->with(['workOrderLogs' => function($query) {
-                    $query->whereIn('status', ['Completed', 'Closed'])
-                          ->orderBy('updated_at', 'desc')
-                          ->limit(1);
-                }])
+                ->whereIn('status', ['Completed', 'Closed', 'Hold']) // Include Hold status
+                ->with(['workOrderLogs'])
                 ->get();
 
             if ($workOrders->isEmpty()) {
@@ -680,17 +809,42 @@ class KPIService
             $ordersProcessed = 0;
 
             foreach ($workOrders as $workOrder) {
-                if ($workOrder->workOrderLogs->isNotEmpty()) {
-                    $log = $workOrder->workOrderLogs->first();
-                    $createdAt = Carbon::parse($workOrder->created_at);
-                    $completedAt = Carbon::parse($log->updated_at);
-                    
-                    // Calculate hours between creation and completion
-                    $hours = $createdAt->diffInHours($completedAt);
-                    if ($hours > 0) {
-                        $totalUnits += $workOrder->ok_qtys ?? 0;
-                        $totalHours += $hours;
-                        $ordersProcessed++;
+                $endLog = null;
+
+                // Determine end log based on work order status
+                if ($workOrder->status === 'Hold') {
+                    // For Hold status: get the LAST Hold log entry
+                    $endLog = $workOrder->workOrderLogs()
+                        ->where('status', 'Hold')
+                        ->orderBy('created_at', 'desc')
+                        ->first();
+                } else {
+                    // For Completed/Closed: get the latest Completed or Closed log
+                    $endLog = $workOrder->workOrderLogs()
+                        ->whereIn('status', ['Completed', 'Closed'])
+                        ->orderBy('created_at', 'desc')
+                        ->first();
+                }
+
+                if ($endLog) {
+                    // Get the first Start log entry for this work order
+                    $startLog = $workOrder->workOrderLogs()
+                        ->where('status', 'Start')
+                        ->orderBy('created_at', 'asc')
+                        ->first();
+
+                    // Only calculate throughput if Start log exists
+                    if ($startLog) {
+                        $startedAt = Carbon::parse($startLog->created_at);
+                        $endedAt = Carbon::parse($endLog->created_at);
+
+                        // Calculate hours between production start and end
+                        $hours = $startedAt->diffInHours($endedAt);
+                        if ($hours > 0) {
+                            $totalUnits += $workOrder->ok_qtys ?? 0;
+                            $totalHours += $hours;
+                            $ordersProcessed++;
+                        }
                     }
                 }
             }
@@ -716,6 +870,569 @@ class KPIService
                 'total_units' => $totalUnits,
                 'units_per_hour' => $unitsPerHour,
                 'total_hours' => round($totalHours, 1),
+                'orders_count' => $ordersProcessed,
+                'trend' => $trend,
+                'status' => $status
+            ];
+        });
+    }
+
+    /**
+     * Calculate Production Throughput V2 - Excludes Hold Periods (Net Production Time)
+     * Formula: Total Units / Net Production Time (sum of Start-to-Hold/Completed/Closed periods)
+     * Uses period and work orders with status 'Completed', 'Closed', or 'Hold'
+     */
+    public function getProductionThroughputByTime_V2($factoryId, $period = '30d')
+    {
+        $cacheKey = "kpi_production_throughput_time_v2_factory_{$factoryId}_{$period}";
+
+        return Cache::remember($cacheKey, 300, function () use ($factoryId, $period) {
+            $dateRange = $this->getDateRange($period);
+
+            // Get completed/closed/hold work orders with their logs
+            $workOrders = WorkOrder::where('factory_id', $factoryId)
+                ->whereBetween('created_at', $dateRange)
+                ->whereIn('status', ['Completed', 'Closed', 'Hold'])
+                ->with(['workOrderLogs'])
+                ->get();
+
+            if ($workOrders->isEmpty()) {
+                return [
+                    'rate' => 0,
+                    'total_units' => 0,
+                    'units_per_hour' => 0,
+                    'total_net_hours' => 0,
+                    'orders_count' => 0,
+                    'trend' => 0,
+                    'status' => 'neutral'
+                ];
+            }
+
+            $totalUnits = 0;
+            $totalNetHours = 0;
+            $ordersProcessed = 0;
+
+            foreach ($workOrders as $workOrder) {
+                // Get all Start, Hold, Completed, and Closed logs in chronological order
+                $logs = $workOrder->workOrderLogs()
+                    ->whereIn('status', ['Start', 'Hold', 'Completed', 'Closed'])
+                    ->orderBy('created_at', 'asc')
+                    ->get();
+
+                if ($logs->isEmpty()) {
+                    continue;
+                }
+
+                // Calculate net production time (sum of all Start-to-Hold/Completed/Closed periods)
+                $netProductionHours = 0;
+                $lastStartTime = null;
+
+                foreach ($logs as $log) {
+                    if ($log->status === 'Start') {
+                        // Mark the start of a production period
+                        $lastStartTime = Carbon::parse($log->created_at);
+                    }
+                    elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
+                        // End of a production period - calculate duration
+                        $endTime = Carbon::parse($log->created_at);
+                        $periodHours = $lastStartTime->diffInHours($endTime, true);
+
+                        // Add this production period to the total
+                        $netProductionHours += $periodHours;
+
+                        // Reset start time (production paused/ended)
+                        $lastStartTime = null;
+                    }
+                }
+
+                // Get units produced from work_orders table
+                $units = $workOrder->ok_qtys ?? 0;
+
+                // Calculate throughput if we have valid data
+                if ($netProductionHours > 0 && $units > 0) {
+                    $totalUnits += $units;
+                    $totalNetHours += $netProductionHours;
+                    $ordersProcessed++;
+                }
+            }
+
+            if ($totalNetHours === 0) {
+                return [
+                    'rate' => 0,
+                    'total_units' => $totalUnits,
+                    'units_per_hour' => 0,
+                    'total_net_hours' => 0,
+                    'orders_count' => $ordersProcessed,
+                    'trend' => 0,
+                    'status' => 'neutral'
+                ];
+            }
+
+            $unitsPerHour = round($totalUnits / $totalNetHours, 2);
+            $trend = $this->calculateTrend('production_throughput_time_v2', $unitsPerHour, $factoryId, $period);
+            $status = $this->getProductionThroughputStatus($unitsPerHour);
+
+            return [
+                'rate' => $unitsPerHour,
+                'total_units' => $totalUnits,
+                'units_per_hour' => $unitsPerHour,
+                'total_net_hours' => round($totalNetHours, 1),
+                'orders_count' => $ordersProcessed,
+                'trend' => $trend,
+                'status' => $status
+            ];
+        });
+    }
+
+    /**
+     * Calculate Gross Production Throughput (Raw Output-Oriented) 1
+     * Formula: Total Gross Units (OK + Scrapped) / Time Period (First Start to End)
+     * Uses custom date range and work orders with status 'Completed', 'Closed', or 'Hold'
+     */
+    public function getGrossProductionThroughputByTimeWithDateRange($factoryId, $fromDate, $toDate)
+    {
+        $cacheKey = "kpi_gross_production_throughput_factory_{$factoryId}_{$fromDate}_{$toDate}";
+
+        return Cache::remember($cacheKey, 300, function () use ($factoryId, $fromDate, $toDate) {
+            $startDate = Carbon::parse($fromDate)->startOfDay();
+            $endDate = Carbon::parse($toDate)->endOfDay();
+
+            // Get work orders CREATED in the time range
+            $workOrders = WorkOrder::where('factory_id', $factoryId)
+                ->whereBetween('created_at', [$startDate, $endDate])
+                ->whereIn('status', ['Completed', 'Closed', 'Hold'])
+                ->with(['workOrderLogs'])
+                ->get();
+
+            if ($workOrders->isEmpty()) {
+                return [
+                    'rate' => 0,
+                    'total_gross_units' => 0,
+                    'units_per_hour' => 0,
+                    'total_hours' => 0,
+                    'orders_count' => 0,
+                    'average_throughput' => 0,
+                    'trend' => 0,
+                    'status' => 'neutral'
+                ];
+            }
+
+            $individualThroughputs = [];
+            $totalGrossUnits = 0;
+            $totalHours = 0;
+            $ordersProcessed = 0;
+
+            foreach ($workOrders as $workOrder) {
+                $endLog = null;
+
+                // Determine end log based on work order status
+                if ($workOrder->status === 'Hold') {
+                    // For Hold status: get the LAST Hold log entry
+                    $endLog = $workOrder->workOrderLogs()
+                        ->where('status', 'Hold')
+                        ->orderBy('created_at', 'desc')
+                        ->first();
+                } else {
+                    // For Completed/Closed: get the latest Completed or Closed log
+                    $endLog = $workOrder->workOrderLogs()
+                        ->whereIn('status', ['Completed', 'Closed'])
+                        ->orderBy('created_at', 'desc')
+                        ->first();
+                }
+
+                if ($endLog) {
+                    // Get the first Start log entry for this work order
+                    $startLog = $workOrder->workOrderLogs()
+                        ->where('status', 'Start')
+                        ->orderBy('created_at', 'asc')
+                        ->first();
+
+                    // Only calculate throughput if Start log exists
+                    if ($startLog) {
+                        // Calculate time period (first Start log to end log)
+                        $startedAt = Carbon::parse($startLog->created_at);
+                        $endedAt = Carbon::parse($endLog->created_at);
+
+                        // Handle edge cases where end time might be before start time
+                        $hours = $startedAt->diffInHours($endedAt, true);
+
+                        // If negative hours, use absolute value (data inconsistency)
+                        if ($hours <= 0) {
+                            $hours = abs($hours);
+                        }
+
+                        // Get GROSS units (OK + Scrapped) from work_orders table
+                        $grossUnits = ($workOrder->ok_qtys ?? 0) + ($workOrder->scrapped_qtys ?? 0);
+
+                        // Calculate throughput for this individual WO
+                        if ($hours > 0 && $grossUnits > 0) {
+                            $throughputPerHour = round($grossUnits / $hours, 3);
+                            $individualThroughputs[] = $throughputPerHour;
+
+                            // Also track totals for summary
+                            $totalGrossUnits += $grossUnits;
+                            $totalHours += $hours;
+                            $ordersProcessed++;
+                        }
+                    }
+                }
+            }
+
+            if (empty($individualThroughputs)) {
+                return [
+                    'rate' => 0,
+                    'total_gross_units' => 0,
+                    'units_per_hour' => 0,
+                    'total_hours' => 0,
+                    'orders_count' => 0,
+                    'average_throughput' => 0,
+                    'trend' => 0,
+                    'status' => 'neutral'
+                ];
+            }
+
+            // Calculate average gross throughput across all WOs
+            $averageGrossThroughput = round(array_sum($individualThroughputs) / count($individualThroughputs), 3);
+            $status = $this->getProductionThroughputStatus($averageGrossThroughput);
+
+            return [
+                'rate' => $averageGrossThroughput,
+                'total_gross_units' => $totalGrossUnits,
+                'units_per_hour' => $averageGrossThroughput,
+                'total_hours' => round($totalHours, 1),
+                'orders_count' => $ordersProcessed,
+                'average_throughput' => $averageGrossThroughput,
+                'individual_throughputs_count' => count($individualThroughputs),
+                'trend' => 0,
+                'status' => $status
+            ];
+        });
+    }
+
+    /**
+     * Calculate Gross Production Throughput (Raw Output-Oriented) 1
+     * Formula: Total Gross Units (OK + Scrapped) / Time Period (First Start to End)
+     * Uses period and work orders with status 'Completed', 'Closed', or 'Hold'
+     */
+    public function getGrossProductionThroughputByTime($factoryId, $period = '30d')
+    {
+        $cacheKey = "kpi_gross_production_throughput_factory_{$factoryId}_{$period}";
+
+        return Cache::remember($cacheKey, 300, function () use ($factoryId, $period) {
+            $dateRange = $this->getDateRange($period);
+
+            // Get completed/closed/hold work orders with their logs
+            $workOrders = WorkOrder::where('factory_id', $factoryId)
+                ->whereBetween('created_at', $dateRange)
+                ->whereIn('status', ['Completed', 'Closed', 'Hold'])
+                ->with(['workOrderLogs'])
+                ->get();
+
+            if ($workOrders->isEmpty()) {
+                return [
+                    'rate' => 0,
+                    'total_gross_units' => 0,
+                    'units_per_hour' => 0,
+                    'total_hours' => 0,
+                    'orders_count' => 0,
+                    'trend' => 0,
+                    'status' => 'neutral'
+                ];
+            }
+
+            $totalGrossUnits = 0;
+            $totalHours = 0;
+            $ordersProcessed = 0;
+
+            foreach ($workOrders as $workOrder) {
+                $endLog = null;
+
+                // Determine end log based on work order status
+                if ($workOrder->status === 'Hold') {
+                    // For Hold status: get the LAST Hold log entry
+                    $endLog = $workOrder->workOrderLogs()
+                        ->where('status', 'Hold')
+                        ->orderBy('created_at', 'desc')
+                        ->first();
+                } else {
+                    // For Completed/Closed: get the latest Completed or Closed log
+                    $endLog = $workOrder->workOrderLogs()
+                        ->whereIn('status', ['Completed', 'Closed'])
+                        ->orderBy('created_at', 'desc')
+                        ->first();
+                }
+
+                if ($endLog) {
+                    // Get the first Start log entry for this work order
+                    $startLog = $workOrder->workOrderLogs()
+                        ->where('status', 'Start')
+                        ->orderBy('created_at', 'asc')
+                        ->first();
+
+                    // Only calculate throughput if Start log exists
+                    if ($startLog) {
+                        $startedAt = Carbon::parse($startLog->created_at);
+                        $endedAt = Carbon::parse($endLog->created_at);
+
+                        // Calculate hours between production start and end
+                        $hours = $startedAt->diffInHours($endedAt);
+                        if ($hours > 0) {
+                            // Get GROSS units (OK + Scrapped) from work_orders table
+                            $grossUnits = ($workOrder->ok_qtys ?? 0) + ($workOrder->scrapped_qtys ?? 0);
+
+                            $totalGrossUnits += $grossUnits;
+                            $totalHours += $hours;
+                            $ordersProcessed++;
+                        }
+                    }
+                }
+            }
+
+            if ($totalHours === 0) {
+                return [
+                    'rate' => 0,
+                    'total_gross_units' => $totalGrossUnits,
+                    'units_per_hour' => 0,
+                    'total_hours' => 0,
+                    'orders_count' => $ordersProcessed,
+                    'trend' => 0,
+                    'status' => 'neutral'
+                ];
+            }
+
+            $unitsPerHour = round($totalGrossUnits / $totalHours, 2);
+            $trend = $this->calculateTrend('gross_production_throughput', $unitsPerHour, $factoryId, $period);
+            $status = $this->getProductionThroughputStatus($unitsPerHour);
+
+            return [
+                'rate' => $unitsPerHour,
+                'total_gross_units' => $totalGrossUnits,
+                'units_per_hour' => $unitsPerHour,
+                'total_hours' => round($totalHours, 1),
+                'orders_count' => $ordersProcessed,
+                'trend' => $trend,
+                'status' => $status
+            ];
+        });
+    }
+
+    /**
+     * Calculate Gross Production Throughput V2 - Excludes Hold Periods (Net Production Time)
+     * Formula: Total Gross Units (OK + Scrapped) / Net Production Time (sum of Start-to-Hold/Completed/Closed periods)
+     * Uses custom date range and work orders with status 'Completed', 'Closed', or 'Hold'
+     */
+    public function getGrossProductionThroughputByTimeWithDateRange_V2($factoryId, $fromDate, $toDate)
+    {
+        $cacheKey = "kpi_gross_production_throughput_v2_factory_{$factoryId}_{$fromDate}_{$toDate}";
+
+        return Cache::remember($cacheKey, 300, function () use ($factoryId, $fromDate, $toDate) {
+            $startDate = Carbon::parse($fromDate)->startOfDay();
+            $endDate = Carbon::parse($toDate)->endOfDay();
+
+            // Get work orders CREATED in the time range
+            $workOrders = WorkOrder::where('factory_id', $factoryId)
+                ->whereBetween('created_at', [$startDate, $endDate])
+                ->whereIn('status', ['Completed', 'Closed', 'Hold'])
+                ->with(['workOrderLogs'])
+                ->get();
+
+            if ($workOrders->isEmpty()) {
+                return [
+                    'rate' => 0,
+                    'total_gross_units' => 0,
+                    'units_per_hour' => 0,
+                    'total_net_hours' => 0,
+                    'orders_count' => 0,
+                    'average_throughput' => 0,
+                    'trend' => 0,
+                    'status' => 'neutral'
+                ];
+            }
+
+            $individualThroughputs = [];
+            $totalGrossUnits = 0;
+            $totalNetHours = 0;
+            $ordersProcessed = 0;
+
+            foreach ($workOrders as $workOrder) {
+                // Get all Start, Hold, Completed, and Closed logs in chronological order
+                $logs = $workOrder->workOrderLogs()
+                    ->whereIn('status', ['Start', 'Hold', 'Completed', 'Closed'])
+                    ->orderBy('created_at', 'asc')
+                    ->get();
+
+                if ($logs->isEmpty()) {
+                    continue;
+                }
+
+                // Calculate net production time (sum of all Start-to-Hold/Completed/Closed periods)
+                $netProductionHours = 0;
+                $lastStartTime = null;
+
+                foreach ($logs as $log) {
+                    if ($log->status === 'Start') {
+                        // Mark the start of a production period
+                        $lastStartTime = Carbon::parse($log->created_at);
+                    }
+                    elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
+                        // End of a production period - calculate duration
+                        $endTime = Carbon::parse($log->created_at);
+                        $periodHours = $lastStartTime->diffInHours($endTime, true);
+
+                        // Add this production period to the total
+                        $netProductionHours += $periodHours;
+
+                        // Reset start time (production paused/ended)
+                        $lastStartTime = null;
+                    }
+                }
+
+                // Get GROSS units (OK + Scrapped) from work_orders table
+                $grossUnits = ($workOrder->ok_qtys ?? 0) + ($workOrder->scrapped_qtys ?? 0);
+
+                // Calculate throughput for this individual WO
+                if ($netProductionHours > 0 && $grossUnits > 0) {
+                    $throughputPerHour = round($grossUnits / $netProductionHours, 3);
+                    $individualThroughputs[] = $throughputPerHour;
+
+                    // Also track totals for summary
+                    $totalGrossUnits += $grossUnits;
+                    $totalNetHours += $netProductionHours;
+                    $ordersProcessed++;
+                }
+            }
+
+            if (empty($individualThroughputs)) {
+                return [
+                    'rate' => 0,
+                    'total_gross_units' => 0,
+                    'units_per_hour' => 0,
+                    'total_net_hours' => 0,
+                    'orders_count' => 0,
+                    'average_throughput' => 0,
+                    'trend' => 0,
+                    'status' => 'neutral'
+                ];
+            }
+
+            // Calculate average throughput across all WOs
+            $averageThroughput = round(array_sum($individualThroughputs) / count($individualThroughputs), 3);
+            $status = $this->getProductionThroughputStatus($averageThroughput);
+
+            return [
+                'rate' => $averageThroughput,
+                'total_gross_units' => $totalGrossUnits,
+                'units_per_hour' => $averageThroughput,
+                'total_net_hours' => round($totalNetHours, 1),
+                'orders_count' => $ordersProcessed,
+                'average_throughput' => $averageThroughput,
+                'individual_throughputs_count' => count($individualThroughputs),
+                'trend' => 0,
+                'status' => $status
+            ];
+        });
+    }
+
+    /**
+     * Calculate Gross Production Throughput V2 - Excludes Hold Periods (Net Production Time)
+     * Formula: Total Gross Units (OK + Scrapped) / Net Production Time (sum of Start-to-Hold/Completed/Closed periods)
+     * Uses period and work orders with status 'Completed', 'Closed', or 'Hold'
+     */
+    public function getGrossProductionThroughputByTime_V2($factoryId, $period = '30d')
+    {
+        $cacheKey = "kpi_gross_production_throughput_v2_factory_{$factoryId}_{$period}";
+
+        return Cache::remember($cacheKey, 300, function () use ($factoryId, $period) {
+            $dateRange = $this->getDateRange($period);
+
+            // Get completed/closed/hold work orders with their logs
+            $workOrders = WorkOrder::where('factory_id', $factoryId)
+                ->whereBetween('created_at', $dateRange)
+                ->whereIn('status', ['Completed', 'Closed', 'Hold'])
+                ->with(['workOrderLogs'])
+                ->get();
+
+            if ($workOrders->isEmpty()) {
+                return [
+                    'rate' => 0,
+                    'total_gross_units' => 0,
+                    'units_per_hour' => 0,
+                    'total_net_hours' => 0,
+                    'orders_count' => 0,
+                    'trend' => 0,
+                    'status' => 'neutral'
+                ];
+            }
+
+            $totalGrossUnits = 0;
+            $totalNetHours = 0;
+            $ordersProcessed = 0;
+
+            foreach ($workOrders as $workOrder) {
+                // Get all Start, Hold, Completed, and Closed logs in chronological order
+                $logs = $workOrder->workOrderLogs()
+                    ->whereIn('status', ['Start', 'Hold', 'Completed', 'Closed'])
+                    ->orderBy('created_at', 'asc')
+                    ->get();
+
+                if ($logs->isEmpty()) {
+                    continue;
+                }
+
+                // Calculate net production time (sum of all Start-to-Hold/Completed/Closed periods)
+                $netProductionHours = 0;
+                $lastStartTime = null;
+
+                foreach ($logs as $log) {
+                    if ($log->status === 'Start') {
+                        // Mark the start of a production period
+                        $lastStartTime = Carbon::parse($log->created_at);
+                    }
+                    elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
+                        // End of a production period - calculate duration
+                        $endTime = Carbon::parse($log->created_at);
+                        $periodHours = $lastStartTime->diffInHours($endTime, true);
+
+                        // Add this production period to the total
+                        $netProductionHours += $periodHours;
+
+                        // Reset start time (production paused/ended)
+                        $lastStartTime = null;
+                    }
+                }
+
+                // Get GROSS units (OK + Scrapped) from work_orders table
+                $grossUnits = ($workOrder->ok_qtys ?? 0) + ($workOrder->scrapped_qtys ?? 0);
+
+                // Calculate throughput if we have valid data
+                if ($netProductionHours > 0 && $grossUnits > 0) {
+                    $totalGrossUnits += $grossUnits;
+                    $totalNetHours += $netProductionHours;
+                    $ordersProcessed++;
+                }
+            }
+
+            if ($totalNetHours === 0) {
+                return [
+                    'rate' => 0,
+                    'total_gross_units' => $totalGrossUnits,
+                    'units_per_hour' => 0,
+                    'total_net_hours' => 0,
+                    'orders_count' => $ordersProcessed,
+                    'trend' => 0,
+                    'status' => 'neutral'
+                ];
+            }
+
+            $unitsPerHour = round($totalGrossUnits / $totalNetHours, 2);
+            $trend = $this->calculateTrend('gross_production_throughput_v2', $unitsPerHour, $factoryId, $period);
+            $status = $this->getProductionThroughputStatus($unitsPerHour);
+
+            return [
+                'rate' => $unitsPerHour,
+                'total_gross_units' => $totalGrossUnits,
+                'units_per_hour' => $unitsPerHour,
+                'total_net_hours' => round($totalNetHours, 1),
                 'orders_count' => $ordersProcessed,
                 'trend' => $trend,
                 'status' => $status
@@ -878,15 +1595,11 @@ class KPIService
                 } elseif ($kpiType === 'production_throughput_time') {
                     $dateRange = $this->getDateRange($previousPeriod);
 
-                    // Get completed/closed work orders with their completion logs for previous period
+                    // Get completed/closed/hold work orders for previous period
                     $workOrders = WorkOrder::where('factory_id', $factoryId)
                         ->whereBetween('created_at', $dateRange)
-                        ->whereIn('status', ['Completed', 'Closed'])
-                        ->with(['workOrderLogs' => function($query) {
-                            $query->whereIn('status', ['Completed', 'Closed'])
-                                  ->orderBy('updated_at', 'desc')
-                                  ->limit(1);
-                        }])
+                        ->whereIn('status', ['Completed', 'Closed', 'Hold']) // Include Hold status
+                        ->with(['workOrderLogs'])
                         ->get();
 
                     if ($workOrders->isEmpty()) {
@@ -897,15 +1610,40 @@ class KPIService
                     $totalHours = 0;
 
                     foreach ($workOrders as $workOrder) {
-                        if ($workOrder->workOrderLogs->isNotEmpty()) {
-                            $log = $workOrder->workOrderLogs->first();
-                            $createdAt = Carbon::parse($workOrder->created_at);
-                            $completedAt = Carbon::parse($log->updated_at);
-                            
-                            $hours = $createdAt->diffInHours($completedAt);
-                            if ($hours > 0) {
-                                $totalUnits += $workOrder->ok_qtys ?? 0;
-                                $totalHours += $hours;
+                        $endLog = null;
+
+                        // Determine end log based on work order status
+                        if ($workOrder->status === 'Hold') {
+                            // For Hold status: get the LAST Hold log entry
+                            $endLog = $workOrder->workOrderLogs()
+                                ->where('status', 'Hold')
+                                ->orderBy('created_at', 'desc')
+                                ->first();
+                        } else {
+                            // For Completed/Closed: get the latest Completed or Closed log
+                            $endLog = $workOrder->workOrderLogs()
+                                ->whereIn('status', ['Completed', 'Closed'])
+                                ->orderBy('created_at', 'desc')
+                                ->first();
+                        }
+
+                        if ($endLog) {
+                            // Get the first Start log entry for this work order
+                            $startLog = $workOrder->workOrderLogs()
+                                ->where('status', 'Start')
+                                ->orderBy('created_at', 'asc')
+                                ->first();
+
+                            // Only calculate if Start log exists
+                            if ($startLog) {
+                                $startedAt = Carbon::parse($startLog->created_at);
+                                $endedAt = Carbon::parse($endLog->created_at);
+
+                                $hours = $startedAt->diffInHours($endedAt);
+                                if ($hours > 0) {
+                                    $totalUnits += $workOrder->ok_qtys ?? 0;
+                                    $totalHours += $hours;
+                                }
                             }
                         }
                     }

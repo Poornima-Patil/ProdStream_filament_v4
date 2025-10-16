@@ -42,9 +42,26 @@ class MachineResource extends Resource
     {
         return $schema
             ->components([
-                TextInput::make('assetId')->required(),
+                TextInput::make('assetId')
+                    ->required()
+                    ->unique(
+                        table: 'machines',
+                        column: 'assetId',
+                        ignoreRecord: true,
+                        modifyRuleUsing: function ($rule) {
+                            return $rule->where('factory_id', auth()->user()->factory_id);
+                        }
+                    ),
                 TextInput::make('name')
-                    ->unique(ignoreRecord: true)->required(),
+                    ->required()
+                    ->unique(
+                        table: 'machines',
+                        column: 'name',
+                        ignoreRecord: true,
+                        modifyRuleUsing: function ($rule) {
+                            return $rule->where('factory_id', auth()->user()->factory_id);
+                        }
+                    ),
                 Select::make('status')->options([
                     1 => 'Active',
                     0 => 'Inactive',
@@ -58,7 +75,10 @@ class MachineResource extends Resource
                     })
                     ->searchable()
                     ->preload()
-                    ->default(1)
+                    ->default(function () {
+                        return \App\Models\Department::where('factory_id', auth()->user()->factory_id)
+                            ->first()?->id;
+                    })
                     ->required(),
                 Select::make('machine_group_id')
                     ->label('Machine Group')
@@ -89,16 +109,17 @@ class MachineResource extends Resource
             ->recordActions([
                 ActionGroup::make([
                 EditAction::make()
-                    ->label('Edit'),
+                    ->label('Edit')->size('sm'),
                 ViewAction::make()
-                    ->label('View'),
+                    ->label('View')->size('sm'),
                 Action::make('calendar')
                     ->label('View Schedule')
                     ->icon('heroicon-o-calendar-days')
                     ->color('info')
+                    ->size('sm')
                     ->url(fn($record) => MachineResource::getUrl('view', ['record' => $record]) . '#machine-schedule-section')
                     ->openUrlInNewTab(false),
-            ])
+            ])->size('sm')->tooltip('Action')->dropdownPlacement('right')
             ], position: RecordActionsPosition::BeforeColumns)
             ->toolbarActions([
                 BulkActionGroup::make([

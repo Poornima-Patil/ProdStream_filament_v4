@@ -81,12 +81,12 @@ class ViewWorkOrder extends ViewRecord
                                 ->whereIn('status', ['Completed', 'Closed'])
                                 ->orderBy('updated_at', 'desc')
                                 ->first();
-                            
+
                             if (!$completionLog) {
                                 return new HtmlString('
                                     <div class="mt-4">
                                         <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
-                                            <h4 class="font-bold text-black dark:text-white">Production Throughput</h4>
+                                            <h4 class="font-bold text-black dark:text-white">Net Production Throughput (Efficiency Oriented) 1</h4>
                                         </div>
                                         <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
                                             <div class="text-center text-gray-500 dark:text-gray-400">
@@ -96,16 +96,36 @@ class ViewWorkOrder extends ViewRecord
                                     </div>
                                 ');
                             }
-                            
-                            // Calculate time period (created_at to completion log created_at)
-                            $createdAt = Carbon::parse($record->created_at);
 
-                            // Use created_at as the end time (when completion log was created)
+                            // Get the first Start log entry for this work order
+                            $startLog = $record->workOrderLogs()
+                                ->where('status', 'Start')
+                                ->orderBy('created_at', 'asc')
+                                ->first();
+
+                            // If no Start log found, show appropriate message
+                            if (!$startLog) {
+                                return new HtmlString('
+                                    <div class="mt-4">
+                                        <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
+                                            <h4 class="font-bold text-black dark:text-white">Net Production Throughput (Efficiency Oriented) 1</h4>
+                                        </div>
+                                        <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
+                                            <div class="text-center text-yellow-500 dark:text-yellow-400">
+                                                No production start log available
+                                            </div>
+                                        </div>
+                                    </div>
+                                ');
+                            }
+
+                            // Calculate time period (first Start log to completion log)
+                            $startedAt = Carbon::parse($startLog->created_at);
                             $completedAt = Carbon::parse($completionLog->created_at);
-                            
-                            // Handle edge cases where completion time might be before creation time
-                            $hours = $createdAt->diffInHours($completedAt, false); // false = can be negative
-                            
+
+                            // Handle edge cases where completion time might be before start time
+                            $hours = $startedAt->diffInHours($completedAt, false); // false = can be negative
+
                             // If negative hours, it might be a data issue - use absolute value or show as data error
                             if ($hours <= 0) {
                                 $hours = abs($hours);
@@ -124,7 +144,7 @@ class ViewWorkOrder extends ViewRecord
                             return new HtmlString('
                                 <div class="mt-4">
                                     <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
-                                        <h4 class="font-bold text-black dark:text-white">Production Throughput</h4>
+                                        <h4 class="font-bold text-black dark:text-white">Net Production Throughput (Efficiency Oriented) 1</h4>
                                     </div>
                                     <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
                                         <div class="flex justify-between items-center mb-2">
@@ -136,8 +156,302 @@ class ViewWorkOrder extends ViewRecord
                                             <span class="text-xs text-gray-600 dark:text-gray-400">24-hour equivalent</span>
                                         </div>
                                         <div class="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                                            <div>Started: ' . $createdAt->format('Y-m-d H:i:s') . '</div>
+                                            <div>Production Started: ' . $startedAt->format('Y-m-d H:i:s') . '</div>
                                             <div>Completed: ' . $completedAt->format('Y-m-d H:i:s') . '</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ');
+                        })->html(),
+
+                    // Net Production Throughput (Efficiency Oriented) 2 - Excludes Hold Periods
+                    TextEntry::make('net_production_throughput_v2')
+                        ->label('')
+                        ->columnSpan([
+                            'sm' => 'full',
+                            'md' => 1,
+                        ])
+                        ->visible(fn($record) => in_array(strtolower($record->status ?? ''), ['completed', 'closed', 'hold']))
+                        ->getStateUsing(function ($record) {
+                            // Get all Start, Hold, Completed, and Closed logs in chronological order
+                            $logs = $record->workOrderLogs()
+                                ->whereIn('status', ['Start', 'Hold', 'Completed', 'Closed'])
+                                ->orderBy('created_at', 'asc')
+                                ->get();
+
+                            if ($logs->isEmpty()) {
+                                return new HtmlString('
+                                    <div class="mt-4">
+                                        <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
+                                            <h4 class="font-bold text-black dark:text-white">Net Production Throughput (Efficiency Oriented) 2</h4>
+                                        </div>
+                                        <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
+                                            <div class="text-center text-gray-500 dark:text-gray-400">
+                                                No production log data available
+                                            </div>
+                                        </div>
+                                    </div>
+                                ');
+                            }
+
+                            // Calculate net production time (sum of all Start-to-Hold/Completed/Closed periods)
+                            $netProductionHours = 0;
+                            $lastStartTime = null;
+                            $productionPeriods = [];
+
+                            foreach ($logs as $log) {
+                                if ($log->status === 'Start') {
+                                    // Mark the start of a production period
+                                    $lastStartTime = Carbon::parse($log->created_at);
+                                }
+                                elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
+                                    // End of a production period - calculate duration
+                                    $endTime = Carbon::parse($log->created_at);
+                                    $periodHours = $lastStartTime->diffInHours($endTime, true);
+
+                                    // Add this production period to the total
+                                    $netProductionHours += $periodHours;
+
+                                    // Track periods for display
+                                    $productionPeriods[] = [
+                                        'start' => $lastStartTime,
+                                        'end' => $endTime,
+                                        'hours' => $periodHours
+                                    ];
+
+                                    // Reset start time (production paused/ended)
+                                    $lastStartTime = null;
+                                }
+                            }
+
+                            // Get units produced from work_orders table
+                            $units = $record->ok_qtys ?? 0;
+
+                            // Calculate throughput
+                            $throughputPerHour = $netProductionHours > 0 ? round($units / $netProductionHours, 3) : 0;
+                            $throughputPerDay = round($throughputPerHour * 24, 1);
+                            $periodCount = count($productionPeriods);
+
+                            return new HtmlString('
+                                <div class="mt-4">
+                                    <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
+                                        <h4 class="font-bold text-black dark:text-white">Net Production Throughput (Efficiency Oriented) 2</h4>
+                                    </div>
+                                    <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Hourly Rate: ' . $throughputPerHour . ' units/hr</span>
+                                            <span class="text-xs text-gray-600 dark:text-gray-400">' . $units . ' units in ' . number_format($netProductionHours, 1) . ' net hrs</span>
+                                        </div>
+                                        <div class="flex justify-between items-center mb-4">
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Daily Rate: ' . $throughputPerDay . ' units/day</span>
+                                            <span class="text-xs text-gray-600 dark:text-gray-400">24-hour equivalent</span>
+                                        </div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                                            <div class="font-semibold mb-1">Production Periods: ' . $periodCount . '</div>
+                                            <div class="text-xs italic">Excludes hold/pause time</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ');
+                        })->html(),
+
+                    // Gross Production Throughput (Raw Output-Oriented) 1
+                    TextEntry::make('gross_production_throughput')
+                        ->label('')
+                        ->columnSpan([
+                            'sm' => 'full',
+                            'md' => 1,
+                        ])
+                        ->visible(fn($record) => in_array(strtolower($record->status ?? ''), ['completed', 'closed', 'hold']))
+                        ->getStateUsing(function ($record) {
+                            // Get the completion/hold log for this work order
+                            $endLog = null;
+
+                            if (strtolower($record->status) === 'hold') {
+                                $endLog = $record->workOrderLogs()
+                                    ->where('status', 'Hold')
+                                    ->orderBy('created_at', 'desc')
+                                    ->first();
+                            } else {
+                                $endLog = $record->workOrderLogs()
+                                    ->whereIn('status', ['Completed', 'Closed'])
+                                    ->orderBy('created_at', 'desc')
+                                    ->first();
+                            }
+
+                            if (!$endLog) {
+                                return new HtmlString('
+                                    <div class="mt-4">
+                                        <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
+                                            <h4 class="font-bold text-black dark:text-white">Gross Production Throughput (Raw Output-Oriented) 1</h4>
+                                        </div>
+                                        <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
+                                            <div class="text-center text-gray-500 dark:text-gray-400">
+                                                No completion/hold data available
+                                            </div>
+                                        </div>
+                                    </div>
+                                ');
+                            }
+
+                            // Get the first Start log entry for this work order
+                            $startLog = $record->workOrderLogs()
+                                ->where('status', 'Start')
+                                ->orderBy('created_at', 'asc')
+                                ->first();
+
+                            // If no Start log found, show appropriate message
+                            if (!$startLog) {
+                                return new HtmlString('
+                                    <div class="mt-4">
+                                        <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
+                                            <h4 class="font-bold text-black dark:text-white">Gross Production Throughput (Raw Output-Oriented) 1</h4>
+                                        </div>
+                                        <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
+                                            <div class="text-center text-yellow-500 dark:text-yellow-400">
+                                                No production start log available
+                                            </div>
+                                        </div>
+                                    </div>
+                                ');
+                            }
+
+                            // Calculate time period (first Start log to end log)
+                            $startedAt = Carbon::parse($startLog->created_at);
+                            $endedAt = Carbon::parse($endLog->created_at);
+
+                            // Handle edge cases where end time might be before start time
+                            $hours = $startedAt->diffInHours($endedAt, false); // false = can be negative
+
+                            // If negative hours, use absolute value (data inconsistency)
+                            if ($hours <= 0) {
+                                $hours = abs($hours);
+                                $dataNote = ' (Data inconsistency detected)';
+                            } else {
+                                $dataNote = '';
+                            }
+
+                            // Get GROSS units (OK + Scrapped) from work_orders table
+                            $okQty = $record->ok_qtys ?? 0;
+                            $scrappedQty = $record->scrapped_qtys ?? 0;
+                            $grossUnits = $okQty + $scrappedQty;
+
+                            // Calculate throughput
+                            $throughputPerHour = $hours > 0 ? round($grossUnits / $hours, 3) : 0;
+                            $throughputPerDay = round($throughputPerHour * 24, 1);
+
+                            return new HtmlString('
+                                <div class="mt-4">
+                                    <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
+                                        <h4 class="font-bold text-black dark:text-white">Gross Production Throughput (Raw Output-Oriented) 1</h4>
+                                    </div>
+                                    <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Hourly Rate: ' . $throughputPerHour . ' units/hr' . $dataNote . '</span>
+                                            <span class="text-xs text-gray-600 dark:text-gray-400">' . $grossUnits . ' total units in ' . number_format($hours, 1) . ' hrs</span>
+                                        </div>
+                                        <div class="flex justify-between items-center mb-4">
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Daily Rate: ' . $throughputPerDay . ' units/day</span>
+                                            <span class="text-xs text-gray-600 dark:text-gray-400">24-hour equivalent</span>
+                                        </div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                                            <div>Production Started: ' . $startedAt->format('Y-m-d H:i:s') . '</div>
+                                            <div>Ended: ' . $endedAt->format('Y-m-d H:i:s') . '</div>
+                                            <div class="mt-2 text-xs italic">Total Output: ' . $okQty . ' OK + ' . $scrappedQty . ' Scrapped</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ');
+                        })->html(),
+
+                    // Gross Production Throughput (Raw Output-Oriented) 2 - Excludes Hold Periods
+                    TextEntry::make('gross_production_throughput_v2')
+                        ->label('')
+                        ->columnSpan([
+                            'sm' => 'full',
+                            'md' => 1,
+                        ])
+                        ->visible(fn($record) => in_array(strtolower($record->status ?? ''), ['completed', 'closed', 'hold']))
+                        ->getStateUsing(function ($record) {
+                            // Get all Start, Hold, Completed, and Closed logs in chronological order
+                            $logs = $record->workOrderLogs()
+                                ->whereIn('status', ['Start', 'Hold', 'Completed', 'Closed'])
+                                ->orderBy('created_at', 'asc')
+                                ->get();
+
+                            if ($logs->isEmpty()) {
+                                return new HtmlString('
+                                    <div class="mt-4">
+                                        <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
+                                            <h4 class="font-bold text-black dark:text-white">Gross Production Throughput (Raw Output-Oriented) 2</h4>
+                                        </div>
+                                        <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
+                                            <div class="text-center text-gray-500 dark:text-gray-400">
+                                                No production log data available
+                                            </div>
+                                        </div>
+                                    </div>
+                                ');
+                            }
+
+                            // Calculate net production time (sum of all Start-to-Hold/Completed/Closed periods)
+                            $netProductionHours = 0;
+                            $lastStartTime = null;
+                            $productionPeriods = [];
+
+                            foreach ($logs as $log) {
+                                if ($log->status === 'Start') {
+                                    // Mark the start of a production period
+                                    $lastStartTime = Carbon::parse($log->created_at);
+                                }
+                                elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
+                                    // End of a production period - calculate duration
+                                    $endTime = Carbon::parse($log->created_at);
+                                    $periodHours = $lastStartTime->diffInHours($endTime, true);
+
+                                    // Add this production period to the total
+                                    $netProductionHours += $periodHours;
+
+                                    // Track periods for display
+                                    $productionPeriods[] = [
+                                        'start' => $lastStartTime,
+                                        'end' => $endTime,
+                                        'hours' => $periodHours
+                                    ];
+
+                                    // Reset start time (production paused/ended)
+                                    $lastStartTime = null;
+                                }
+                            }
+
+                            // Get GROSS units (OK + Scrapped) from work_orders table
+                            $okQty = $record->ok_qtys ?? 0;
+                            $scrappedQty = $record->scrapped_qtys ?? 0;
+                            $grossUnits = $okQty + $scrappedQty;
+
+                            // Calculate throughput
+                            $throughputPerHour = $netProductionHours > 0 ? round($grossUnits / $netProductionHours, 3) : 0;
+                            $throughputPerDay = round($throughputPerHour * 24, 1);
+                            $periodCount = count($productionPeriods);
+
+                            return new HtmlString('
+                                <div class="mt-4">
+                                    <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
+                                        <h4 class="font-bold text-black dark:text-white">Gross Production Throughput (Raw Output-Oriented) 2</h4>
+                                    </div>
+                                    <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Hourly Rate: ' . $throughputPerHour . ' units/hr</span>
+                                            <span class="text-xs text-gray-600 dark:text-gray-400">' . $grossUnits . ' total units in ' . number_format($netProductionHours, 1) . ' net hrs</span>
+                                        </div>
+                                        <div class="flex justify-between items-center mb-4">
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Daily Rate: ' . $throughputPerDay . ' units/day</span>
+                                            <span class="text-xs text-gray-600 dark:text-gray-400">24-hour equivalent</span>
+                                        </div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                                            <div class="font-semibold mb-1">Production Periods: ' . $periodCount . '</div>
+                                            <div class="text-xs italic">Excludes hold/pause time</div>
+                                            <div class="mt-2 text-xs italic">Total Output: ' . $okQty . ' OK + ' . $scrappedQty . ' Scrapped</div>
                                         </div>
                                     </div>
                                 </div>
@@ -533,7 +847,13 @@ class ViewWorkOrder extends ViewRecord
                     TextEntry::make('work_order_logs_table')
                         ->label('Work Order Logs')
                         ->getStateUsing(function ($record) {
-                            $record->load(['workOrderLogs.user', 'quantities']);
+                            $record->load([
+                                'workOrderLogs' => function ($query) {
+                                    $query->orderBy('created_at', 'asc');
+                                },
+                                'workOrderLogs.user',
+                                'quantities'
+                            ]);
                             $quantities = $record->quantities;
                             $quantitiesIndex = 0;
 

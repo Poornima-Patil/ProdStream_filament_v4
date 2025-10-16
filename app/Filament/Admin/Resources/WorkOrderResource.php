@@ -1810,7 +1810,7 @@ Select::make('operator_id')
                             self::sendAlert($data, $record);
                         })
                         ->button(),
-                ]),
+                ])->size('sm')->tooltip('Action')->dropdownPlacement('right')
             ], position: RecordActionsPosition::BeforeColumns)
             ->headerActions([])
             ->toolbarActions([

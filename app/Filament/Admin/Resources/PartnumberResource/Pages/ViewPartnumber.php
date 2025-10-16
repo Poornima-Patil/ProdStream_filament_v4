@@ -22,6 +22,8 @@ class ViewPartnumber extends ViewRecord
 
     public ?string $dateTo = null;
 
+    protected $listeners = ['kpi-date-type-changed' => 'refreshKpis'];
+
     public function mount($record): void
     {
         parent::mount($record);
@@ -50,6 +52,12 @@ class ViewPartnumber extends ViewRecord
     public function getDateRange(): array
     {
         return [$this->dateFrom, $this->dateTo];
+    }
+
+    public function refreshKpis(): void
+    {
+        // Refresh the component to recalculate KPIs with new date type
+        $this->dispatch('$refresh');
     }
 
     public function infolist(Schema $schema): Schema
@@ -99,6 +107,9 @@ class ViewPartnumber extends ViewRecord
                                 return new \Illuminate\Support\HtmlString('<div class="text-gray-500 dark:text-gray-400">No Part Number Found</div>');
                             }
 
+                            // Get KPI date filter type from settings
+                            $kpiDateType = session('kpi_date_type', 'created_at');
+
                             // Get work order status distribution for ALL statuses (for Summary)
                             // For part numbers, we need complex join: part_numbers -> purchase_orders -> boms -> work_orders
                             $summaryQuery = \Illuminate\Support\Facades\DB::table('part_numbers')
@@ -108,12 +119,29 @@ class ViewPartnumber extends ViewRecord
                                 ->where('part_numbers.id', $record->id)
                                 ->where('work_orders.factory_id', \Filament\Facades\Filament::getTenant()->id);
 
-                            // Apply date range filter
+                            // Apply date range filter based on KPI date type
                             if ($this->dateFrom && $this->dateTo) {
-                                $summaryQuery->whereBetween('work_orders.created_at', [
-                                    Carbon::parse($this->dateFrom)->startOfDay(),
-                                    Carbon::parse($this->dateTo)->endOfDay(),
-                                ]);
+                                if ($kpiDateType === 'start_time') {
+                                    // Only include work orders that have a Start log entry
+                                    $summaryQuery->whereExists(function ($query) use ($summaryQuery) {
+                                        $query->select(\Illuminate\Support\Facades\DB::raw(1))
+                                            ->from('work_order_logs')
+                                            ->whereColumn('work_order_logs.work_order_id', 'work_orders.id')
+                                            ->where('work_order_logs.status', 'Start')
+                                            ->whereBetween('work_order_logs.created_at', [
+                                                Carbon::parse($this->dateFrom)->startOfDay(),
+                                                Carbon::parse($this->dateTo)->endOfDay(),
+                                            ])
+                                            ->orderBy('work_order_logs.created_at', 'asc')
+                                            ->limit(1);
+                                    });
+                                } else {
+                                    // Default: use created_at
+                                    $summaryQuery->whereBetween('work_orders.created_at', [
+                                        Carbon::parse($this->dateFrom)->startOfDay(),
+                                        Carbon::parse($this->dateTo)->endOfDay(),
+                                    ]);
+                                }
                             }
 
                             $statusDistribution = $summaryQuery->selectRaw('work_orders.status, COUNT(*) as count')
@@ -146,12 +174,29 @@ class ViewPartnumber extends ViewRecord
                                 ->where('work_orders.factory_id', \Filament\Facades\Filament::getTenant()->id)
                                 ->whereIn('work_orders.status', ['Completed', 'Closed']);
 
-                            // Apply date range filter
+                            // Apply date range filter based on KPI date type
                             if ($this->dateFrom && $this->dateTo) {
-                                $qualityQuery->whereBetween('work_orders.created_at', [
-                                    Carbon::parse($this->dateFrom)->startOfDay(),
-                                    Carbon::parse($this->dateTo)->endOfDay(),
-                                ]);
+                                if ($kpiDateType === 'start_time') {
+                                    // Only include work orders that have a Start log entry
+                                    $qualityQuery->whereExists(function ($query) {
+                                        $query->select(\Illuminate\Support\Facades\DB::raw(1))
+                                            ->from('work_order_logs')
+                                            ->whereColumn('work_order_logs.work_order_id', 'work_orders.id')
+                                            ->where('work_order_logs.status', 'Start')
+                                            ->whereBetween('work_order_logs.created_at', [
+                                                Carbon::parse($this->dateFrom)->startOfDay(),
+                                                Carbon::parse($this->dateTo)->endOfDay(),
+                                            ])
+                                            ->orderBy('work_order_logs.created_at', 'asc')
+                                            ->limit(1);
+                                    });
+                                } else {
+                                    // Default: use created_at
+                                    $qualityQuery->whereBetween('work_orders.created_at', [
+                                        Carbon::parse($this->dateFrom)->startOfDay(),
+                                        Carbon::parse($this->dateTo)->endOfDay(),
+                                    ]);
+                                }
                             }
 
                             $qualityData = $qualityQuery->selectRaw('
@@ -171,8 +216,48 @@ class ViewPartnumber extends ViewRecord
                                 $qualityRate = (($totalProduced - $totalScrapped) / $totalProduced) * 100;
                             }
 
+                            // Count excluded non-started work orders when using start_time filter
+                            $excludedCount = 0;
+                            if ($kpiDateType === 'start_time' && $this->dateFrom && $this->dateTo) {
+                                $excludedCount = \Illuminate\Support\Facades\DB::table('part_numbers')
+                                    ->join('purchase_orders', 'part_numbers.id', '=', 'purchase_orders.part_number_id')
+                                    ->join('boms', 'purchase_orders.id', '=', 'boms.purchase_order_id')
+                                    ->join('work_orders', 'boms.id', '=', 'work_orders.bom_id')
+                                    ->where('part_numbers.id', $record->id)
+                                    ->where('work_orders.factory_id', \Filament\Facades\Filament::getTenant()->id)
+                                    ->whereNotExists(function ($query) {
+                                        $query->select(\Illuminate\Support\Facades\DB::raw(1))
+                                            ->from('work_order_logs')
+                                            ->whereColumn('work_order_logs.work_order_id', 'work_orders.id')
+                                            ->where('work_order_logs.status', 'Start');
+                                    })
+                                    ->whereBetween('work_orders.created_at', [
+                                        Carbon::parse($this->dateFrom)->startOfDay(),
+                                        Carbon::parse($this->dateTo)->endOfDay(),
+                                    ])
+                                    ->count();
+                            }
+
                             return new \Illuminate\Support\HtmlString('
                                 <div class="space-y-6">
+                                    '.($excludedCount > 0 ? '
+                                    <!-- Info banner for excluded non-started work orders -->
+                                    <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                                        <div class="flex items-start">
+                                            <div class="flex-shrink-0">
+                                                <svg class="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                                                </svg>
+                                            </div>
+                                            <div class="ml-3">
+                                                <p class="text-sm text-blue-800 dark:text-blue-200">
+                                                    <strong>Production Start Date Filter Active:</strong> '.$excludedCount.' work order'.($excludedCount > 1 ? 's' : '').' not yet started '.($excludedCount > 1 ? 'are' : 'is').' excluded from these metrics.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    ' : '').'
+
                                     <!-- Top Row: Work Order Summary and Quality Metrics Side by Side -->
                                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                         <!-- Work Order Summary - Left Half -->

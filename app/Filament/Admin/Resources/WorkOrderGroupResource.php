@@ -180,12 +180,13 @@ class WorkOrderGroupResource extends Resource
             ])
             ->recordActions([
                 ActionGroup::make([
-                    ViewAction::make()->label('View'),
-                    EditAction::make()->label('Edit'),
+                    ViewAction::make()->label('View')->size('sm'),
+                    EditAction::make()->label('Edit')->size('sm'),
                     Action::make('activate')
                         ->label('Activate')
                         ->icon('heroicon-o-play')
                         ->color('success')
+                        ->size('sm')
                         ->visible(fn (WorkOrderGroup $record) => $record->status === 'draft')
                         ->authorize('activate')
                         ->action(function (WorkOrderGroup $record) {
@@ -226,7 +227,7 @@ class WorkOrderGroupResource extends Resource
                                 ->success()
                                 ->send();
                         }),
-                ])
+                ])->size('sm')->tooltip('Action')->dropdownPlacement('right')
             ], position: RecordActionsPosition::BeforeColumns)
             ->toolbarActions([
                 BulkActionGroup::make([

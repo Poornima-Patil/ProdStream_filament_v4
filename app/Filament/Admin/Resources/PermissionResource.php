@@ -62,8 +62,8 @@ class PermissionResource extends Resource
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                EditAction::make(),
-                RestoreAction::make(),
+                EditAction::make()->size('sm'),
+                RestoreAction::make()->size('sm'),
 
             ])
             ->toolbarActions([

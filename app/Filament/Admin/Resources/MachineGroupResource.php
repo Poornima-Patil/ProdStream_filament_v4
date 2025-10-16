@@ -41,7 +41,15 @@ class MachineGroupResource extends Resource
             ->components([
                 TextInput::make('group_name')
                     ->label('Group Name')
-                    ->required(),
+                    ->required()
+                    ->unique(
+                        table: 'machine_groups',
+                        column: 'group_name',
+                        ignoreRecord: true,
+                        modifyRuleUsing: function ($rule) {
+                            return $rule->where('factory_id', auth()->user()->factory_id);
+                        }
+                    ),
                 Textarea::make('description')
                     ->label('Description')
                     ->required(),
@@ -66,9 +74,9 @@ class MachineGroupResource extends Resource
             ])
           ->recordActions([
                 ActionGroup::make([
-                    EditAction::make()->label('Edit'),
-                    ViewAction::make()->label('View'),
-                ])
+                    EditAction::make()->label('Edit')->size('sm'),
+                    ViewAction::make()->label('View')->size('sm'),
+                ])->size('sm')->tooltip('Action')->dropdownPlacement('right')
             ], position: RecordActionsPosition::BeforeColumns)
             ->toolbarActions([
                 BulkActionGroup::make([

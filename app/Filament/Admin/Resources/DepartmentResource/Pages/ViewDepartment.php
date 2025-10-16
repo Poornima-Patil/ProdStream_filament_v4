@@ -21,11 +21,12 @@ class ViewDepartment extends ViewRecord
     public function infolist(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('View Department')
+            Section::make('Department details')
                 ->hiddenLabel()
                 ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('View Department')
+                     ->hiddenLabel()
                         ->label('')
                         ->getStateUsing(function ($record) {
                             if (!$record) {
