@@ -1,5 +1,7 @@
 # Machine Status - Analytics Mode Documentation
 
+**IMPORTANT NOTE:** This document describes the **Machine Status KPI**, which tracks machine status distribution (Running, Hold, Scheduled, Idle). For machine utilization percentages and productivity metrics, see [MACHINE_UTILIZATION_RATE.md](MACHINE_UTILIZATION_RATE.md).
+
 ## Table of Contents
 1. [Overview](#overview)
 2. [Analytics Display Components](#analytics-display-components)
@@ -19,18 +21,29 @@
 
 ### What is Machine Status Analytics Mode?
 
-Machine Status Analytics Mode provides **historical performance analysis** of machines based on aggregated daily data. It allows users to analyze trends, compare periods, and gain insights into machine utilization, production efficiency, and quality metrics over time.
+Machine Status Analytics Mode provides **historical analysis of machine status distribution** over time. It shows how many machines were Running, on Hold, Scheduled (Assigned), or Idle on each day, allowing users to identify patterns, compare time periods, and understand machine utilization from a status perspective.
+
+### Machine Status vs Machine Utilization
+
+**Two Separate KPIs:**
+
+| KPI | What It Shows | Key Metrics |
+|-----|--------------|-------------|
+| **Machine Status** (This Document) | Distribution of machine states | Running, Hold, Scheduled, Idle counts |
+| **Machine Utilization** | Productivity percentages | Scheduled Utilization %, Active Utilization % |
+
+**Important:** These are distinct KPIs. Machine Status shows *what state machines are in*, while Machine Utilization shows *how productively time is being used*.
 
 ### Dashboard Mode vs Analytics Mode
 
 | Feature | Dashboard Mode | Analytics Mode |
 |---------|---------------|----------------|
-| **Data Source** | Real-time from `work_orders` table | Pre-aggregated from `kpi_machine_daily` table |
-| **Refresh Rate** | Manual refresh button (on-demand) | Static historical data |
+| **Data Source** | Real-time from `work_orders` table | Historical aggregation from `work_orders` |
+| **Refresh Rate** | Manual refresh button (on-demand) | Calculated on-demand with caching |
 | **Time Scope** | Current day only | Any historical date range |
-| **Purpose** | Monitor what's happening NOW | Analyze what happened BEFORE |
-| **Display** | Live machine status tables | Summary cards + daily breakdown |
-| **Use Case** | "What machines are running today?" | "How did we perform last month?" |
+| **Purpose** | Monitor what's happening NOW | Analyze status patterns over time |
+| **Display** | Live status tables by machine | Summary cards + daily breakdown table |
+| **Use Case** | "What machines are running right now?" | "How many machines were idle last week?" |
 
 ### When to Use Each Mode
 
@@ -68,28 +81,37 @@ Machine Status Analytics Mode provides **historical performance analysis** of ma
 
 ### 1. Summary Cards (Top Section)
 
-Displays 6 key metrics aggregated over the selected time period:
+Displays 4 key metrics showing average machine counts across the selected time period:
 
 ```
-┌─────────────────┬─────────────────┬─────────────────┐
-│ Avg Utilization │  Total Uptime   │ Total Downtime  │
-│     75.5%       │    180.5 h      │     58.5 h      │
-└─────────────────┴─────────────────┴─────────────────┘
-┌─────────────────┬─────────────────┬─────────────────┐
-│ Units Produced  │  Work Orders    │    Machines     │
-│     12,450      │       48        │        6        │
-└─────────────────┴─────────────────┴─────────────────┘
+┌─────────────────┬─────────────────┬─────────────────┬─────────────────┐
+│  Avg Running    │   Avg On Hold   │  Avg Scheduled  │    Avg Idle     │
+│      4.2        │      1.3        │      2.1        │      0.4        │
+│  (52.5% of 8)   │  (16.3% of 8)   │  (26.3% of 8)   │   (5.0% of 8)   │
+└─────────────────┴─────────────────┴─────────────────┴─────────────────┘
 ```
+
+**With Comparison Enabled:**
+Each card shows trend indicators comparing current vs previous period:
+- ↑ +0.5 machines (+12%) - for Running (green = good)
+- ↓ -0.3 machines (-19%) - for Hold (green = good, fewer holds)
+- ↑ +0.2 machines (+10%) - for Scheduled (neutral)
+- ↓ -0.1 machines (-20%) - for Idle (green = good, fewer idle)
 
 ### 2. Daily Breakdown Table (Main Content)
 
-Shows day-by-day details for the selected period:
+Shows day-by-day status distribution for the selected period:
 
-| Date | Utilization % | Uptime (h) | Downtime (h) | Units | Work Orders |
-|------|--------------|------------|--------------|-------|-------------|
-| Oct 14, 2025 | 78.2% | 18.8 | 5.2 | 2,340 | 8 |
-| Oct 13, 2025 | 72.5% | 17.4 | 6.6 | 2,180 | 7 |
-| Oct 12, 2025 | 80.1% | 19.2 | 4.8 | 2,520 | 9 |
+| Date | Running | Hold | Scheduled | Idle | Visual Distribution |
+|------|---------|------|-----------|------|---------------------|
+| Oct 14, 2025 | 5 (63%) | 1 (13%) | 2 (25%) | 0 (0%) | ████████░░░░ |
+| Oct 13, 2025 | 4 (50%) | 2 (25%) | 2 (25%) | 0 (0%) | ██████████ |
+| Oct 12, 2025 | 6 (75%) | 0 (0%) | 1 (13%) | 1 (13%) | ████████░░░░ |
+
+**Features:**
+- **Paginated**: Shows 10 days per page (configurable)
+- **Visual Distribution**: Color-coded progress bars with borders showing status breakdown
+- **Color Coding**: Green (Running), Yellow (Hold), Blue (Scheduled), Gray (Idle)
 
 ### 3. Comparison Mode (Optional)
 
@@ -103,185 +125,539 @@ When enabled, shows:
 
 ## Metrics Definitions
 
-### 1. Utilization Rate
+### Machine Status Overview
 
-The system tracks **TWO types of utilization** to provide different perspectives on machine performance:
+Machine Status tracks the **count of machines in each status category**. Each machine can be in one of four states on any given day:
 
----
+1. **Running** - Machines actively producing (work order status = 'Start')
+2. **Hold** - Machines paused due to issues (work order status = 'Hold')
+3. **Scheduled** - Machines with assigned work not yet started (work order status = 'Assigned')
+4. **Idle** - Machines with no work orders scheduled
 
-#### 1.1 Scheduled Utilization (Factory View)
+### Status Determination Logic
 
-**What it measures:** Percentage of available time that machines had work orders scheduled, including hold periods
+For each day, each machine is categorized based on work orders scheduled for that day:
 
-**Accountability:** Factory/Management perspective - measures total time machines were assigned work
+```
+For Machine X on Date Y:
+1. Get all work orders where start_time falls on Date Y
+2. Check statuses of those work orders:
+   - If any WO has status 'Start' → Machine is RUNNING
+   - Else if any WO has status 'Hold' → Machine is ON HOLD
+   - Else if any WO has status 'Assigned' → Machine is SCHEDULED
+   - Else (no work orders) → Machine is IDLE
+```
+
+**Priority Order:** Running > Hold > Scheduled > Idle
+- A machine with multiple work orders uses the highest priority status
+
+### 1. Average Running
+
+**What it measures:** Average number of machines actively running (producing) per day
 
 **Formula:**
 ```
-Scheduled Utilization = (Scheduled Work Time / Available Time) × 100
+Average Running = Sum of Running Machines across all days / Number of Days
 
 Where:
-- Scheduled Work Time = Sum of (work_order.end_time - work_order.start_time)
-                        for work orders with status IN ('Start', 'Completed')
-- Available Time = Total shift hours for the period
-```
-
-**Data Source:**
-- Uses `work_orders.start_time` and `work_orders.end_time` columns
-- Counts entire duration from start to end, including any hold periods within that timeframe
-
-**Example:**
-```
-Machine-001 on Oct 14, 2025
-- Factory has 3 shifts: 6:00-14:00, 14:00-22:00, 22:00-6:00
-- Available Time: 28 hours (factory has 4 shifts configured)
-
-Work Orders:
-- WO1: 06:00-14:00 (8 hours, Status: Completed)
-  Includes: 1.5 hours on hold for material
-- WO2: 14:00-22:00 (8 hours, Status: Start)
-  Includes: 2 hours on hold for quality check
-
-Scheduled Work Time: 8 + 8 = 16 hours (entire duration, including holds)
-Scheduled Utilization: (16 / 28) × 100 = 57.14%
-```
-
-**Database Field:** `kpi_machine_daily.utilization_rate`
-
-**Purpose:**
-- Helps factory managers understand overall machine assignment
-- Shows if machines have enough work scheduled
-- Includes all accountability periods (active + holds)
-
----
-
-#### 1.2 Active Utilization (Operator View)
-
-**What it measures:** Percentage of available time that machines were **actively running**, excluding hold periods
-
-**Accountability:** Operator/Production perspective - measures actual productive work time
-
-**Formula:**
-```
-Active Utilization = (Active Work Time / Available Time) × 100
-
-Where:
-- Active Work Time = Sum of durations when work order status was 'Start'
-                     (tracked in work_order_logs)
-- Available Time = Total shift hours for the period
-- Excludes: All hold periods, setup time, waiting time
-```
-
-**Data Source:**
-- Uses `work_order_logs` table to track status changes
-- Only counts time between status = 'Start' and next status change
-- Precisely calculates when machine was actively producing
-
-**Calculation Logic:**
-```
-For each work order:
-1. Get all status changes from work_order_logs ordered by changed_at
-2. Iterate through logs:
-   - If previous status was 'Start' and current status is 'Hold'/'Completed':
-     → Count the time difference as active time
-   - If status is 'Hold': skip this period (not counted)
-3. Sum all active time periods
-4. Calculate percentage vs available hours
+- Running Machines (per day) = COUNT(DISTINCT machine_id) where work order status = 'Start'
 ```
 
 **Example:**
 ```
-Machine-001 on Oct 14, 2025
-- Available Time: 28 hours
+Factory with 8 machines, analyzing Last 7 Days:
 
-Work Order WO1 Timeline (from work_order_logs):
-06:00 - Status: Start
-09:30 - Status: Hold (Material delay)    → Active: 3.5 hours
-11:00 - Status: Start (Resumed)
-14:00 - Status: Completed                → Active: 3.0 hours
+Oct 14: 5 machines running
+Oct 13: 4 machines running
+Oct 12: 6 machines running
+Oct 11: 5 machines running
+Oct 10: 4 machines running
+Oct 9:  5 machines running
+Oct 8:  5 machines running
 
-Work Order WO2 Timeline:
-14:00 - Status: Start
-18:00 - Status: Hold (Quality check)     → Active: 4.0 hours
-20:00 - Status: Start (Resumed)
-22:00 - Status: Completed                → Active: 2.0 hours
-
-Total Active Time: 3.5 + 3.0 + 4.0 + 2.0 = 12.5 hours
-Active Utilization: (12.5 / 28) × 100 = 44.64%
+Average Running = (5+4+6+5+4+5+5) / 7 = 4.86 machines
+Percentage: 4.86 / 8 = 60.7% of total machines
 ```
 
-**Database Field:** `kpi_machine_daily.active_utilization_rate`
-
-**Purpose:**
-- Shows actual productive time (operator accountability)
-- Helps identify hold/delay issues
-- More accurate for operator performance evaluation
-- Always equal to or lower than Scheduled Utilization
+**Interpretation:**
+- **6-8 machines**: Excellent capacity utilization
+- **4-6 machines**: Good utilization
+- **2-4 machines**: Moderate (check workload)
+- **0-2 machines**: Poor (investigate capacity issues)
 
 ---
 
-#### 1.3 Key Differences Between Both Metrics
+### 2. Average On Hold
 
-| Aspect | Scheduled Utilization | Active Utilization |
-|--------|----------------------|-------------------|
-| **Perspective** | Factory/Management | Operator/Production |
-| **Includes Holds?** | ✅ Yes | ❌ No |
-| **Data Source** | `work_orders` table | `work_order_logs` table |
-| **Calculation** | end_time - start_time | Sum of 'Start' status durations |
-| **Value** | Higher | Lower (excludes holds) |
-| **Use Case** | Machine assignment planning | Operator performance |
-| **Formula** | (Scheduled Time / Available) × 100 | (Active Time / Available) × 100 |
-
-**Relationship:**
-```
-Active Utilization ≤ Scheduled Utilization
-
-The difference indicates time spent in hold/delay states:
-Hold Time ≈ Scheduled Utilization - Active Utilization
-```
-
-**Real Example:**
-```
-Machine-003 on Oct 14, 2025:
-- Scheduled Utilization: 65.0% (18.2 hours scheduled)
-- Active Utilization: 52.3% (14.6 hours actively running)
-- Difference: 12.7% (3.6 hours in hold)
-
-Interpretation: Machine had work assigned for 65% of the day,
-but only ran actively for 52%, with 13% spent waiting/on hold.
-```
-
----
-
-#### 1.4 Interpretation Guidelines
-
-**Scheduled Utilization:**
-- **> 80%**: Excellent machine assignment
-- **60-80%**: Good utilization
-- **40-60%**: Moderate (check work order planning)
-- **< 40%**: Poor (urgent attention needed - insufficient work)
-
-**Active Utilization:**
-- **> 70%**: Excellent productive time
-- **50-70%**: Good productive time
-- **30-50%**: Moderate (investigate hold causes)
-- **< 30%**: Poor (excessive holds/delays)
-
-**Gap Analysis:**
-```
-If Scheduled is 75% but Active is 45%:
-→ Large gap (30%) indicates excessive hold time
-→ Action: Investigate hold reasons (material, quality, maintenance)
-
----
-
-### 2. Uptime Hours
-
-**What it measures:** Total hours machines were productive (running or completed work)
+**What it measures:** Average number of machines on hold (paused) per day
 
 **Formula:**
 ```
-Uptime Hours = Sum of (end_time - start_time) for all work orders where status IN ('Start', 'Completed')
+Average Hold = Sum of Machines on Hold across all days / Number of Days
+
+Where:
+- Machines on Hold (per day) = COUNT(DISTINCT machine_id) where work order status = 'Hold'
 ```
+
+**Example:**
+```
+Oct 14: 1 machine on hold (material delay)
+Oct 13: 2 machines on hold (quality issues)
+Oct 12: 0 machines on hold
+Oct 11: 1 machine on hold
+Oct 10: 2 machines on hold
+Oct 9:  1 machine on hold
+Oct 8:  1 machine on hold
+
+Average Hold = (1+2+0+1+2+1+1) / 7 = 1.14 machines
+Percentage: 1.14 / 8 = 14.3% of total machines
+```
+
+**What counts as Hold:**
+- Material shortages
+- Quality issues requiring inspection
+- Equipment failures awaiting repair
+- Operator breaks (if work order paused)
+
+**Interpretation:**
+- **0-1 machines**: Excellent (minimal disruptions)
+- **1-2 machines**: Acceptable (some issues)
+- **2-4 machines**: Concerning (investigate root causes)
+- **4+ machines**: Critical (systemic problems)
+
+---
+
+### 3. Average Scheduled
+
+**What it measures:** Average number of machines with assigned work not yet started
+
+**Formula:**
+```
+Average Scheduled = Sum of Scheduled Machines across all days / Number of Days
+
+Where:
+- Scheduled Machines (per day) = COUNT(DISTINCT machine_id) where work order status = 'Assigned'
+```
+
+**Example:**
+```
+Oct 14: 2 machines scheduled (work starts later today)
+Oct 13: 2 machines scheduled
+Oct 12: 1 machine scheduled
+Oct 11: 2 machines scheduled
+Oct 10: 2 machines scheduled
+Oct 9:  3 machines scheduled
+Oct 8:  2 machines scheduled
+
+Average Scheduled = (2+2+1+2+2+3+2) / 7 = 2.0 machines
+Percentage: 2.0 / 8 = 25% of total machines
+```
+
+**Interpretation:**
+- **2-4 machines**: Good planning (work queued up)
+- **1-2 machines**: Acceptable
+- **0-1 machines**: Risk of capacity gaps
+- **4+ machines**: Possible scheduling congestion
+
+---
+
+### 4. Average Idle
+
+**What it measures:** Average number of machines with no work orders scheduled
+
+**Formula:**
+```
+Average Idle = Sum of Idle Machines across all days / Number of Days
+
+Where:
+- Idle Machines (per day) = Total Machines - (Running + Hold + Scheduled)
+```
+
+**Example:**
+```
+Factory with 8 machines:
+
+Oct 14: 5 running + 1 hold + 2 scheduled = 0 idle
+Oct 13: 4 running + 2 hold + 2 scheduled = 0 idle
+Oct 12: 6 running + 0 hold + 1 scheduled = 1 idle
+Oct 11: 5 running + 1 hold + 2 scheduled = 0 idle
+Oct 10: 4 running + 2 hold + 2 scheduled = 0 idle
+Oct 9:  5 running + 1 hold + 3 scheduled = -1 idle → 0 (can't be negative)
+Oct 8:  5 running + 1 hold + 2 scheduled = 0 idle
+
+Average Idle = (0+0+1+0+0+0+0) / 7 = 0.14 machines
+Percentage: 0.14 / 8 = 1.8% of total machines
+```
+
+**Interpretation:**
+- **0 machines**: Excellent (full capacity planning)
+- **0-1 machines**: Good utilization
+- **1-3 machines**: Moderate underutilization
+- **3+ machines**: Poor (insufficient workload)
+
+---
+
+###5. Total Machines
+
+**What it measures:** Total number of machines in the factory
+
+**Formula:**
+```
+Total Machines = COUNT(machines) where factory_id = current_factory
+```
+
+**Used in calculations:**
+- Percentage calculations for all status metrics
+- Baseline for capacity planning
+
+---
+
+### 6. Days Analyzed
+
+**What it measures:** Number of days included in the selected time period
+
+**Example:**
+```
+Time Period: "Last 7 Days"
+Days Analyzed: 7
+
+Time Period: "This Month" (October)
+Days Analyzed: 19 (if today is Oct 19)
+```
+
+---
+
+## Data Sources
+
+### Primary Tables
+
+#### 1. `work_orders` (Main source for Analytics)
+
+```sql
+Fields used:
+- factory_id, machine_id
+- start_time (determines which day)
+- status ('Start', 'Hold', 'Assigned', 'Completed')
+```
+
+#### 2. `machines` (For total machine count)
+
+```sql
+Fields used:
+- id, factory_id
+- name, assetId (for display)
+```
+
+### Data Query Example
+
+```php
+// Get machine status distribution for Oct 14, 2025
+$date = '2025-10-14';
+$totalMachines = Machine::where('factory_id', $factoryId)->count();
+
+$workOrders = WorkOrder::where('factory_id', $factoryId)
+    ->whereBetween('start_time', [
+        Carbon::parse($date)->startOfDay(),
+        Carbon::parse($date)->endOfDay()
+    ])
+    ->whereIn('status', ['Start', 'Assigned', 'Hold', 'Completed'])
+    ->get(['id', 'machine_id', 'status']);
+
+// Group by status
+$machinesRunning = $workOrders->where('status', 'Start')
+    ->pluck('machine_id')->unique()->count();
+
+$machinesOnHold = $workOrders->where('status', 'Hold')
+    ->pluck('machine_id')->unique()->count();
+
+$machinesScheduled = $workOrders->where('status', 'Assigned')
+    ->pluck('machine_id')->unique()->count();
+
+// Machines with any work orders
+$machinesWithWork = $workOrders->pluck('machine_id')->unique()->count();
+$machinesIdle = $totalMachines - $machinesWithWork;
+```
+
+---
+
+## Calculation Details
+
+### How Averages Are Calculated
+
+All "Average" metrics in Machine Status Analytics use the same simple formula:
+
+**Formula:**
+```
+Average = Sum of all daily counts / Number of days
+```
+
+**Process:**
+1. **Loop through each day** in the selected date range
+2. **Count machines in each status** for that day
+3. **Sum all the daily counts** across all days
+4. **Divide by the number of days** to get the average
+
+**Concrete Example:**
+
+Selected Period: "Last 7 Days" (Oct 8-14, 2025)
+Factory with 8 total machines
+
+```
+Day 1 (Oct 14): 5 running, 1 hold, 2 scheduled, 0 idle
+Day 2 (Oct 13): 4 running, 2 hold, 2 scheduled, 0 idle
+Day 3 (Oct 12): 6 running, 0 hold, 1 scheduled, 1 idle
+Day 4 (Oct 11): 5 running, 1 hold, 2 scheduled, 0 idle
+Day 5 (Oct 10): 4 running, 2 hold, 2 scheduled, 0 idle
+Day 6 (Oct 9):  5 running, 1 hold, 2 scheduled, 0 idle
+Day 7 (Oct 8):  5 running, 1 hold, 2 scheduled, 0 idle
+```
+
+**Average Running Calculation:**
+```
+Daily counts: [5, 4, 6, 5, 4, 5, 5]
+Sum: 5 + 4 + 6 + 5 + 4 + 5 + 5 = 34 machines
+Days: 7
+Average: 34 / 7 = 4.86 → Rounded to 4.9 machines
+Percentage: (4.9 / 8) × 100 = 61.3% of total machines
+```
+
+**Average Hold Calculation:**
+```
+Daily counts: [1, 2, 0, 1, 2, 1, 1]
+Sum: 1 + 2 + 0 + 1 + 2 + 1 + 1 = 8 machines
+Days: 7
+Average: 8 / 7 = 1.14 → Rounded to 1.1 machines
+Percentage: (1.1 / 8) × 100 = 13.8% of total machines
+```
+
+**Average Scheduled Calculation:**
+```
+Daily counts: [2, 2, 1, 2, 2, 2, 2]
+Sum: 2 + 2 + 1 + 2 + 2 + 2 + 2 = 13 machines
+Days: 7
+Average: 13 / 7 = 1.86 → Rounded to 1.9 machines
+Percentage: (1.9 / 8) × 100 = 23.8% of total machines
+```
+
+**Average Idle Calculation:**
+```
+Daily counts: [0, 0, 1, 0, 0, 0, 0]
+Sum: 0 + 0 + 1 + 0 + 0 + 0 + 0 = 1 machine
+Days: 7
+Average: 1 / 7 = 0.14 → Rounded to 0.1 machines
+Percentage: (0.1 / 8) × 100 = 1.3% of total machines
+```
+
+**Code Implementation:**
+```php
+// In OperationalKPIService.php
+$summary = [
+    'avg_running' => round(
+        array_sum(array_column($dailyBreakdown, 'running')) / count($dailyBreakdown),
+        1
+    ),
+    'avg_hold' => round(
+        array_sum(array_column($dailyBreakdown, 'hold')) / count($dailyBreakdown),
+        1
+    ),
+    'avg_scheduled' => round(
+        array_sum(array_column($dailyBreakdown, 'scheduled')) / count($dailyBreakdown),
+        1
+    ),
+    'avg_idle' => round(
+        array_sum(array_column($dailyBreakdown, 'idle')) / count($dailyBreakdown),
+        1
+    ),
+];
+```
+
+**Where:**
+- `array_column($dailyBreakdown, 'running')` extracts all running counts from daily data
+- `array_sum(...)` adds all the counts together
+- `count($dailyBreakdown)` gets the total number of days analyzed
+- `round(..., 1)` rounds to 1 decimal place
+
+**Result:** You get the **average number of machines in each status per day** over the selected period.
+
+---
+
+### Service Layer
+
+**File:** `app/Services/KPI/OperationalKPIService.php`
+
+**Method:** `getMachineStatusAnalytics(array $options): array`
+
+**Implementation:**
+
+```php
+public function getMachineStatusAnalytics(array $options): array
+{
+    $period = $options['time_period'] ?? 'yesterday';
+    $enableComparison = $options['enable_comparison'] ?? false;
+    $comparisonType = $options['comparison_type'] ?? 'previous_period';
+
+    [$startDate, $endDate] = $this->getDateRange($period, $dateFrom, $dateTo);
+
+    // Fetch primary period data
+    $primaryData = $this->fetchMachineStatusDistribution($startDate, $endDate);
+
+    $result = [
+        'primary_period' => [
+            'start_date' => $startDate->toDateString(),
+            'end_date' => $endDate->toDateString(),
+            'daily_breakdown' => $primaryData['daily'],
+            'summary' => $primaryData['summary'],
+        ],
+    ];
+
+    // Add comparison if enabled
+    if ($enableComparison) {
+        [$compStart, $compEnd] = $this->getComparisonDateRange($startDate, $endDate, $comparisonType);
+        $comparisonData = $this->fetchMachineStatusDistribution($compStart, $compEnd);
+
+        $result['comparison_period'] = [
+            'start_date' => $compStart->toDateString(),
+            'end_date' => $compEnd->toDateString(),
+            'daily_breakdown' => $comparisonData['daily'],
+            'summary' => $comparisonData['summary'],
+        ];
+
+        $result['comparison_analysis'] = $this->calculateStatusDistributionComparison(
+            $primaryData['summary'],
+            $comparisonData['summary']
+        );
+    }
+
+    return $result;
+}
+```
+
+**Method:** `fetchMachineStatusDistribution(Carbon $startDate, Carbon $endDate): array`
+
+This method loops through each day in the date range and calculates the machine status distribution:
+
+```php
+protected function fetchMachineStatusDistribution(Carbon $startDate, Carbon $endDate): array
+{
+    $totalMachines = Machine::where('factory_id', $this->factory->id)->count();
+    $dailyBreakdown = [];
+    $current = $startDate->copy();
+
+    while ($current->lte($endDate)) {
+        $dayStart = $current->copy()->startOfDay();
+        $dayEnd = $current->copy()->endOfDay();
+
+        // Get work orders for this day
+        $workOrders = WorkOrder::where('factory_id', $this->factory->id)
+            ->whereBetween('start_time', [$dayStart, $dayEnd])
+            ->whereIn('status', ['Start', 'Assigned', 'Hold', 'Completed'])
+            ->get(['id', 'machine_id', 'status']);
+
+        // Group machines by status
+        $machinesRunning = $workOrders->where('status', 'Start')
+            ->pluck('machine_id')->unique()->count();
+        $machinesOnHold = $workOrders->where('status', 'Hold')
+            ->pluck('machine_id')->unique()->count();
+        $machinesScheduled = $workOrders->where('status', 'Assigned')
+            ->pluck('machine_id')->unique()->count();
+
+        // Calculate idle
+        $machinesWithWork = $workOrders->pluck('machine_id')->unique()->count();
+        $machinesIdle = $totalMachines - $machinesWithWork;
+
+        $dailyBreakdown[] = [
+            'date' => $current->toDateString(),
+            'running' => $machinesRunning,
+            'hold' => $machinesOnHold,
+            'scheduled' => $machinesScheduled,
+            'idle' => $machinesIdle,
+            'total_machines' => $totalMachines,
+        ];
+
+        $current->addDay();
+    }
+
+    // Calculate summary statistics
+    $summary = [
+        'avg_running' => round(array_sum(array_column($dailyBreakdown, 'running')) / count($dailyBreakdown), 1),
+        'avg_hold' => round(array_sum(array_column($dailyBreakdown, 'hold')) / count($dailyBreakdown), 1),
+        'avg_scheduled' => round(array_sum(array_column($dailyBreakdown, 'hold')) / count($dailyBreakdown), 1),
+        'avg_idle' => round(array_sum(array_column($dailyBreakdown, 'idle')) / count($dailyBreakdown), 1),
+        'total_machines' => $totalMachines,
+        'days_analyzed' => count($dailyBreakdown),
+        // Percentage calculations
+        'avg_running_pct' => round(($summary['avg_running'] / $totalMachines) * 100, 1),
+        'avg_hold_pct' => round(($summary['avg_hold'] / $totalMachines) * 100, 1),
+        'avg_scheduled_pct' => round(($summary['avg_scheduled'] / $totalMachines) * 100, 1),
+        'avg_idle_pct' => round(($summary['avg_idle'] / $totalMachines) * 100, 1),
+    ];
+
+    return [
+        'daily' => $dailyBreakdown,
+        'summary' => $summary,
+    ];
+}
+```
+
+### Caching Strategy
+
+**Cache Key Format:**
+```php
+$cacheKey = "machine_status_analytics_{$period}_" . md5(json_encode($options));
+```
+
+**Cache Store:** Custom `kpi_cache` store (see `TenantKPICache.php`)
+
+**Cache TTL:**
+- Yesterday: 3600 seconds (1 hour)
+- Last Week: 3600 seconds
+- Last Month: 7200 seconds (2 hours)
+- Custom ranges: 1800 seconds (30 minutes)
+
+**Cache Tags:** `factory_{factory_id}`, `tier_2`, `kpi`
+
+---
+
+##Comparison Mode Calculations
+
+### Comparison Analysis
+
+**Method:** `calculateStatusDistributionComparison(array $current, array $previous): array`
+
+For each status, the system calculates:
+
+1. **Difference:** `current - previous`
+2. **Percentage Change:** `((current - previous) / previous) × 100`
+3. **Trend:** 'up' if current > previous, 'down' otherwise
+4. **Status:** 'improved' or 'declined' based on whether the change is good or bad
+
+**Example:**
+
+```php
+Running:
+- Current: 5.2 machines
+- Previous: 4.7 machines
+- Difference: +0.5
+- Percentage Change: +10.6%
+- Trend: up
+- Status: improved (more machines running is good)
+
+Hold:
+- Current: 1.1 machines
+- Previous: 1.5 machines
+- Difference: -0.4
+- Percentage Change: -26.7%
+- Trend: down
+- Status: improved (fewer machines on hold is good)
+```
+
+---
+
+## Time Periods
+
+### Available Time Period Options
+
+Analytics Mode supports the following time periods:
 
 **What counts as uptime:**
 - Work orders with status 'Start' (actively running)
@@ -640,151 +1016,186 @@ Total Available Time per Day = 5 machines × 24 hours = 120 hours
 
 ## Data Population
 
-### Overview
+### How Analytics Data is Updated
 
-Analytics data is populated through a **daily aggregation process** that:
-1. Queries raw work order data
-2. Calculates all metrics per machine per day
-3. Inserts/updates the `kpi_machine_daily` table
+**Important:** Machine Status Analytics data is **NOT pre-aggregated or updated in the background**. Instead, it uses an **on-demand calculation with caching** approach.
 
-### Aggregation Command
+### On-Demand Calculation (Current Implementation)
 
-**Command Name:** `php artisan kpi:aggregate-daily`
+When a user views Machine Status Analytics:
 
-**Purpose:** Process work orders and populate KPI metrics for Analytics mode
+1. **User Opens Analytics Mode** → Triggers `getMachineStatusAnalytics()` method
+2. **Cache Check** → System checks if data exists in cache
+3. **If Cached** → Returns cached data immediately (fast)
+4. **If Not Cached** → Queries `work_orders` table directly and calculates metrics
+5. **Store in Cache** → Saves results for subsequent requests
+6. **Return Data** → Displays analytics to user
 
-### Command Usage
+**Flow Diagram:**
 
-#### Basic Usage (Single Date)
-```bash
-# Aggregate data for Oct 14, 2025 for factory 1
-php artisan kpi:aggregate-daily 2025-10-14 --factory=1
+```
+User Views Analytics
+       ↓
+Check Cache (TenantKPICache)
+       ↓
+   Cached? ─── Yes ──→ Return Cached Data (Fast!) ✓
+       ↓
+      No
+       ↓
+Query work_orders table directly
+       ↓
+Loop through each day in date range
+       ↓
+Calculate machine status distribution
+       ↓
+Build summary statistics
+       ↓
+Store in cache (with TTL)
+       ↓
+Return fresh data to user
 ```
 
-#### Date Range
-```bash
-# Aggregate data from Sept 30 to Oct 14 for factory 1
-php artisan kpi:aggregate-daily 2025-09-30 --to=2025-10-14 --factory=1
-```
+### Cache Implementation
 
-#### All Factories
-```bash
-# Aggregate data for Oct 14 for all factories
-php artisan kpi:aggregate-daily 2025-10-14
-```
+**Cache Store:** Custom `kpi_cache` store (separate from default Laravel cache)
 
-#### Force Re-aggregation
-```bash
-# Re-calculate metrics even if data already exists
-php artisan kpi:aggregate-daily 2025-10-14 --factory=1 --force
-```
+**Cache Class:** `App\Support\TenantKPICache`
 
-#### Default (Yesterday)
-```bash
-# Aggregate yesterday's data for all factories
-php artisan kpi:aggregate-daily
-```
-
-### Aggregation Process
-
-**Step-by-Step:**
-
-1. **Query work orders for the date**
-   ```sql
-   SELECT * FROM work_orders
-   WHERE DATE(start_time) = ?
-     AND factory_id = ?
-   ```
-
-2. **Group by machine**
-   - Collect all work orders per machine
-
-3. **Calculate metrics**
-   - Utilization Rate: (runtime / 24 hours) × 100
-   - Uptime Hours: Sum of work order durations where status IN ('Start', 'Completed')
-   - Downtime Hours: 24 - Uptime Hours
-   - Units Produced: Sum of ok_qtys
-   - Work Orders Completed: Count where status = 'Completed'
-   - Quality Rate: (ok_qtys / (ok_qtys + scrapped_qtys)) × 100
-   - Scrap Rate: 100 - Quality Rate
-   - Average Cycle Time: Total time / Total units
-
-4. **Upsert into kpi_machine_daily**
-   ```sql
-   INSERT INTO kpi_machine_daily (...)
-   ON DUPLICATE KEY UPDATE ...
-   ```
-
-### Scheduling Strategy
-
-#### Manual (Current)
-```bash
-# Run after work orders are simulated/completed
-php artisan kpi:aggregate-daily 2025-10-14 --factory=1
-```
-
-#### Automated (Future - Add to Scheduler)
-
-**In `bootstrap/app.php` or `routes/console.php`:**
+**Cache Key Format:**
 ```php
-use Illuminate\Support\Facades\Schedule;
+"machine_status_analytics_{$period}_" . md5(json_encode($options))
 
-Schedule::command('kpi:aggregate-daily')
-    ->dailyAt('00:30')  // Run at 12:30 AM
+Examples:
+- machine_status_analytics_yesterday_a3f2d8e1...
+- machine_status_analytics_last_week_9c4b1a7f...
+- machine_status_analytics_30d_5e8d2c9a...
+```
+
+**Cache TTL (Time To Live):**
+
+| Time Period | Cache Duration | Reasoning |
+|-------------|----------------|-----------|
+| Yesterday | 3600 seconds (1 hour) | Historical data, won't change often |
+| Last Week | 3600 seconds (1 hour) | Historical data, stable |
+| Last Month | 7200 seconds (2 hours) | Large dataset, longer cache OK |
+| Custom Range | 1800 seconds (30 minutes) | May vary, shorter cache |
+| Today | 300 seconds (5 minutes) | Data actively changing |
+
+**Cache Tags:**
+- `factory_{factory_id}` - Isolates cache per factory
+- `tier_2` - Groups all Tier 2 KPIs together
+- `kpi` - General KPI tag
+
+**Clearing Cache:**
+
+To manually clear Machine Status Analytics cache:
+
+```php
+// Clear all Tier 2 KPI cache for a factory
+$factory = \App\Models\Factory::first();
+$cache = new \App\Support\TenantKPICache($factory);
+$cache->flushTier('tier_2');
+
+// Or via Tinker
+php artisan tinker
+> $factory = \App\Models\Factory::find(1);
+> $cache = new \App\Support\TenantKPICache($factory);
+> $cache->flushTier('tier_2');
+```
+
+### Advantages of On-Demand Approach
+
+✅ **No Background Jobs Needed** - Simpler infrastructure, no scheduler setup
+✅ **Always Fresh Data** - Queries latest work order data directly
+✅ **Flexible Date Ranges** - Can analyze any custom period without pre-aggregation
+✅ **Lower Storage Requirements** - No need for `kpi_machine_daily` table
+✅ **Easier to Maintain** - No aggregation logic to keep in sync with work orders
+
+### Disadvantages of On-Demand Approach
+
+❌ **First Load Slower** - Initial query takes time (3-5 seconds for large date ranges)
+❌ **Database Load** - Direct queries on `work_orders` table
+❌ **Scalability Concerns** - May slow down with millions of work orders
+❌ **Repeated Calculations** - Same data recalculated after cache expires
+
+### Performance Characteristics
+
+**Fast Scenarios:**
+- Data is cached (subsequent views within TTL period)
+- Short date ranges (Yesterday, Last 7 Days)
+- Small factory (few machines, limited work orders)
+
+**Slow Scenarios:**
+- Cache expired or first load
+- Long date ranges (Last 90 Days, This Year)
+- Large factory (many machines, thousands of work orders)
+- Complex queries with comparisons enabled
+
+**Typical Performance:**
+
+| Scenario | First Load | Cached Load |
+|----------|-----------|-------------|
+| Yesterday (8 machines) | 0.5-1 second | <100ms |
+| Last 7 Days (8 machines) | 1-2 seconds | <100ms |
+| Last 30 Days (8 machines) | 3-5 seconds | <150ms |
+| Last 90 Days (8 machines) | 8-12 seconds | <200ms |
+
+### Future Enhancement: Pre-Aggregation
+
+**Potential Approach (Not Currently Implemented):**
+
+Create a background job to pre-calculate and store daily metrics:
+
+**Step 1: Create Migration**
+```sql
+CREATE TABLE kpi_machine_status_daily (
+    id BIGINT PRIMARY KEY,
+    factory_id INT NOT NULL,
+    date DATE NOT NULL,
+    machines_running INT DEFAULT 0,
+    machines_hold INT DEFAULT 0,
+    machines_scheduled INT DEFAULT 0,
+    machines_idle INT DEFAULT 0,
+    total_machines INT DEFAULT 0,
+    calculated_at TIMESTAMP NULL,
+    UNIQUE KEY unique_factory_date (factory_id, date)
+);
+```
+
+**Step 2: Create Artisan Command**
+```bash
+php artisan make:command AggregateKPIMachineStatus
+```
+
+**Step 3: Schedule Daily**
+```php
+// In bootstrap/app.php or routes/console.php
+Schedule::command('kpi:aggregate-machine-status')
+    ->dailyAt('01:00')  // Run at 1 AM
     ->timezone('America/New_York');
 ```
 
-**Why 12:30 AM?**
-- All work orders for previous day are finalized
-- Low system activity
-- Data ready for morning reports
+**Benefits of Pre-Aggregation:**
+- ✅ Faster analytics load times (query pre-aggregated table)
+- ✅ Lower database load (no complex joins)
+- ✅ Better for large datasets
+- ✅ Enables historical trend analysis
 
-### Backfilling Historical Data
+**Trade-offs:**
+- ❌ Requires background job infrastructure
+- ❌ More storage space needed
+- ❌ Additional maintenance complexity
+- ❌ Data may be slightly stale (until next aggregation)
 
-**Scenario:** You have 3 weeks of work orders but no aggregated KPI data
+**Recommendation:** Implement pre-aggregation if:
+- Factory has >20 machines
+- Analytics accessed frequently (>50 times/day)
+- Work order volume exceeds 1000/day
+- Load times consistently >5 seconds
 
-**Solution:**
-```bash
-# Aggregate all historical dates at once
-php artisan kpi:aggregate-daily 2025-09-30 --to=2025-10-21 --factory=1
-```
+**Current State:** Machine Status Analytics does **not** use background jobs or scheduled commands. All data is calculated on-demand when users view the analytics page.
 
-**Output:**
-```
-Processing date range: 2025-09-30 to 2025-10-21
-Factory: 1
-
- 19/19 [============================] 100%
-
-Successfully processed:
-- Total days: 19
-- Total machines: 7
-- Total records created/updated: 133
-- Errors: 0
-
-Completed in 4.2 seconds
-```
-
-### Error Handling
-
-**Common Issues:**
-
-1. **No work orders found for date**
-   - Command skips date with info message
-   - No error thrown
-
-2. **Invalid date format**
-   - Error: "Invalid date format. Use YYYY-MM-DD"
-   - Command exits
-
-3. **Factory not found**
-   - Error: "Factory with ID X not found"
-   - Command exits
-
-4. **Database constraint violation**
-   - Logs error with details
-   - Continues processing other machines
-   - Shows summary at end
+**For future reference:** If pre-aggregation is implemented, this section will document the aggregation command usage.
 
 ---
 

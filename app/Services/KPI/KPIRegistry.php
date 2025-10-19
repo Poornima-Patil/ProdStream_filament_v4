@@ -93,7 +93,7 @@ class KPIRegistry
                     'name' => 'Machine Utilization Rate',
                     'description' => 'Percentage of time machines are actively producing',
                     'tier' => 2,
-                    'status' => 'planned',
+                    'status' => 'active',
                     'icon' => 'heroicon-o-chart-pie',
                 ],
                 [

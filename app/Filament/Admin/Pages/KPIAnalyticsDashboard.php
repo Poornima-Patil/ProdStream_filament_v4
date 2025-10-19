@@ -91,6 +91,45 @@ class KPIAnalyticsDashboard extends Page implements HasForms
 
     public bool $woClosedExpanded = false;
 
+    // Production Schedule pagination properties
+    public int $onTimePage = 1;
+
+    public int $earlyPage = 1;
+
+    public int $latePage = 1;
+
+    public int $earlyFromFuturePage = 1;
+
+    public int $lateFromPastPage = 1;
+
+    public int $highRiskPage = 1;
+
+    public int $mediumRiskPage = 1;
+
+    public int $onTrackPage = 1;
+
+    // Machine Status Analytics Daily Breakdown pagination
+    public int $dailyBreakdownPage = 1;
+
+    public int $dailyBreakdownPerPage = 10;
+
+    // Production Schedule collapsible section states
+    public bool $onTimeExpanded = true;
+
+    public bool $earlyExpanded = true;
+
+    public bool $lateExpanded = true;
+
+    public bool $earlyFromFutureExpanded = true;
+
+    public bool $lateFromPastExpanded = true;
+
+    public bool $highRiskExpanded = true;
+
+    public bool $mediumRiskExpanded = true;
+
+    public bool $onTrackExpanded = false;
+
     /**
      * Apply search and filter to machine data
      */
@@ -502,6 +541,216 @@ class KPIAnalyticsDashboard extends Page implements HasForms
             ],
             'total_work_orders' => 0,
             'updated_at' => now()->toDateTimeString(),
+        ];
+    }
+
+    /**
+     * Get production schedule adherence data
+     */
+    public function getProductionScheduleData(): array
+    {
+        $factory = Auth::user()->factory;
+
+        if (! $factory) {
+            return $this->getEmptyProductionScheduleData();
+        }
+
+        // In Dashboard mode, get real-time data for TODAY only
+        if ($this->kpiMode === 'dashboard') {
+            $service = new RealTimeKPIService($factory);
+            $data = $service->getProductionScheduleAdherence($this->skipCache);
+
+            // Reset skip cache flag after fetching data
+            $this->skipCache = false;
+
+            return $data;
+        }
+
+        // In Analytics mode, get data for the selected time period
+        $service = new OperationalKPIService($factory);
+
+        return $service->getProductionScheduleAdherenceAnalytics([
+            'time_period' => $this->timePeriod,
+            'date_from' => $this->dateFrom,
+            'date_to' => $this->dateTo,
+            'enable_comparison' => $this->enableComparison,
+            'comparison_type' => $this->comparisonType,
+        ]);
+    }
+
+    /**
+     * Get empty production schedule data structure
+     */
+    protected function getEmptyProductionScheduleData(): array
+    {
+        return [
+            'summary' => [
+                'scheduled_today' => 0,
+                'on_time_count' => 0,
+                'early_count' => 0,
+                'late_count' => 0,
+                'on_time_rate' => 0,
+                'avg_delay_minutes' => 0,
+                'early_from_future_count' => 0,
+                'late_from_past_count' => 0,
+                'total_completions_today' => 0,
+            ],
+            'scheduled_today' => [
+                'on_time' => [],
+                'early' => [],
+                'late' => [],
+            ],
+            'other_completions' => [
+                'early_from_future' => [],
+                'late_from_past' => [],
+            ],
+            'at_risk' => [
+                'high_risk' => [],
+                'medium_risk' => [],
+                'on_track' => [],
+            ],
+            'updated_at' => now()->toDateTimeString(),
+        ];
+    }
+
+    /**
+     * Get paginated work orders for a scheduled today category
+     */
+    public function getPaginatedCompleted(array $workOrders, string $category): array
+    {
+        // This will be called from the production schedule template
+        // Use simple pagination for now
+        return [
+            'data' => array_slice($workOrders, 0, 10),
+            'current_page' => 1,
+            'total_pages' => max(1, (int) ceil(count($workOrders) / 10)),
+            'total' => count($workOrders),
+            'per_page' => 10,
+            'from' => count($workOrders) > 0 ? 1 : 0,
+            'to' => min(10, count($workOrders)),
+        ];
+    }
+
+    /**
+     * Get paginated work orders for an other completions category
+     */
+    public function getPaginatedOtherCompletions(array $workOrders, string $category): array
+    {
+        return $this->getPaginatedCompleted($workOrders, $category);
+    }
+
+    /**
+     * Get paginated work orders for an at-risk category
+     */
+    public function getPaginatedAtRisk(array $workOrders, string $category): array
+    {
+        return $this->getPaginatedCompleted($workOrders, $category);
+    }
+
+    /**
+     * Toggle collapsible section for scheduled today WOs
+     */
+    public function toggleScheduledTodaySection(string $section): void
+    {
+        match ($section) {
+            'on_time' => $this->onTimeExpanded = ! $this->onTimeExpanded,
+            'early' => $this->earlyExpanded = ! $this->earlyExpanded,
+            'late' => $this->lateExpanded = ! $this->lateExpanded,
+            default => null,
+        };
+    }
+
+    /**
+     * Toggle collapsible section for other completions
+     */
+    public function toggleOtherCompletionsSection(string $section): void
+    {
+        match ($section) {
+            'early_from_future' => $this->earlyFromFutureExpanded = ! $this->earlyFromFutureExpanded,
+            'late_from_past' => $this->lateFromPastExpanded = ! $this->lateFromPastExpanded,
+            default => null,
+        };
+    }
+
+    /**
+     * Toggle collapsible section for at-risk WOs
+     */
+    public function toggleAtRiskSection(string $section): void
+    {
+        match ($section) {
+            'high_risk' => $this->highRiskExpanded = ! $this->highRiskExpanded,
+            'medium_risk' => $this->mediumRiskExpanded = ! $this->mediumRiskExpanded,
+            'on_track' => $this->onTrackExpanded = ! $this->onTrackExpanded,
+            default => null,
+        };
+    }
+
+    /**
+     * Navigate to specific page for a scheduled today WO category
+     */
+    public function gotoScheduledTodayPage(string $category, int $page): void
+    {
+        match ($category) {
+            'on_time' => $this->onTimePage = max(1, $page),
+            'early' => $this->earlyPage = max(1, $page),
+            'late' => $this->latePage = max(1, $page),
+            default => null,
+        };
+    }
+
+    /**
+     * Navigate to specific page for an other completions category
+     */
+    public function gotoOtherCompletionsPage(string $category, int $page): void
+    {
+        match ($category) {
+            'early_from_future' => $this->earlyFromFuturePage = max(1, $page),
+            'late_from_past' => $this->lateFromPastPage = max(1, $page),
+            default => null,
+        };
+    }
+
+    /**
+     * Navigate to specific page for an at-risk WO category
+     */
+    public function gotoAtRiskPage(string $category, int $page): void
+    {
+        match ($category) {
+            'high_risk' => $this->highRiskPage = max(1, $page),
+            'medium_risk' => $this->mediumRiskPage = max(1, $page),
+            'on_track' => $this->onTrackPage = max(1, $page),
+            default => null,
+        };
+    }
+
+    /**
+     * Navigate to specific page for daily breakdown table
+     */
+    public function gotoDailyBreakdownPage(int $page): void
+    {
+        $this->dailyBreakdownPage = max(1, $page);
+    }
+
+    /**
+     * Get paginated daily breakdown data
+     */
+    public function getPaginatedDailyBreakdown(array $dailyData): array
+    {
+        $total = count($dailyData);
+        $totalPages = max(1, (int) ceil($total / $this->dailyBreakdownPerPage));
+        $page = min($this->dailyBreakdownPage, $totalPages);
+
+        $offset = ($page - 1) * $this->dailyBreakdownPerPage;
+        $paginated = array_slice($dailyData, $offset, $this->dailyBreakdownPerPage);
+
+        return [
+            'data' => $paginated,
+            'current_page' => $page,
+            'total_pages' => $totalPages,
+            'total' => $total,
+            'per_page' => $this->dailyBreakdownPerPage,
+            'from' => $total > 0 ? $offset + 1 : 0,
+            'to' => $total > 0 ? min($offset + $this->dailyBreakdownPerPage, $total) : 0,
         ];
     }
 

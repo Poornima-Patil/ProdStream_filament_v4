@@ -18,12 +18,17 @@ class ProductionSchedulePage extends Page
 
     protected static string|\UnitEnum|null $navigationGroup = 'KPI System';
 
-    // Pagination properties for completed WO categories
+    // Pagination properties for scheduled today categories
     public int $onTimePage = 1;
 
     public int $earlyPage = 1;
 
     public int $latePage = 1;
+
+    // Pagination properties for other completions categories
+    public int $earlyFromFuturePage = 1;
+
+    public int $lateFromPastPage = 1;
 
     // Pagination properties for at-risk WO categories
     public int $highRiskPage = 1;
@@ -34,12 +39,17 @@ class ProductionSchedulePage extends Page
 
     public int $perPage = 10;
 
-    // Collapsible section states for completed WOs
+    // Collapsible section states for scheduled today
     public bool $onTimeExpanded = true;
 
     public bool $earlyExpanded = true;
 
     public bool $lateExpanded = true;
+
+    // Collapsible section states for other completions
+    public bool $earlyFromFutureExpanded = true;
+
+    public bool $lateFromPastExpanded = true;
 
     // Collapsible section states for at-risk WOs
     public bool $highRiskExpanded = true;
@@ -106,7 +116,7 @@ class ProductionSchedulePage extends Page
     /**
      * Get empty data structure
      */
-    protected function getEmptyData(): array
+    public function getEmptyData(): array
     {
         return [
             'summary' => [
@@ -116,11 +126,18 @@ class ProductionSchedulePage extends Page
                 'late_count' => 0,
                 'on_time_rate' => 0,
                 'avg_delay_minutes' => 0,
+                'early_from_future_count' => 0,
+                'late_from_past_count' => 0,
+                'total_completions_today' => 0,
             ],
-            'completed' => [
+            'scheduled_today' => [
                 'on_time' => [],
                 'early' => [],
                 'late' => [],
+            ],
+            'other_completions' => [
+                'early_from_future' => [],
+                'late_from_past' => [],
             ],
             'at_risk' => [
                 'high_risk' => [],
@@ -132,14 +149,26 @@ class ProductionSchedulePage extends Page
     }
 
     /**
-     * Toggle collapsible section for completed WOs
+     * Toggle collapsible section for scheduled today WOs
      */
-    public function toggleCompletedSection(string $section): void
+    public function toggleScheduledTodaySection(string $section): void
     {
         match ($section) {
             'on_time' => $this->onTimeExpanded = ! $this->onTimeExpanded,
             'early' => $this->earlyExpanded = ! $this->earlyExpanded,
             'late' => $this->lateExpanded = ! $this->lateExpanded,
+            default => null,
+        };
+    }
+
+    /**
+     * Toggle collapsible section for other completions
+     */
+    public function toggleOtherCompletionsSection(string $section): void
+    {
+        match ($section) {
+            'early_from_future' => $this->earlyFromFutureExpanded = ! $this->earlyFromFutureExpanded,
+            'late_from_past' => $this->lateFromPastExpanded = ! $this->lateFromPastExpanded,
             default => null,
         };
     }
@@ -158,14 +187,26 @@ class ProductionSchedulePage extends Page
     }
 
     /**
-     * Navigate to specific page for a completed WO category
+     * Navigate to specific page for a scheduled today WO category
      */
-    public function gotoCompletedPage(string $category, int $page): void
+    public function gotoScheduledTodayPage(string $category, int $page): void
     {
         match ($category) {
             'on_time' => $this->onTimePage = max(1, $page),
             'early' => $this->earlyPage = max(1, $page),
             'late' => $this->latePage = max(1, $page),
+            default => null,
+        };
+    }
+
+    /**
+     * Navigate to specific page for an other completions category
+     */
+    public function gotoOtherCompletionsPage(string $category, int $page): void
+    {
+        match ($category) {
+            'early_from_future' => $this->earlyFromFuturePage = max(1, $page),
+            'late_from_past' => $this->lateFromPastPage = max(1, $page),
             default => null,
         };
     }
@@ -184,7 +225,7 @@ class ProductionSchedulePage extends Page
     }
 
     /**
-     * Get paginated work orders for a completed category
+     * Get paginated work orders for a scheduled today category
      */
     public function getPaginatedCompleted(array $workOrders, string $category): array
     {
@@ -192,6 +233,35 @@ class ProductionSchedulePage extends Page
             'on_time' => $this->onTimePage,
             'early' => $this->earlyPage,
             'late' => $this->latePage,
+            default => 1,
+        };
+
+        $total = count($workOrders);
+        $totalPages = max(1, (int) ceil($total / $this->perPage));
+        $page = min($page, $totalPages);
+
+        $offset = ($page - 1) * $this->perPage;
+        $paginated = array_slice($workOrders, $offset, $this->perPage);
+
+        return [
+            'data' => $paginated,
+            'current_page' => $page,
+            'total_pages' => $totalPages,
+            'total' => $total,
+            'per_page' => $this->perPage,
+            'from' => $total > 0 ? $offset + 1 : 0,
+            'to' => $total > 0 ? min($offset + $this->perPage, $total) : 0,
+        ];
+    }
+
+    /**
+     * Get paginated work orders for an other completions category
+     */
+    public function getPaginatedOtherCompletions(array $workOrders, string $category): array
+    {
+        $page = match ($category) {
+            'early_from_future' => $this->earlyFromFuturePage,
+            'late_from_past' => $this->lateFromPastPage,
             default => 1,
         };
 
@@ -251,6 +321,8 @@ class ProductionSchedulePage extends Page
         $this->onTimePage = 1;
         $this->earlyPage = 1;
         $this->latePage = 1;
+        $this->earlyFromFuturePage = 1;
+        $this->lateFromPastPage = 1;
         $this->highRiskPage = 1;
         $this->mediumRiskPage = 1;
         $this->onTrackPage = 1;

@@ -610,6 +610,14 @@
 
                         {{-- Analytics Mode Content --}}
                         @if($kpiMode === 'analytics')
+                            @include('filament.admin.pages.machine-status-analytics')
+                        @endif
+                    </div>
+                </x-filament::card>
+            @endif
+
+            {{-- OLD ANALYTICS CONTENT - TO BE REMOVED --}}
+            @if(false && $kpiMode === 'analytics')
                             <div wire:key="analytics-data-{{ md5(json_encode($this->form->getState())) }}">
                             @if(isset($data['primary_period']))
                                 {{-- Period Header --}}
@@ -996,9 +1004,7 @@
                             @endif
                             </div>
                         @endif
-                    </div>
-                </x-filament::card>
-            @endif
+            {{-- END OF OLD ANALYTICS CONTENT --}}
 
             {{-- Work Order Status KPI Content --}}
             @if($selectedKPI === 'work_order_status')
@@ -1517,6 +1523,37 @@
                         </div>
                     </div>
                 </x-filament::card>
+            @endif
+
+            {{-- Production Schedule Adherence KPI Content --}}
+            @if($selectedKPI === 'production_schedule')
+                @if($kpiMode === 'analytics')
+                    @include('filament.admin.pages.production-schedule-analytics')
+                @else
+                    @include('filament.admin.pages.production-schedule')
+                @endif
+            @endif
+
+            {{-- Machine Utilization Rate KPI Content --}}
+            @if($selectedKPI === 'machine_utilization')
+                @if($kpiMode === 'dashboard')
+                    {{-- Dashboard Mode: Shows TODAY's data only --}}
+                    @include('filament.admin.pages.machine-utilization')
+                @else
+                    {{-- Analytics Mode: Historical data from kpi_machine_daily table --}}
+                    {{-- TODO: Create machine-utilization-analytics.blade.php for Analytics mode --}}
+                    <x-filament::card>
+                        <div class="text-center py-8">
+                            <x-heroicon-o-chart-bar class="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
+                            <p class="text-gray-600 dark:text-gray-400">
+                                Analytics mode for Machine Utilization Rate is coming soon.
+                            </p>
+                            <p class="text-sm text-gray-500 dark:text-gray-500 mt-2">
+                                Use Dashboard mode to view today's utilization data.
+                            </p>
+                        </div>
+                    </x-filament::card>
+                @endif
             @endif
         </div>
     @endif

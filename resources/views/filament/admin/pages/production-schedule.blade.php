@@ -1,12 +1,23 @@
-<x-filament-panels::page>
-    @php
+@php
+    try {
         $data = $this->getProductionScheduleData();
         $summary = $data['summary'];
-        $completed = $data['completed'];
+        $scheduledToday = $data['scheduled_today'];
+        $otherCompletions = $data['other_completions'];
         $atRisk = $data['at_risk'];
-    @endphp
+    } catch (\Exception $e) {
+        \Log::error('Production Schedule Page Error: ' . $e->getMessage());
+        $data = $this->getEmptyData();
+        $summary = $data['summary'];
+        $scheduledToday = $data['scheduled_today'];
+        $otherCompletions = $data['other_completions'];
+        $atRisk = $data['at_risk'];
+    }
+@endphp
 
-    {{-- Page Header with Refresh --}}
+<x-filament::card>
+    <div class="space-y-6">
+        {{-- Page Header with Refresh --}}
     <div class="flex justify-between items-center mb-6">
         <div>
             <h2 class="text-2xl font-bold">Production Schedule Adherence</h2>
@@ -120,11 +131,11 @@
         </div>
     </div>
 
-    {{-- SECTION 1: COMPLETED TODAY --}}
+    {{-- SECTION 1: SCHEDULED FOR TODAY --}}
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8 border border-gray-200 dark:border-gray-700">
         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-                Completed Today (Scheduled to End Today)
+                Scheduled to End Today
             </h3>
             <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 Work orders that were scheduled to end today and their actual completion timing
@@ -132,10 +143,10 @@
         </div>
 
         {{-- On Time --}}
-        @php $onTimePaginated = $this->getPaginatedCompleted($completed['on_time'], 'on_time'); @endphp
+        @php $onTimePaginated = $this->getPaginatedCompleted($scheduledToday['on_time'], 'on_time'); @endphp
         <div class="border-b border-gray-200 dark:border-gray-700">
             <button
-                wire:click="toggleCompletedSection('on_time')"
+                wire:click="toggleScheduledTodaySection('on_time')"
                 class="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
             >
                 <div class="flex items-center gap-3">
@@ -150,14 +161,14 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
-                    <span class="text-lg font-bold text-green-600 dark:text-green-400">{{ count($completed['on_time']) }}</span>
+                    <span class="text-lg font-bold text-green-600 dark:text-green-400">{{ count($scheduledToday['on_time']) }}</span>
                     <svg class="w-5 h-5 text-gray-400 transition-transform {{ $onTimeExpanded ? 'rotate-180' : '' }}" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                     </svg>
                 </div>
             </button>
 
-            @if($onTimeExpanded && count($completed['on_time']) > 0)
+            @if($onTimeExpanded && count($scheduledToday['on_time']) > 0)
                 <div class="px-6 pb-4">
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm">
@@ -203,7 +214,7 @@
                             :from="$onTimePaginated['from']"
                             :to="$onTimePaginated['to']"
                             status="on_time"
-                            wireMethod="gotoCompletedPage"
+                            wireMethod="gotoScheduledTodayPage"
                         />
                     @endif
                 </div>
@@ -211,10 +222,10 @@
         </div>
 
         {{-- Early --}}
-        @php $earlyPaginated = $this->getPaginatedCompleted($completed['early'], 'early'); @endphp
+        @php $earlyPaginated = $this->getPaginatedCompleted($scheduledToday['early'], 'early'); @endphp
         <div class="border-b border-gray-200 dark:border-gray-700">
             <button
-                wire:click="toggleCompletedSection('early')"
+                wire:click="toggleScheduledTodaySection('early')"
                 class="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
             >
                 <div class="flex items-center gap-3">
@@ -229,14 +240,14 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
-                    <span class="text-lg font-bold text-blue-600 dark:text-blue-400">{{ count($completed['early']) }}</span>
+                    <span class="text-lg font-bold text-blue-600 dark:text-blue-400">{{ count($scheduledToday['early']) }}</span>
                     <svg class="w-5 h-5 text-gray-400 transition-transform {{ $earlyExpanded ? 'rotate-180' : '' }}" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                     </svg>
                 </div>
             </button>
 
-            @if($earlyExpanded && count($completed['early']) > 0)
+            @if($earlyExpanded && count($scheduledToday['early']) > 0)
                 <div class="px-6 pb-4">
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm">
@@ -282,7 +293,7 @@
                             :from="$earlyPaginated['from']"
                             :to="$earlyPaginated['to']"
                             status="early"
-                            wireMethod="gotoCompletedPage"
+                            wireMethod="gotoScheduledTodayPage"
                         />
                     @endif
                 </div>
@@ -290,10 +301,10 @@
         </div>
 
         {{-- Late --}}
-        @php $latePaginated = $this->getPaginatedCompleted($completed['late'], 'late'); @endphp
+        @php $latePaginated = $this->getPaginatedCompleted($scheduledToday['late'], 'late'); @endphp
         <div>
             <button
-                wire:click="toggleCompletedSection('late')"
+                wire:click="toggleScheduledTodaySection('late')"
                 class="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
             >
                 <div class="flex items-center gap-3">
@@ -308,14 +319,14 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
-                    <span class="text-lg font-bold text-red-600 dark:text-red-400">{{ count($completed['late']) }}</span>
+                    <span class="text-lg font-bold text-red-600 dark:text-red-400">{{ count($scheduledToday['late']) }}</span>
                     <svg class="w-5 h-5 text-gray-400 transition-transform {{ $lateExpanded ? 'rotate-180' : '' }}" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                     </svg>
                 </div>
             </button>
 
-            @if($lateExpanded && count($completed['late']) > 0)
+            @if($lateExpanded && count($scheduledToday['late']) > 0)
                 <div class="px-6 pb-4">
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm">
@@ -361,7 +372,7 @@
                             :from="$latePaginated['from']"
                             :to="$latePaginated['to']"
                             status="late"
-                            wireMethod="gotoCompletedPage"
+                            wireMethod="gotoScheduledTodayPage"
                         />
                     @endif
                 </div>
@@ -369,7 +380,177 @@
         </div>
     </div>
 
-    {{-- SECTION 2: AT-RISK WORK ORDERS --}}
+    {{-- SECTION 2: OTHER COMPLETIONS TODAY --}}
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8 border border-gray-200 dark:border-gray-700">
+        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                Other Completions Today
+            </h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Work orders completed today but scheduled for different dates
+            </p>
+        </div>
+
+        {{-- Early from Future Schedule --}}
+        @php $earlyFromFuturePaginated = $this->getPaginatedOtherCompletions($otherCompletions['early_from_future'], 'early_from_future'); @endphp
+        <div class="border-b border-gray-200 dark:border-gray-700">
+            <button
+                wire:click="toggleOtherCompletionsSection('early_from_future')"
+                class="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+            >
+                <div class="flex items-center gap-3">
+                    <div class="bg-blue-100 dark:bg-blue-900 p-2 rounded">
+                        <svg class="w-5 h-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.707-10.293a1 1 0 00-1.414-1.414l-3 3a1 1 0 000 1.414l3 3a1 1 0 001.414-1.414L9.414 11H13a1 1 0 100-2H9.414l1.293-1.293z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="text-left">
+                        <h4 class="text-base font-semibold text-gray-900 dark:text-white">Early from Future Schedule</h4>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Scheduled for future dates, completed today</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-lg font-bold text-blue-600 dark:text-blue-400">{{ count($otherCompletions['early_from_future']) }}</span>
+                    <svg class="w-5 h-5 text-gray-400 transition-transform {{ $earlyFromFutureExpanded ? 'rotate-180' : '' }}" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+            </button>
+
+            @if($earlyFromFutureExpanded && count($otherCompletions['early_from_future']) > 0)
+                <div class="px-6 pb-4">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50 dark:bg-gray-700">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">WO Number</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">Machine</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">Part Number</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">Operator</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">Scheduled End</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">Actual Completion</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">Variance</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                @foreach($earlyFromFuturePaginated['data'] as $wo)
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                        <td class="px-4 py-3 text-gray-900 dark:text-white font-medium">{{ $wo['wo_number'] }}</td>
+                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
+                                            {{ $wo['machine_name'] }}<br>
+                                            <span class="text-xs text-gray-500">{{ $wo['machine_asset_id'] }}</span>
+                                        </td>
+                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $wo['part_number'] }}</td>
+                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $wo['operator'] }}</td>
+                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $wo['scheduled_end'] }}</td>
+                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $wo['actual_completion'] }}</td>
+                                        <td class="px-4 py-3">
+                                            <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                                                {{ $wo['variance_display'] }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if($earlyFromFuturePaginated['total_pages'] > 1)
+                        <x-machine-table-pagination
+                            :currentPage="$earlyFromFuturePaginated['current_page']"
+                            :totalPages="$earlyFromFuturePaginated['total_pages']"
+                            :total="$earlyFromFuturePaginated['total']"
+                            :from="$earlyFromFuturePaginated['from']"
+                            :to="$earlyFromFuturePaginated['to']"
+                            status="early_from_future"
+                            wireMethod="gotoOtherCompletionsPage"
+                        />
+                    @endif
+                </div>
+            @endif
+        </div>
+
+        {{-- Late from Past Schedule --}}
+        @php $lateFromPastPaginated = $this->getPaginatedOtherCompletions($otherCompletions['late_from_past'], 'late_from_past'); @endphp
+        <div>
+            <button
+                wire:click="toggleOtherCompletionsSection('late_from_past')"
+                class="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+            >
+                <div class="flex items-center gap-3">
+                    <div class="bg-orange-100 dark:bg-orange-900 p-2 rounded">
+                        <svg class="w-5 h-5 text-orange-600 dark:text-orange-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="text-left">
+                        <h4 class="text-base font-semibold text-gray-900 dark:text-white">Late from Past Schedule</h4>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Scheduled for past dates, completed today (delayed)</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-lg font-bold text-orange-600 dark:text-orange-400">{{ count($otherCompletions['late_from_past']) }}</span>
+                    <svg class="w-5 h-5 text-gray-400 transition-transform {{ $lateFromPastExpanded ? 'rotate-180' : '' }}" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+            </button>
+
+            @if($lateFromPastExpanded && count($otherCompletions['late_from_past']) > 0)
+                <div class="px-6 pb-4">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50 dark:bg-gray-700">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">WO Number</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">Machine</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">Part Number</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">Operator</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">Scheduled End</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">Actual Completion</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase">Variance</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                                @foreach($lateFromPastPaginated['data'] as $wo)
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                                        <td class="px-4 py-3 text-gray-900 dark:text-white font-medium">{{ $wo['wo_number'] }}</td>
+                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
+                                            {{ $wo['machine_name'] }}<br>
+                                            <span class="text-xs text-gray-500">{{ $wo['machine_asset_id'] }}</span>
+                                        </td>
+                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $wo['part_number'] }}</td>
+                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $wo['operator'] }}</td>
+                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $wo['scheduled_end'] }}</td>
+                                        <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $wo['actual_completion'] }}</td>
+                                        <td class="px-4 py-3">
+                                            <span class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200">
+                                                {{ $wo['variance_display'] }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if($lateFromPastPaginated['total_pages'] > 1)
+                        <x-machine-table-pagination
+                            :currentPage="$lateFromPastPaginated['current_page']"
+                            :totalPages="$lateFromPastPaginated['total_pages']"
+                            :total="$lateFromPastPaginated['total']"
+                            :from="$lateFromPastPaginated['from']"
+                            :to="$lateFromPastPaginated['to']"
+                            status="late_from_past"
+                            wireMethod="gotoOtherCompletionsPage"
+                        />
+                    @endif
+                </div>
+            @endif
+        </div>
+    </div>
+
+    {{-- SECTION 3: AT-RISK WORK ORDERS --}}
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow border border-gray-200 dark:border-gray-700">
         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
@@ -651,8 +832,9 @@
         </div>
     </div>
 
-    {{-- Last Updated --}}
-    <div class="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
-        Last updated: {{ \Carbon\Carbon::parse($data['updated_at'])->format('M d, Y H:i:s') }}
+        {{-- Last Updated --}}
+        <div class="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            Last updated: {{ \Carbon\Carbon::parse($data['updated_at'])->format('M d, Y H:i:s') }}
+        </div>
     </div>
-</x-filament-panels::page>
+</x-filament::card>

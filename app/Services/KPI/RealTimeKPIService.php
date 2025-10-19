@@ -437,7 +437,8 @@ class RealTimeKPIService extends BaseKPIService
      * Shows on-time completion rate and at-risk work orders
      *
      * DASHBOARD MODE (Real-Time):
-     * - COMPLETED TODAY: WOs scheduled to end today, categorized by timing
+     * - SCHEDULED FOR TODAY: WOs scheduled to end today, categorized by timing
+     * - OTHER COMPLETIONS: WOs completed today but scheduled for other dates
      * - AT-RISK: WOs currently running with approaching deadlines
      */
     public function getProductionScheduleAdherence(bool $skipCache = false): array
@@ -446,7 +447,7 @@ class RealTimeKPIService extends BaseKPIService
             $today = now()->startOfDay();
             $endOfToday = now()->endOfDay();
 
-            // Get WOs scheduled to end TODAY
+            // SECTION 1: Get WOs SCHEDULED to end TODAY
             $scheduledWOs = \App\Models\WorkOrder::where('factory_id', $this->factory->id)
                 ->whereBetween('end_time', [$today, $endOfToday])
                 ->whereIn('status', ['Completed', 'Closed'])
@@ -457,14 +458,14 @@ class RealTimeKPIService extends BaseKPIService
                 ])
                 ->get();
 
-            // Get actual completion times from logs
+            // Get actual completion times from logs for scheduled WOs
             $woIds = $scheduledWOs->pluck('id');
             $completionLogs = \App\Models\WorkOrderLog::whereIn('work_order_id', $woIds)
                 ->where('status', 'Completed')
                 ->get(['work_order_id', 'changed_at'])
                 ->keyBy('work_order_id');
 
-            // Categorize by timing
+            // Categorize scheduled WOs by timing
             $onTime = [];
             $early = [];
             $late = [];
@@ -523,6 +524,79 @@ class RealTimeKPIService extends BaseKPIService
             $avgDelayMinutes = $lateCount > 0
                 ? round($totalDelayMinutes / $lateCount, 0)
                 : 0;
+
+            // SECTION 2: Get WOs COMPLETED today but scheduled for OTHER dates
+            $allCompletedTodayIds = \App\Models\WorkOrderLog::whereBetween('changed_at', [$today, $endOfToday])
+                ->where('status', 'Completed')
+                ->pluck('work_order_id')
+                ->unique();
+
+            $otherCompletions = \App\Models\WorkOrder::where('factory_id', $this->factory->id)
+                ->whereIn('status', ['Completed', 'Closed'])
+                ->whereIn('id', $allCompletedTodayIds)
+                ->where(function ($query) use ($today, $endOfToday) {
+                    // NOT scheduled to end today
+                    $query->where('end_time', '<', $today)
+                        ->orWhere('end_time', '>', $endOfToday);
+                })
+                ->with([
+                    'machine:id,name,assetId',
+                    'operator.user:id,first_name,last_name',
+                    'bom.purchaseOrder.partNumber:id,partnumber',
+                ])
+                ->get();
+
+            // Get completion logs for other completions
+            $otherWoIds = $otherCompletions->pluck('id');
+            $otherCompletionLogs = \App\Models\WorkOrderLog::whereIn('work_order_id', $otherWoIds)
+                ->where('status', 'Completed')
+                ->get(['work_order_id', 'changed_at'])
+                ->keyBy('work_order_id');
+
+            // Categorize other completions
+            $earlyFromFuture = [];
+            $lateFromPast = [];
+
+            foreach ($otherCompletions as $wo) {
+                $completionLog = $otherCompletionLogs->get($wo->id);
+                $actualCompletion = $completionLog ? \Carbon\Carbon::parse($completionLog->changed_at) : null;
+                $scheduledEnd = \Carbon\Carbon::parse($wo->end_time);
+
+                if (! $actualCompletion) {
+                    continue;
+                }
+
+                $operatorName = $wo->operator?->user
+                    ? "{$wo->operator->user->first_name} {$wo->operator->user->last_name}"
+                    : 'Unassigned';
+
+                $partNumber = $wo->bom?->purchaseOrder?->partNumber?->partnumber ?? 'N/A';
+
+                // Calculate variance in days for longer periods
+                $varianceDays = $actualCompletion->diffInDays($scheduledEnd, false);
+                $varianceHours = $actualCompletion->copy()->subDays($varianceDays)->diffInHours($scheduledEnd, false);
+
+                $woData = [
+                    'id' => $wo->id,
+                    'wo_number' => $wo->unique_id ?? 'N/A',
+                    'machine_name' => $wo->machine?->name ?? 'N/A',
+                    'machine_asset_id' => $wo->machine?->assetId ?? 'N/A',
+                    'operator' => $operatorName,
+                    'part_number' => $partNumber,
+                    'scheduled_end' => $scheduledEnd->format('M d, Y H:i'),
+                    'actual_completion' => $actualCompletion->format('M d, Y H:i'),
+                    'variance_days' => $varianceDays,
+                    'variance_display' => $this->formatExtendedVariance($actualCompletion, $scheduledEnd),
+                ];
+
+                if ($scheduledEnd > $endOfToday) {
+                    // Scheduled for future, completed early
+                    $earlyFromFuture[] = $woData;
+                } else {
+                    // Scheduled for past, completed late
+                    $lateFromPast[] = $woData;
+                }
+            }
 
             // Get AT-RISK work orders (currently running, deadline approaching)
             $atRiskWOs = \App\Models\WorkOrder::where('factory_id', $this->factory->id)
@@ -585,11 +659,18 @@ class RealTimeKPIService extends BaseKPIService
                     'late_count' => count($late),
                     'on_time_rate' => $onTimeRate,
                     'avg_delay_minutes' => $avgDelayMinutes,
+                    'early_from_future_count' => count($earlyFromFuture),
+                    'late_from_past_count' => count($lateFromPast),
+                    'total_completions_today' => $totalScheduled + count($earlyFromFuture) + count($lateFromPast),
                 ],
-                'completed' => [
+                'scheduled_today' => [
                     'on_time' => $onTime,
                     'early' => $early,
                     'late' => $late,
+                ],
+                'other_completions' => [
+                    'early_from_future' => $earlyFromFuture,
+                    'late_from_past' => $lateFromPast,
                 ],
                 'at_risk' => [
                     'high_risk' => $highRisk,
@@ -639,6 +720,243 @@ class RealTimeKPIService extends BaseKPIService
     }
 
     /**
+     * Format extended variance (days/hours) for work orders scheduled far from completion date
+     */
+    private function formatExtendedVariance(\Carbon\Carbon $actualCompletion, \Carbon\Carbon $scheduledEnd): string
+    {
+        $isEarly = $actualCompletion < $scheduledEnd;
+
+        $days = abs($actualCompletion->diffInDays($scheduledEnd));
+        $hours = abs($actualCompletion->copy()->addDays($isEarly ? $days : -$days)->diffInHours($scheduledEnd));
+
+        $prefix = $isEarly ? 'Early by' : 'Late by';
+
+        if ($days > 0 && $hours > 0) {
+            return sprintf('%s %dd %dh', $prefix, $days, $hours);
+        } elseif ($days > 0) {
+            return sprintf('%s %dd', $prefix, $days);
+        } elseif ($hours > 0) {
+            return sprintf('%s %dh', $prefix, $hours);
+        }
+
+        return 'On Time';
+    }
+
+    /**
+     * Get machine utilization metrics for TODAY
+     * Shows both Scheduled Utilization (factory view) and Active Utilization (operator view)
+     *
+     * DASHBOARD MODE (Real-Time):
+     * - Shows ONLY TODAY's data (work orders with start_time = today)
+     * - Calculates utilization for current day in real-time
+     * - Two types of utilization:
+     *   1. Scheduled Utilization: Includes hold periods (factory perspective)
+     *   2. Active Utilization: Excludes hold periods (operator perspective)
+     */
+    public function getMachineUtilization(bool $skipCache = false): array
+    {
+        $callback = function () {
+            $today = now()->startOfDay();
+            $endOfToday = now()->endOfDay();
+
+            // Get all machines for this factory
+            $machines = Machine::where('factory_id', $this->factory->id)->get();
+
+            // Get shifts to calculate available hours
+            $shifts = \App\Models\Shift::where('factory_id', $this->factory->id)->get();
+            $availableHoursPerMachine = 0;
+
+            foreach ($shifts as $shift) {
+                $start = \Carbon\Carbon::createFromTimeString($shift->start_time);
+                $end = \Carbon\Carbon::createFromTimeString($shift->end_time);
+
+                // Handle overnight shifts
+                if ($end->lt($start)) {
+                    $end->addDay();
+                }
+
+                $availableHoursPerMachine += $end->diffInHours($start);
+            }
+
+            // Initialize summary metrics
+            $totalScheduledHours = 0;
+            $totalActiveHours = 0;
+            $machinesWithWork = 0;
+            $machineDetails = [];
+
+            foreach ($machines as $machine) {
+                // Get work orders scheduled for TODAY for this machine
+                $workOrders = \App\Models\WorkOrder::where('factory_id', $this->factory->id)
+                    ->where('machine_id', $machine->id)
+                    ->whereDate('start_time', $today)
+                    ->whereIn('status', ['Start', 'Completed', 'Hold'])
+                    ->get();
+
+                if ($workOrders->isEmpty()) {
+                    // Machine has no work scheduled for today
+                    $machineDetails[] = [
+                        'id' => $machine->id,
+                        'name' => $machine->name,
+                        'asset_id' => $machine->assetId,
+                        'scheduled_utilization' => 0.0,
+                        'active_utilization' => 0.0,
+                        'scheduled_hours' => 0.0,
+                        'active_hours' => 0.0,
+                        'available_hours' => $availableHoursPerMachine,
+                        'hold_hours' => 0.0,
+                        'idle_hours' => $availableHoursPerMachine,
+                        'work_order_count' => 0,
+                    ];
+
+                    continue;
+                }
+
+                $machinesWithWork++;
+
+                // CALCULATION 1: Scheduled Utilization (Factory View)
+                // Sum of (end_time - start_time) for all work orders, clipped to today
+                $scheduledSeconds = 0;
+
+                foreach ($workOrders as $wo) {
+                    $start = \Carbon\Carbon::parse($wo->start_time);
+                    $end = \Carbon\Carbon::parse($wo->end_time);
+
+                    // Clip to today's boundaries
+                    $effectiveStart = $start->lt($today) ? $today->copy() : $start->copy();
+                    $effectiveEnd = $end->gt($endOfToday) ? $endOfToday->copy() : $end->copy();
+
+                    if ($effectiveEnd->gt($effectiveStart)) {
+                        $scheduledSeconds += $effectiveStart->diffInSeconds($effectiveEnd);
+                    }
+                }
+
+                $scheduledHours = round($scheduledSeconds / 3600, 2);
+
+                // CALCULATION 2: Active Utilization (Operator View)
+                // Only count time when status = 'Start' (from work_order_logs)
+                $activeSeconds = 0;
+
+                foreach ($workOrders as $wo) {
+                    // Get all status change logs for this work order
+                    $logs = \App\Models\WorkOrderLog::where('work_order_id', $wo->id)
+                        ->orderBy('changed_at', 'asc')
+                        ->get(['status', 'changed_at']);
+
+                    if ($logs->isEmpty()) {
+                        continue;
+                    }
+
+                    $previousLog = null;
+
+                    foreach ($logs as $log) {
+                        if ($previousLog && $previousLog->status === 'Start') {
+                            // Machine was actively running from previousLog to current log
+                            $startTime = \Carbon\Carbon::parse($previousLog->changed_at);
+                            $endTime = \Carbon\Carbon::parse($log->changed_at);
+
+                            // Clip to today's boundaries
+                            $effectiveStart = $startTime->lt($today) ? $today->copy() : $startTime->copy();
+                            $effectiveEnd = $endTime->gt($endOfToday) ? $endOfToday->copy() : $endTime->copy();
+
+                            if ($effectiveEnd->gt($effectiveStart)) {
+                                $activeSeconds += $effectiveStart->diffInSeconds($effectiveEnd);
+                            }
+                        }
+
+                        $previousLog = $log;
+                    }
+
+                    // Handle ongoing work orders still in 'Start' status
+                    if ($previousLog && $previousLog->status === 'Start') {
+                        $startTime = \Carbon\Carbon::parse($previousLog->changed_at);
+                        $endTime = now();
+
+                        // Clip to today's boundaries
+                        $effectiveStart = $startTime->lt($today) ? $today->copy() : $startTime->copy();
+                        $effectiveEnd = $endTime->gt($endOfToday) ? $endOfToday->copy() : $endTime->copy();
+
+                        if ($effectiveEnd->gt($effectiveStart)) {
+                            $activeSeconds += $effectiveStart->diffInSeconds($effectiveEnd);
+                        }
+                    }
+                }
+
+                $activeHours = round($activeSeconds / 3600, 2);
+
+                // Calculate utilization percentages
+                $scheduledUtilization = $availableHoursPerMachine > 0
+                    ? round(min(($scheduledHours / $availableHoursPerMachine) * 100, 100), 2)
+                    : 0.0;
+
+                $activeUtilization = $availableHoursPerMachine > 0
+                    ? round(min(($activeHours / $availableHoursPerMachine) * 100, 100), 2)
+                    : 0.0;
+
+                // Calculate derived metrics
+                $holdHours = round($scheduledHours - $activeHours, 2);
+                $idleHours = round($availableHoursPerMachine - $scheduledHours, 2);
+
+                $machineDetails[] = [
+                    'id' => $machine->id,
+                    'name' => $machine->name,
+                    'asset_id' => $machine->assetId,
+                    'scheduled_utilization' => $scheduledUtilization,
+                    'active_utilization' => $activeUtilization,
+                    'scheduled_hours' => $scheduledHours,
+                    'active_hours' => $activeHours,
+                    'available_hours' => $availableHoursPerMachine,
+                    'hold_hours' => max($holdHours, 0), // Ensure non-negative
+                    'idle_hours' => max($idleHours, 0), // Ensure non-negative
+                    'work_order_count' => $workOrders->count(),
+                ];
+
+                $totalScheduledHours += $scheduledHours;
+                $totalActiveHours += $activeHours;
+            }
+
+            // Calculate factory-wide summary
+            $totalAvailableHours = $machines->count() * $availableHoursPerMachine;
+
+            $factoryScheduledUtilization = $totalAvailableHours > 0
+                ? round(($totalScheduledHours / $totalAvailableHours) * 100, 2)
+                : 0.0;
+
+            $factoryActiveUtilization = $totalAvailableHours > 0
+                ? round(($totalActiveHours / $totalAvailableHours) * 100, 2)
+                : 0.0;
+
+            // Sort machines by scheduled utilization (descending)
+            usort($machineDetails, function ($a, $b) {
+                return ($b['scheduled_utilization'] ?? 0) <=> ($a['scheduled_utilization'] ?? 0);
+            });
+
+            return [
+                'summary' => [
+                    'scheduled_utilization_rate' => $factoryScheduledUtilization,
+                    'active_utilization_rate' => $factoryActiveUtilization,
+                    'total_machines' => $machines->count(),
+                    'machines_with_work' => $machinesWithWork,
+                    'machines_idle' => $machines->count() - $machinesWithWork,
+                    'total_scheduled_hours' => round($totalScheduledHours, 2),
+                    'total_active_hours' => round($totalActiveHours, 2),
+                    'total_hold_hours' => round($totalScheduledHours - $totalActiveHours, 2),
+                    'total_available_hours' => $totalAvailableHours,
+                    'date' => $today->format('Y-m-d'),
+                ],
+                'machines' => $machineDetails,
+                'updated_at' => now()->toDateTimeString(),
+            ];
+        };
+
+        // Skip cache if requested (for manual refresh)
+        if ($skipCache) {
+            return $callback();
+        }
+
+        return $this->getCachedKPI('machine_utilization', $callback, 300);
+    }
+
+    /**
      * Get all real-time KPIs (implements abstract method)
      */
     public function getKPIs(array $options = []): array
@@ -647,6 +965,7 @@ class RealTimeKPIService extends BaseKPIService
             'machine_status' => $this->getCurrentMachineStatus(),
             'work_order_status' => $this->getCurrentWorkOrderStatus(),
             'production_schedule_adherence' => $this->getProductionScheduleAdherence(),
+            'machine_utilization' => $this->getMachineUtilization(),
             // Future: Add more Tier 1 KPIs here
             // 'current_throughput' => $this->getCurrentThroughputRate(),
             // 'current_quality' => $this->getCurrentQualityRate(),
