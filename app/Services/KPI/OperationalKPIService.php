@@ -1000,6 +1000,260 @@ class OperationalKPIService extends BaseKPIService
     }
 
     /**
+     * Get setup time analytics with historical data and comparisons
+     * Returns historical breakdown of setup times per machine and daily aggregations
+     * Setup time = gap between 'Assigned' and first 'Start' status in work_order_logs
+     */
+    public function getSetupTimeAnalytics(array $options): array
+    {
+        $period = $options['time_period'] ?? 'yesterday';
+        $enableComparison = $options['enable_comparison'] ?? false;
+        $comparisonType = $options['comparison_type'] ?? 'previous_period';
+        $machineFilter = $options['machine_id'] ?? null;
+
+        $dateFrom = isset($options['date_from']) ? Carbon::parse($options['date_from']) : null;
+        $dateTo = isset($options['date_to']) ? Carbon::parse($options['date_to']) : null;
+
+        [$startDate, $endDate] = $this->getDateRange($period, $dateFrom, $dateTo);
+
+        $cacheKey = "setup_time_analytics_{$period}_".md5(json_encode($options));
+        $cacheTTL = $this->getCacheTTL($period);
+
+        return $this->getCachedKPI($cacheKey, function () use ($startDate, $endDate, $enableComparison, $comparisonType, $options, $machineFilter) {
+            // Fetch primary period data
+            $primaryData = $this->fetchSetupTimeDistribution($startDate, $endDate, $machineFilter);
+
+            $result = [
+                'primary_period' => [
+                    'start_date' => $startDate->toDateString(),
+                    'end_date' => $endDate->toDateString(),
+                    'label' => $this->getPeriodLabel($options['time_period'] ?? 'yesterday', $startDate, $endDate),
+                    'daily_breakdown' => $primaryData['daily'],
+                    'machine_breakdown' => $primaryData['by_machine'],
+                    'summary' => $primaryData['summary'],
+                ],
+            ];
+
+            // Add comparison if enabled
+            if ($enableComparison) {
+                [$compStart, $compEnd] = $this->getComparisonDateRange($startDate, $endDate, $comparisonType);
+
+                $comparisonData = $this->fetchSetupTimeDistribution($compStart, $compEnd, $machineFilter);
+
+                $result['comparison_period'] = [
+                    'start_date' => $compStart->toDateString(),
+                    'end_date' => $compEnd->toDateString(),
+                    'label' => $this->getPeriodLabel($comparisonType, $compStart, $compEnd),
+                    'daily_breakdown' => $comparisonData['daily'],
+                    'machine_breakdown' => $comparisonData['by_machine'],
+                    'summary' => $comparisonData['summary'],
+                ];
+
+                $result['comparison_analysis'] = $this->calculateSetupTimeComparison(
+                    $primaryData['summary'],
+                    $comparisonData['summary']
+                );
+            }
+
+            return $result;
+        }, $cacheTTL);
+    }
+
+    /**
+     * Fetch setup time distribution for a date range
+     * Calculates setup time from work_order_logs by finding gap between 'Assigned' and 'Start'
+     */
+    protected function fetchSetupTimeDistribution(Carbon $startDate, Carbon $endDate, ?int $machineFilter = null): array
+    {
+        // Get all Assigned status logs in the date range
+        $assignedLogs = \App\Models\WorkOrderLog::where('status', 'Assigned')
+            ->whereBetween('changed_at', [$startDate->startOfDay(), $endDate->endOfDay()])
+            ->get(['work_order_id', 'changed_at']);
+
+        $dailyBreakdown = [];
+        $machineBreakdown = [];
+        $totalSetupMinutes = 0;
+        $totalSetups = 0;
+
+        foreach ($assignedLogs as $assignedLog) {
+            // Find corresponding first 'Start' log AFTER this Assigned log
+            $startLog = \App\Models\WorkOrderLog::where('work_order_id', $assignedLog->work_order_id)
+                ->where('status', 'Start')
+                ->where('changed_at', '>', $assignedLog->changed_at)
+                ->orderBy('changed_at', 'asc')
+                ->first(['work_order_id', 'changed_at']);
+
+            if (!$startLog) {
+                continue; // WO not yet started
+            }
+
+            // Calculate setup time in minutes
+            $setupMinutes = $assignedLog->changed_at->diffInMinutes($startLog->changed_at);
+
+            // Get work order details
+            $workOrder = \App\Models\WorkOrder::find($assignedLog->work_order_id, ['id', 'machine_id', 'factory_id']);
+            if (!$workOrder || $workOrder->factory_id !== $this->factory->id) {
+                continue;
+            }
+
+            // Apply machine filter if specified
+            if ($machineFilter && $workOrder->machine_id != $machineFilter) {
+                continue;
+            }
+
+            $date = $assignedLog->changed_at->toDateString();
+
+            // Initialize daily breakdown for this date
+            if (!isset($dailyBreakdown[$date])) {
+                $dailyBreakdown[$date] = [
+                    'date' => $date,
+                    'total_setup_time' => 0,
+                    'total_setups' => 0,
+                    'avg_setup_time' => 0,
+                    'max_setup_time' => 0,
+                    'min_setup_time' => PHP_INT_MAX,
+                ];
+            }
+
+            // Update daily breakdown
+            $dailyBreakdown[$date]['total_setup_time'] += $setupMinutes;
+            $dailyBreakdown[$date]['total_setups'] += 1;
+            $dailyBreakdown[$date]['max_setup_time'] = max($dailyBreakdown[$date]['max_setup_time'], $setupMinutes);
+            $dailyBreakdown[$date]['min_setup_time'] = min($dailyBreakdown[$date]['min_setup_time'], $setupMinutes);
+
+            $totalSetupMinutes += $setupMinutes;
+            $totalSetups += 1;
+
+            // Initialize machine breakdown
+            if (!isset($machineBreakdown[$workOrder->machine_id])) {
+                $machine = \App\Models\Machine::find($workOrder->machine_id, ['id', 'name', 'assetId']);
+                $machineBreakdown[$workOrder->machine_id] = [
+                    'machine_id' => $workOrder->machine_id,
+                    'machine_name' => $machine?->name ?? 'Unknown',
+                    'asset_id' => $machine?->assetId ?? null,
+                    'total_setup_time' => 0,
+                    'total_setups' => 0,
+                    'avg_setup_time' => 0,
+                ];
+            }
+
+            // Update machine breakdown
+            $machineBreakdown[$workOrder->machine_id]['total_setup_time'] += $setupMinutes;
+            $machineBreakdown[$workOrder->machine_id]['total_setups'] += 1;
+        }
+
+        // Calculate averages and finalize daily breakdown
+        foreach ($dailyBreakdown as &$day) {
+            if ($day['total_setups'] > 0) {
+                $day['avg_setup_time'] = round($day['total_setup_time'] / $day['total_setups'], 2);
+                $day['min_setup_time'] = min($day['min_setup_time'], $day['max_setup_time']);
+            } else {
+                $day['min_setup_time'] = 0;
+            }
+            // Convert minutes to hours for readability
+            $day['total_setup_time_hours'] = round($day['total_setup_time'] / 60, 2);
+            $day['avg_setup_time_minutes'] = $day['avg_setup_time'];
+        }
+
+        // Sort daily breakdown by date
+        ksort($dailyBreakdown);
+        $dailyBreakdown = array_values($dailyBreakdown);
+
+        // Calculate averages and finalize machine breakdown
+        foreach ($machineBreakdown as &$machine) {
+            if ($machine['total_setups'] > 0) {
+                $machine['avg_setup_time'] = round($machine['total_setup_time'] / $machine['total_setups'], 2);
+            }
+            $machine['total_setup_time_hours'] = round($machine['total_setup_time'] / 60, 2);
+        }
+
+        // Sort machine breakdown by total setup time (descending)
+        usort($machineBreakdown, fn ($a, $b) => $b['total_setup_time'] <=> $a['total_setup_time']);
+
+        // Calculate summary statistics
+        $daysCount = count($dailyBreakdown);
+        $machinesCount = count($machineBreakdown);
+
+        $summary = [
+            'total_setup_time' => round($totalSetupMinutes / 60, 2), // Hours
+            'total_setup_minutes' => $totalSetupMinutes,
+            'total_setups' => $totalSetups,
+            'avg_daily_setup_time' => $daysCount > 0 ? round($totalSetupMinutes / $daysCount / 60, 2) : 0, // Hours
+            'avg_setup_duration' => $totalSetups > 0 ? round($totalSetupMinutes / $totalSetups, 2) : 0, // Minutes
+            'max_setup_duration' => $totalSetups > 0 ? max(array_column($dailyBreakdown, 'max_setup_time')) : 0,
+            'min_setup_duration' => $totalSetups > 0 ? min(array_filter(array_column($dailyBreakdown, 'min_setup_time'))) : 0,
+            'days_analyzed' => $daysCount,
+            'machines_with_setups' => $machinesCount,
+        ];
+
+        // Calculate setup % of available time (8-hour shift = 480 minutes)
+        if ($daysCount > 0) {
+            $summary['avg_setup_percentage'] = round(($summary['avg_daily_setup_time'] * 60 / 480) * 100, 2);
+        } else {
+            $summary['avg_setup_percentage'] = 0;
+        }
+
+        return [
+            'daily' => $dailyBreakdown,
+            'by_machine' => array_values($machineBreakdown),
+            'summary' => $summary,
+        ];
+    }
+
+    /**
+     * Calculate comparison metrics for setup time
+     */
+    protected function calculateSetupTimeComparison(array $current, array $previous): array
+    {
+        return [
+            'total_setup_time' => [
+                'current' => $current['total_setup_time'] ?? 0,
+                'previous' => $previous['total_setup_time'] ?? 0,
+                'difference' => round(($current['total_setup_time'] ?? 0) - ($previous['total_setup_time'] ?? 0), 2),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['total_setup_time'] ?? 0,
+                    $previous['total_setup_time'] ?? 0
+                ),
+                'trend' => ($current['total_setup_time'] ?? 0) > ($previous['total_setup_time'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['total_setup_time'] ?? 0) < ($previous['total_setup_time'] ?? 0) ? 'improved' : 'declined',
+            ],
+            'avg_daily_setup_time' => [
+                'current' => $current['avg_daily_setup_time'] ?? 0,
+                'previous' => $previous['avg_daily_setup_time'] ?? 0,
+                'difference' => round(($current['avg_daily_setup_time'] ?? 0) - ($previous['avg_daily_setup_time'] ?? 0), 2),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['avg_daily_setup_time'] ?? 0,
+                    $previous['avg_daily_setup_time'] ?? 0
+                ),
+                'trend' => ($current['avg_daily_setup_time'] ?? 0) > ($previous['avg_daily_setup_time'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['avg_daily_setup_time'] ?? 0) < ($previous['avg_daily_setup_time'] ?? 0) ? 'improved' : 'declined',
+            ],
+            'avg_setup_duration' => [
+                'current' => $current['avg_setup_duration'] ?? 0,
+                'previous' => $previous['avg_setup_duration'] ?? 0,
+                'difference' => round(($current['avg_setup_duration'] ?? 0) - ($previous['avg_setup_duration'] ?? 0), 2),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['avg_setup_duration'] ?? 0,
+                    $previous['avg_setup_duration'] ?? 0
+                ),
+                'trend' => ($current['avg_setup_duration'] ?? 0) > ($previous['avg_setup_duration'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['avg_setup_duration'] ?? 0) < ($previous['avg_setup_duration'] ?? 0) ? 'improved' : 'declined',
+            ],
+            'total_setups' => [
+                'current' => $current['total_setups'] ?? 0,
+                'previous' => $previous['total_setups'] ?? 0,
+                'difference' => ($current['total_setups'] ?? 0) - ($previous['total_setups'] ?? 0),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['total_setups'] ?? 0,
+                    $previous['total_setups'] ?? 0
+                ),
+                'trend' => ($current['total_setups'] ?? 0) > ($previous['total_setups'] ?? 0) ? 'up' : 'down',
+                'status' => 'neutral',
+            ],
+        ];
+    }
+
+    /**
      * Get all operational KPIs (implements abstract method)
      */
     public function getKPIs(array $options = []): array
@@ -1008,6 +1262,7 @@ class OperationalKPIService extends BaseKPIService
             'machine_status' => $this->getMachineStatusAnalytics($options),
             'work_order_status' => $this->getWorkOrderStatusAnalytics($options),
             'machine_utilization' => $this->getMachineUtilizationAnalytics($options),
+            'setup_time' => $this->getSetupTimeAnalytics($options),
             // Future: Add more Tier 2 KPIs here
             // 'production_throughput' => $this->getProductionThroughputAnalytics($options),
             // 'operator_performance' => $this->getOperatorPerformanceAnalytics($options),

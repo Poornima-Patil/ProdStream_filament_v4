@@ -101,7 +101,7 @@ class KPIRegistry
                     'name' => 'Setup Time per Machine',
                     'description' => 'Average time taken for machine setup and changeover',
                     'tier' => 2,
-                    'status' => 'planned',
+                    'status' => 'active',
                     'icon' => 'heroicon-o-wrench',
                 ],
                 // Add more operational KPIs here...
