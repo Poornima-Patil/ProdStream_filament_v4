@@ -498,12 +498,516 @@ class OperationalKPIService extends BaseKPIService
     }
 
     /**
+     * Get work order status analytics with historical data and comparisons
+     * Returns historical breakdown of work order status distribution
+     */
+    public function getWorkOrderStatusAnalytics(array $options): array
+    {
+        $period = $options['time_period'] ?? 'yesterday';
+        $enableComparison = $options['enable_comparison'] ?? false;
+        $comparisonType = $options['comparison_type'] ?? 'previous_period';
+
+        $dateFrom = isset($options['date_from']) ? Carbon::parse($options['date_from']) : null;
+        $dateTo = isset($options['date_to']) ? Carbon::parse($options['date_to']) : null;
+
+        [$startDate, $endDate] = $this->getDateRange($period, $dateFrom, $dateTo);
+
+        $cacheKey = "work_order_status_analytics_{$period}_".md5(json_encode($options));
+        $cacheTTL = $this->getCacheTTL($period);
+
+        return $this->getCachedKPI($cacheKey, function () use ($startDate, $endDate, $enableComparison, $comparisonType, $options, $period) {
+            // Fetch primary period data
+            $primaryData = $this->fetchWorkOrderStatusDistribution($startDate, $endDate);
+
+            $result = [
+                'status_distribution' => $primaryData['status_distribution'],
+                'total_work_orders' => $primaryData['total_work_orders'],
+                'updated_at' => now()->toDateTimeString(),
+                'period_label' => $this->getPeriodLabel($period, $startDate, $endDate),
+                'date_range' => [
+                    'start' => $startDate->toDateString(),
+                    'end' => $endDate->toDateString(),
+                ],
+                'primary_period' => [
+                    'start_date' => $startDate->toDateString(),
+                    'end_date' => $endDate->toDateString(),
+                    'label' => $this->getPeriodLabel($period, $startDate, $endDate),
+                    'summary' => $primaryData['summary'],
+                ],
+            ];
+
+            // Add comparison if enabled
+            if ($enableComparison) {
+                [$compStart, $compEnd] = $this->getComparisonDateRange($startDate, $endDate, $comparisonType);
+
+                $comparisonData = $this->fetchWorkOrderStatusDistribution($compStart, $compEnd);
+
+                $result['comparison_period'] = [
+                    'start_date' => $compStart->toDateString(),
+                    'end_date' => $compEnd->toDateString(),
+                    'label' => $this->getPeriodLabel($comparisonType, $compStart, $compEnd),
+                    'summary' => $comparisonData['summary'],
+                ];
+
+                $result['comparison_analysis'] = $this->calculateWorkOrderStatusComparison(
+                    $primaryData['summary'],
+                    $comparisonData['summary']
+                );
+            }
+
+            return $result;
+        }, $cacheTTL);
+    }
+
+    /**
+     * Fetch work order status distribution for a specific date range
+     * Returns work orders grouped by status for the analytics period
+     */
+    protected function fetchWorkOrderStatusDistribution(Carbon $startDate, Carbon $endDate): array
+    {
+        // Get all work orders that had activity during this period
+        // We'll check work_order_logs to see status changes during the period
+        $workOrders = \App\Models\WorkOrder::where('factory_id', $this->factory->id)
+            ->whereHas('workOrderLogs', function ($query) use ($startDate, $endDate) {
+                $query->whereBetween('changed_at', [$startDate, $endDate]);
+            })
+            ->with([
+                'machine:id,name,assetId',
+                'operator.user:id,first_name,last_name',
+                'bom.purchaseOrder.partNumber:id,partnumber',
+                'workOrderLogs' => function ($q) use ($startDate, $endDate) {
+                    $q->whereBetween('changed_at', [$startDate, $endDate])
+                        ->with('holdReason:id,code,description')
+                        ->orderBy('changed_at', 'desc');
+                },
+            ])
+            ->get();
+
+        $statusDistribution = [
+            'hold' => ['count' => 0, 'work_orders' => []],
+            'start' => ['count' => 0, 'work_orders' => []],
+            'assigned' => ['count' => 0, 'work_orders' => []],
+            'completed' => ['count' => 0, 'work_orders' => []],
+            'closed' => ['count' => 0, 'work_orders' => []],
+        ];
+
+        // Track which statuses each work order had during the period
+        $workOrderStatusCounts = [
+            'assigned' => 0,
+            'start' => 0,
+            'hold' => 0,
+            'completed' => 0,
+            'closed' => 0,
+        ];
+
+        foreach ($workOrders as $wo) {
+            $logs = $wo->workOrderLogs;
+
+            if ($logs->isEmpty()) {
+                continue;
+            }
+
+            // Get all unique statuses this work order had during the period
+            $statuses = $logs->pluck('status')->unique()->map(fn($s) => strtolower($s));
+
+            foreach ($statuses as $status) {
+                if (! isset($statusDistribution[$status])) {
+                    continue;
+                }
+
+                // Find the most recent log for this status
+                $statusLog = $logs->firstWhere('status', ucfirst($status));
+
+                $operatorName = $wo->operator?->user
+                    ? "{$wo->operator->user->first_name} {$wo->operator->user->last_name}"
+                    : 'Unassigned';
+
+                $partNumber = $wo->bom?->purchaseOrder?->partNumber?->partnumber ?? 'N/A';
+
+                $woData = [
+                    'id' => $wo->id,
+                    'wo_number' => $wo->unique_id ?? 'N/A',
+                    'machine_name' => $wo->machine?->name ?? 'N/A',
+                    'machine_asset_id' => $wo->machine?->assetId ?? 'N/A',
+                    'operator' => $operatorName,
+                    'part_number' => $partNumber,
+                    'qty_target' => $wo->qty ?? 0,
+                    'qty_produced' => $wo->ok_qtys ?? 0,
+                    'start_time' => $wo->start_time?->toDateTimeString(),
+                    'end_time' => $wo->end_time?->toDateTimeString(),
+                    'status_changed_at' => $statusLog?->changed_at?->toDateTimeString(),
+                ];
+
+                // Add status-specific fields
+                if ($status === 'hold') {
+                    $woData['hold_reason'] = $statusLog?->holdReason?->description ?? 'No reason specified';
+                    $woData['hold_since'] = $statusLog?->changed_at?->toDateTimeString();
+                    $woData['hold_duration'] = $statusLog?->changed_at
+                        ? now()->diffForHumans($statusLog->changed_at, true)
+                        : 'Unknown';
+                } elseif ($status === 'start') {
+                    $woData['progress_percentage'] = $wo->qty > 0
+                        ? round(($wo->ok_qtys / $wo->qty) * 100, 1)
+                        : 0;
+                    $woData['estimated_completion'] = $wo->end_time
+                        ? $wo->end_time->diffForHumans()
+                        : 'N/A';
+                } elseif ($status === 'assigned') {
+                    $woData['scheduled_start'] = $wo->start_time
+                        ? $wo->start_time->format('M d, H:i')
+                        : 'Not scheduled';
+                } elseif ($status === 'completed') {
+                    $woData['completed_at'] = $statusLog?->changed_at?->toDateTimeString() ?? $wo->updated_at?->toDateTimeString();
+                    $woData['completion_rate'] = $wo->qty > 0
+                        ? round(($wo->ok_qtys / $wo->qty) * 100, 1)
+                        : 0;
+                } elseif ($status === 'closed') {
+                    $woData['closed_at'] = $statusLog?->changed_at?->toDateTimeString() ?? $wo->updated_at?->toDateTimeString();
+                    $woData['completion_rate'] = $wo->qty > 0
+                        ? round(($wo->ok_qtys / $wo->qty) * 100, 1)
+                        : 0;
+                }
+
+                $statusDistribution[$status]['work_orders'][] = $woData;
+                $workOrderStatusCounts[$status]++;
+            }
+        }
+
+        // Update counts
+        foreach ($statusDistribution as $status => &$data) {
+            $data['count'] = $workOrderStatusCounts[$status];
+        }
+
+        // Sort work orders within each status group
+        foreach ($statusDistribution as $status => &$data) {
+            if (empty($data['work_orders'])) {
+                continue;
+            }
+
+            usort($data['work_orders'], function ($a, $b) use ($status) {
+                if ($status === 'hold') {
+                    return ($b['hold_since'] ?? '') <=> ($a['hold_since'] ?? '');
+                } elseif ($status === 'start') {
+                    return ($a['progress_percentage'] ?? 0) <=> ($b['progress_percentage'] ?? 0);
+                } elseif ($status === 'assigned') {
+                    return ($a['start_time'] ?? '') <=> ($b['start_time'] ?? '');
+                } elseif ($status === 'completed') {
+                    return ($b['completed_at'] ?? '') <=> ($a['completed_at'] ?? '');
+                } elseif ($status === 'closed') {
+                    return ($b['closed_at'] ?? '') <=> ($a['closed_at'] ?? '');
+                }
+
+                return 0;
+            });
+        }
+
+        $totalWorkOrders = array_sum($workOrderStatusCounts);
+
+        return [
+            'status_distribution' => $statusDistribution,
+            'total_work_orders' => $totalWorkOrders,
+            'summary' => [
+                'total' => $totalWorkOrders,
+                'assigned_count' => $workOrderStatusCounts['assigned'],
+                'start_count' => $workOrderStatusCounts['start'],
+                'hold_count' => $workOrderStatusCounts['hold'],
+                'completed_count' => $workOrderStatusCounts['completed'],
+                'closed_count' => $workOrderStatusCounts['closed'],
+                'assigned_pct' => $totalWorkOrders > 0 ? round(($workOrderStatusCounts['assigned'] / $totalWorkOrders) * 100, 1) : 0,
+                'start_pct' => $totalWorkOrders > 0 ? round(($workOrderStatusCounts['start'] / $totalWorkOrders) * 100, 1) : 0,
+                'hold_pct' => $totalWorkOrders > 0 ? round(($workOrderStatusCounts['hold'] / $totalWorkOrders) * 100, 1) : 0,
+                'completed_pct' => $totalWorkOrders > 0 ? round(($workOrderStatusCounts['completed'] / $totalWorkOrders) * 100, 1) : 0,
+                'closed_pct' => $totalWorkOrders > 0 ? round(($workOrderStatusCounts['closed'] / $totalWorkOrders) * 100, 1) : 0,
+            ],
+        ];
+    }
+
+    /**
+     * Calculate comparison metrics for work order status distribution
+     */
+    protected function calculateWorkOrderStatusComparison(array $current, array $previous): array
+    {
+        return [
+            'total' => [
+                'current' => $current['total'] ?? 0,
+                'previous' => $previous['total'] ?? 0,
+                'difference' => ($current['total'] ?? 0) - ($previous['total'] ?? 0),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['total'] ?? 0,
+                    $previous['total'] ?? 0
+                ),
+                'trend' => ($current['total'] ?? 0) > ($previous['total'] ?? 0) ? 'up' : 'down',
+            ],
+            'assigned' => [
+                'current' => $current['assigned_count'] ?? 0,
+                'previous' => $previous['assigned_count'] ?? 0,
+                'difference' => ($current['assigned_count'] ?? 0) - ($previous['assigned_count'] ?? 0),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['assigned_count'] ?? 0,
+                    $previous['assigned_count'] ?? 0
+                ),
+                'trend' => ($current['assigned_count'] ?? 0) > ($previous['assigned_count'] ?? 0) ? 'up' : 'down',
+                'status' => 'neutral', // Assigned is neither good nor bad
+            ],
+            'start' => [
+                'current' => $current['start_count'] ?? 0,
+                'previous' => $previous['start_count'] ?? 0,
+                'difference' => ($current['start_count'] ?? 0) - ($previous['start_count'] ?? 0),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['start_count'] ?? 0,
+                    $previous['start_count'] ?? 0
+                ),
+                'trend' => ($current['start_count'] ?? 0) > ($previous['start_count'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['start_count'] ?? 0) > ($previous['start_count'] ?? 0) ? 'improved' : 'declined',
+            ],
+            'hold' => [
+                'current' => $current['hold_count'] ?? 0,
+                'previous' => $previous['hold_count'] ?? 0,
+                'difference' => ($current['hold_count'] ?? 0) - ($previous['hold_count'] ?? 0),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['hold_count'] ?? 0,
+                    $previous['hold_count'] ?? 0
+                ),
+                'trend' => ($current['hold_count'] ?? 0) > ($previous['hold_count'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['hold_count'] ?? 0) < ($previous['hold_count'] ?? 0) ? 'improved' : 'declined',
+            ],
+            'completed' => [
+                'current' => $current['completed_count'] ?? 0,
+                'previous' => $previous['completed_count'] ?? 0,
+                'difference' => ($current['completed_count'] ?? 0) - ($previous['completed_count'] ?? 0),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['completed_count'] ?? 0,
+                    $previous['completed_count'] ?? 0
+                ),
+                'trend' => ($current['completed_count'] ?? 0) > ($previous['completed_count'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['completed_count'] ?? 0) > ($previous['completed_count'] ?? 0) ? 'improved' : 'declined',
+            ],
+            'closed' => [
+                'current' => $current['closed_count'] ?? 0,
+                'previous' => $previous['closed_count'] ?? 0,
+                'difference' => ($current['closed_count'] ?? 0) - ($previous['closed_count'] ?? 0),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['closed_count'] ?? 0,
+                    $previous['closed_count'] ?? 0
+                ),
+                'trend' => ($current['closed_count'] ?? 0) > ($previous['closed_count'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['closed_count'] ?? 0) > ($previous['closed_count'] ?? 0) ? 'improved' : 'declined',
+            ],
+        ];
+    }
+
+    /**
+     * Get machine utilization analytics with historical data from kpi_machine_daily table
+     * Returns historical breakdown of machine utilization metrics
+     */
+    public function getMachineUtilizationAnalytics(array $options): array
+    {
+        $period = $options['time_period'] ?? 'last_week';
+        $enableComparison = $options['enable_comparison'] ?? false;
+        $comparisonType = $options['comparison_type'] ?? 'previous_period';
+
+        $dateFrom = isset($options['date_from']) ? Carbon::parse($options['date_from']) : null;
+        $dateTo = isset($options['date_to']) ? Carbon::parse($options['date_to']) : null;
+
+        [$startDate, $endDate] = $this->getDateRange($period, $dateFrom, $dateTo);
+
+        $cacheKey = "machine_utilization_analytics_{$period}_".md5(json_encode($options));
+        $cacheTTL = $this->getCacheTTL($period);
+
+        return $this->getCachedKPI($cacheKey, function () use ($startDate, $endDate, $enableComparison, $comparisonType, $options, $period) {
+            // Fetch primary period data
+            $primaryData = $this->fetchMachineUtilizationData($startDate, $endDate);
+
+            $result = [
+                'primary_period' => [
+                    'start_date' => $startDate->toDateString(),
+                    'end_date' => $endDate->toDateString(),
+                    'label' => $this->getPeriodLabel($period, $startDate, $endDate),
+                    'daily_breakdown' => $primaryData['daily'],
+                    'summary' => $primaryData['summary'],
+                ],
+            ];
+
+            // Add comparison if enabled
+            if ($enableComparison) {
+                [$compStart, $compEnd] = $this->getComparisonDateRange($startDate, $endDate, $comparisonType);
+
+                $comparisonData = $this->fetchMachineUtilizationData($compStart, $compEnd);
+
+                $result['comparison_period'] = [
+                    'start_date' => $compStart->toDateString(),
+                    'end_date' => $compEnd->toDateString(),
+                    'label' => $this->getPeriodLabel($comparisonType, $compStart, $compEnd),
+                    'daily_breakdown' => $comparisonData['daily'],
+                    'summary' => $comparisonData['summary'],
+                ];
+
+                $result['comparison_analysis'] = $this->calculateMachineUtilizationComparison(
+                    $primaryData['summary'],
+                    $comparisonData['summary']
+                );
+            }
+
+            return $result;
+        }, $cacheTTL);
+    }
+
+    /**
+     * Fetch machine utilization data from kpi_machine_daily table for a specific date range
+     */
+    protected function fetchMachineUtilizationData(Carbon $startDate, Carbon $endDate): array
+    {
+        // Fetch aggregated data from kpi_machine_daily table
+        $dailyRecords = MachineDaily::where('factory_id', $this->factory->id)
+            ->whereBetween('summary_date', [$startDate, $endDate])
+            ->with('machine:id,name,assetId')
+            ->orderBy('summary_date', 'asc')
+            ->get();
+
+        // Group by date for daily breakdown
+        $dailyBreakdown = [];
+        $current = $startDate->copy();
+
+        while ($current->lte($endDate)) {
+            $dateStr = $current->toDateString();
+
+            $dayRecords = $dailyRecords->filter(function ($record) use ($dateStr) {
+                return Carbon::parse($record->summary_date)->toDateString() === $dateStr;
+            });
+
+            $machineCount = $dayRecords->count();
+
+            $dailyBreakdown[] = [
+                'date' => $dateStr,
+                'avg_utilization_rate' => $machineCount > 0
+                    ? round($dayRecords->avg('utilization_rate'), 2)
+                    : 0,
+                'avg_active_utilization_rate' => $machineCount > 0
+                    ? round($dayRecords->avg('active_utilization_rate'), 2)
+                    : 0,
+                'uptime_hours' => round($dayRecords->sum('uptime_hours'), 2),
+                'downtime_hours' => round($dayRecords->sum('downtime_hours'), 2),
+                'planned_downtime_hours' => round($dayRecords->sum('planned_downtime_hours'), 2),
+                'unplanned_downtime_hours' => round($dayRecords->sum('unplanned_downtime_hours'), 2),
+                'units_produced' => $dayRecords->sum('units_produced'),
+                'work_orders_completed' => $dayRecords->sum('work_orders_completed'),
+                'machines_tracked' => $machineCount,
+            ];
+
+            $current->addDay();
+        }
+
+        // Calculate summary statistics
+        $daysCount = count($dailyBreakdown);
+        $totalMachines = $dailyRecords->pluck('machine_id')->unique()->count();
+
+        $summary = [
+            'avg_scheduled_utilization' => $daysCount > 0
+                ? round(collect($dailyBreakdown)->avg('avg_utilization_rate'), 2)
+                : 0,
+            'avg_active_utilization' => $daysCount > 0
+                ? round(collect($dailyBreakdown)->avg('avg_active_utilization_rate'), 2)
+                : 0,
+            'total_uptime_hours' => round(collect($dailyBreakdown)->sum('uptime_hours'), 2),
+            'total_downtime_hours' => round(collect($dailyBreakdown)->sum('downtime_hours'), 2),
+            'total_planned_downtime_hours' => round(collect($dailyBreakdown)->sum('planned_downtime_hours'), 2),
+            'total_unplanned_downtime_hours' => round(collect($dailyBreakdown)->sum('unplanned_downtime_hours'), 2),
+            'total_units_produced' => collect($dailyBreakdown)->sum('units_produced'),
+            'total_work_orders_completed' => collect($dailyBreakdown)->sum('work_orders_completed'),
+            'machines_analyzed' => $totalMachines,
+            'days_analyzed' => $daysCount,
+        ];
+
+        return [
+            'daily' => $dailyBreakdown,
+            'summary' => $summary,
+        ];
+    }
+
+    /**
+     * Calculate comparison metrics for machine utilization
+     */
+    protected function calculateMachineUtilizationComparison(array $current, array $previous): array
+    {
+        return [
+            'scheduled_utilization' => [
+                'current' => $current['avg_scheduled_utilization'] ?? 0,
+                'previous' => $previous['avg_scheduled_utilization'] ?? 0,
+                'difference' => round(($current['avg_scheduled_utilization'] ?? 0) - ($previous['avg_scheduled_utilization'] ?? 0), 2),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['avg_scheduled_utilization'] ?? 0,
+                    $previous['avg_scheduled_utilization'] ?? 0
+                ),
+                'trend' => ($current['avg_scheduled_utilization'] ?? 0) > ($previous['avg_scheduled_utilization'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['avg_scheduled_utilization'] ?? 0) > ($previous['avg_scheduled_utilization'] ?? 0) ? 'improved' : 'declined',
+            ],
+            'active_utilization' => [
+                'current' => $current['avg_active_utilization'] ?? 0,
+                'previous' => $previous['avg_active_utilization'] ?? 0,
+                'difference' => round(($current['avg_active_utilization'] ?? 0) - ($previous['avg_active_utilization'] ?? 0), 2),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['avg_active_utilization'] ?? 0,
+                    $previous['avg_active_utilization'] ?? 0
+                ),
+                'trend' => ($current['avg_active_utilization'] ?? 0) > ($previous['avg_active_utilization'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['avg_active_utilization'] ?? 0) > ($previous['avg_active_utilization'] ?? 0) ? 'improved' : 'declined',
+            ],
+            'uptime_hours' => [
+                'current' => $current['total_uptime_hours'] ?? 0,
+                'previous' => $previous['total_uptime_hours'] ?? 0,
+                'difference' => round(($current['total_uptime_hours'] ?? 0) - ($previous['total_uptime_hours'] ?? 0), 2),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['total_uptime_hours'] ?? 0,
+                    $previous['total_uptime_hours'] ?? 0
+                ),
+                'trend' => ($current['total_uptime_hours'] ?? 0) > ($previous['total_uptime_hours'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['total_uptime_hours'] ?? 0) > ($previous['total_uptime_hours'] ?? 0) ? 'improved' : 'declined',
+            ],
+            'downtime_hours' => [
+                'current' => $current['total_downtime_hours'] ?? 0,
+                'previous' => $previous['total_downtime_hours'] ?? 0,
+                'difference' => round(($current['total_downtime_hours'] ?? 0) - ($previous['total_downtime_hours'] ?? 0), 2),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['total_downtime_hours'] ?? 0,
+                    $previous['total_downtime_hours'] ?? 0
+                ),
+                'trend' => ($current['total_downtime_hours'] ?? 0) > ($previous['total_downtime_hours'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['total_downtime_hours'] ?? 0) < ($previous['total_downtime_hours'] ?? 0) ? 'improved' : 'declined',
+            ],
+            'units_produced' => [
+                'current' => $current['total_units_produced'] ?? 0,
+                'previous' => $previous['total_units_produced'] ?? 0,
+                'difference' => ($current['total_units_produced'] ?? 0) - ($previous['total_units_produced'] ?? 0),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['total_units_produced'] ?? 0,
+                    $previous['total_units_produced'] ?? 0
+                ),
+                'trend' => ($current['total_units_produced'] ?? 0) > ($previous['total_units_produced'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['total_units_produced'] ?? 0) > ($previous['total_units_produced'] ?? 0) ? 'improved' : 'declined',
+            ],
+            'work_orders_completed' => [
+                'current' => $current['total_work_orders_completed'] ?? 0,
+                'previous' => $previous['total_work_orders_completed'] ?? 0,
+                'difference' => ($current['total_work_orders_completed'] ?? 0) - ($previous['total_work_orders_completed'] ?? 0),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['total_work_orders_completed'] ?? 0,
+                    $previous['total_work_orders_completed'] ?? 0
+                ),
+                'trend' => ($current['total_work_orders_completed'] ?? 0) > ($previous['total_work_orders_completed'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['total_work_orders_completed'] ?? 0) > ($previous['total_work_orders_completed'] ?? 0) ? 'improved' : 'declined',
+            ],
+        ];
+    }
+
+    /**
      * Get all operational KPIs (implements abstract method)
      */
     public function getKPIs(array $options = []): array
     {
         return [
             'machine_status' => $this->getMachineStatusAnalytics($options),
+            'work_order_status' => $this->getWorkOrderStatusAnalytics($options),
+            'machine_utilization' => $this->getMachineUtilizationAnalytics($options),
             // Future: Add more Tier 2 KPIs here
             // 'production_throughput' => $this->getProductionThroughputAnalytics($options),
             // 'operator_performance' => $this->getOperatorPerformanceAnalytics($options),

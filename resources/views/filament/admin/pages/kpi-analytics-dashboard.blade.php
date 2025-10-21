@@ -1008,23 +1008,40 @@
 
             {{-- Work Order Status KPI Content --}}
             @if($selectedKPI === 'work_order_status')
-                <x-filament::card>
-                    <div class="space-y-4">
-                        <div class="flex items-center justify-between">
-                            <h2 class="text-xl font-bold">Work Order Status Distribution</h2>
-                            <button
-                                wire:click="refreshData"
-                                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-                                wire:loading.attr="disabled"
-                            >
-                                <x-heroicon-o-arrow-path class="w-4 h-4" wire:loading.class="animate-spin" wire:target="refreshData" />
-                                <span>Refresh</span>
-                            </button>
-                        </div>
+                @if($kpiMode === 'analytics')
+                    {{-- Analytics Mode: Historical data with comparison support --}}
+                    <x-filament::card>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h2 class="text-xl font-bold">Work Order Status Distribution - Analytics</h2>
+                            </div>
 
-                        @php
-                            $woData = $this->getWorkOrderStatusData();
-                        @endphp
+                            @php
+                                $data = $this->getWorkOrderStatusData();
+                            @endphp
+
+                            @include('filament.admin.pages.work-order-status-analytics')
+                        </div>
+                    </x-filament::card>
+                @else
+                    {{-- Dashboard Mode: Real-time data for TODAY --}}
+                    <x-filament::card>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h2 class="text-xl font-bold">Work Order Status Distribution</h2>
+                                <button
+                                    wire:click="refreshData"
+                                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                                    wire:loading.attr="disabled"
+                                >
+                                    <x-heroicon-o-arrow-path class="w-4 h-4" wire:loading.class="animate-spin" wire:target="refreshData" />
+                                    <span>Refresh</span>
+                                </button>
+                            </div>
+
+                            @php
+                                $woData = $this->getWorkOrderStatusData();
+                            @endphp
 
                         {{-- SECTION 1: PLANNED FOR TODAY --}}
                         <div class="mb-8">
@@ -1523,6 +1540,7 @@
                         </div>
                     </div>
                 </x-filament::card>
+                @endif
             @endif
 
             {{-- Production Schedule Adherence KPI Content --}}
@@ -1541,16 +1559,11 @@
                     @include('filament.admin.pages.machine-utilization')
                 @else
                     {{-- Analytics Mode: Historical data from kpi_machine_daily table --}}
-                    {{-- TODO: Create machine-utilization-analytics.blade.php for Analytics mode --}}
                     <x-filament::card>
-                        <div class="text-center py-8">
-                            <x-heroicon-o-chart-bar class="w-16 h-16 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
-                            <p class="text-gray-600 dark:text-gray-400">
-                                Analytics mode for Machine Utilization Rate is coming soon.
-                            </p>
-                            <p class="text-sm text-gray-500 dark:text-gray-500 mt-2">
-                                Use Dashboard mode to view today's utilization data.
-                            </p>
+                        <div class="space-y-4">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Machine Utilization Rate - Analytics</h2>
+                            @php $data = $this->getMachineUtilizationData(); @endphp
+                            @include('filament.admin.pages.machine-utilization-analytics')
                         </div>
                     </x-filament::card>
                 @endif

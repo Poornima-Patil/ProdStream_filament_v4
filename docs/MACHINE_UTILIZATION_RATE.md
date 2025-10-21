@@ -1,8 +1,8 @@
 # Machine Utilization Rate KPI Documentation
 
-**Last Updated:** October 17, 2025
-**Status:** Active (Dashboard Mode)
-**Version:** 1.0
+**Last Updated:** October 21, 2025
+**Status:** Active (Dashboard Mode & Analytics Mode)
+**Version:** 2.0
 
 ---
 
@@ -314,7 +314,7 @@ but only ran actively for 52%, with 13% spent waiting/on hold.
 | **Refresh** | Manual refresh button | Static historical data |
 | **Purpose** | Monitor TODAY's utilization | Analyze historical trends |
 | **Use Case** | "How are we doing TODAY?" | "How did we perform last month?" |
-| **Status** | ✅ **Active** (Implemented) | ⏳ Planned (Not yet implemented) |
+| **Status** | ✅ **Active** (Implemented) | ✅ **Active** (Implemented v2.0) |
 
 ### Dashboard Mode
 
@@ -332,13 +332,131 @@ View: `machine-utilization.blade.php`
 
 ### Analytics Mode
 
-**Status:** Not yet implemented
+**Status:** ✅ **Active** (Implemented in v2.0)
 
-Planned features:
-- Historical date range selection (last week, last month, custom range)
-- Trend analysis over time
-- Comparison mode (period-over-period)
-- Aggregated data from `kpi_machine_daily` table
+**Implemented Features:**
+
+Service: `OperationalKPIService::getMachineUtilizationAnalytics()`
+- File: `app/Services/KPI/OperationalKPIService.php`
+- Data Source: `kpi_machine_daily` table (pre-aggregated daily metrics)
+- Cache: Variable TTL based on data freshness (5 min for today, 6 hours for old data)
+
+View: `machine-utilization-analytics.blade.php`
+- File: `resources/views/filament/admin/pages/machine-utilization-analytics.blade.php`
+- Displays historical utilization metrics with daily breakdown
+- Supports multiple time periods and custom date ranges
+- Includes period-over-period comparison analysis
+
+**Features:**
+✅ Historical date range selection (yesterday, last week, last month, custom range)
+✅ Daily breakdown table with pagination
+✅ Comparison mode (previous period, previous week/month/quarter/year)
+✅ Aggregated data from `kpi_machine_daily` table
+✅ Summary cards with trend indicators
+✅ Comprehensive comparison analysis section
+
+**Time Period Options:**
+- Today, Yesterday
+- This Week, Last Week
+- This Month, Last Month
+- Last 7/14/30/60/90 Days
+- This Quarter, This Year
+- Custom Date Range
+
+**Comparison Types:**
+- Previous Period (same duration)
+- Previous Week
+- Previous Month
+- Previous Quarter
+- Same Period Last Year
+
+**Metrics Tracked:**
+1. **Scheduled Utilization** - Average % across selected period
+2. **Active Utilization** - Average % when machines are running
+3. **Uptime Hours** - Total productive machine hours
+4. **Downtime Hours** - Total non-productive hours
+5. **Units Produced** - Total units manufactured
+6. **Work Orders Completed** - Total WOs finished
+
+**Data Structure:**
+```php
+[
+    'primary_period' => [
+        'start_date' => '2025-10-14',
+        'end_date' => '2025-10-20',
+        'label' => 'Last Week',
+        'daily_breakdown' => [
+            [
+                'date' => '2025-10-14',
+                'avg_utilization_rate' => 65.5,
+                'avg_active_utilization_rate' => 52.3,
+                'uptime_hours' => 87.4,
+                'downtime_hours' => 21.8,
+                'units_produced' => 1250,
+                'work_orders_completed' => 15,
+                'machines_tracked' => 7,
+            ],
+            // ... more daily records
+        ],
+        'summary' => [
+            'avg_scheduled_utilization' => 66.2,
+            'avg_active_utilization' => 53.1,
+            'total_uptime_hours' => 612.8,
+            'total_downtime_hours' => 152.2,
+            'total_units_produced' => 8750,
+            'total_work_orders_completed' => 105,
+            'machines_analyzed' => 7,
+            'days_analyzed' => 7,
+        ],
+    ],
+    'comparison_period' => [...],  // If comparison enabled
+    'comparison_analysis' => [
+        'scheduled_utilization' => [
+            'current' => 66.2,
+            'previous' => 58.5,
+            'difference' => 7.7,
+            'percentage_change' => 13.16,
+            'trend' => 'up',
+            'status' => 'improved',
+        ],
+        // ... more metrics
+    ],
+]
+```
+
+**Smart Caching Strategy:**
+```php
+protected function getCacheTTL(string $period): int
+{
+    return match($period) {
+        'today' => 300,        // 5 minutes
+        'yesterday' => 900,    // 15 minutes
+        'last_week' => 3600,   // 1 hour
+        'last_month' => 21600, // 6 hours
+        default => 1800        // 30 minutes
+    };
+}
+```
+
+**Implementation Details:**
+
+Backend Methods:
+1. `getMachineUtilizationAnalytics()` - Main analytics entry point
+2. `fetchMachineUtilizationData()` - Queries kpi_machine_daily table
+3. `calculateMachineUtilizationComparison()` - Compares periods
+
+Frontend Components:
+1. Period header with date range
+2. 4 summary cards (scheduled %, active %, uptime, downtime)
+3. Daily breakdown table with pagination
+4. Comparison analysis section with 6 metric cards
+5. Trend indicators (up/down arrows with color coding)
+
+**Visual Indicators:**
+- Green: Improved metrics
+- Red: Declined metrics
+- Trend arrows show direction
+- Percentage changes calculated automatically
 
 ---
 
@@ -441,7 +559,7 @@ public function getMachineUtilization(bool $skipCache = false): array
 
 ### Blade Template Integration
 
-**File:** `resources/views/filament/admin/pages/kpi-analytics-dashboard.blade.php` (lines 1531-1551)
+**File:** `resources/views/filament/admin/pages/kpi-analytics-dashboard.blade.php`
 
 ```blade
 {{-- Machine Utilization Rate KPI Content --}}
@@ -450,15 +568,19 @@ public function getMachineUtilization(bool $skipCache = false): array
         {{-- Dashboard Mode: Shows TODAY's data only --}}
         @include('filament.admin.pages.machine-utilization')
     @else
-        {{-- Analytics Mode: Coming soon --}}
+        {{-- Analytics Mode: Historical data from kpi_machine_daily table --}}
         <x-filament::card>
-            <p>Analytics mode coming soon. Use Dashboard mode to view today's utilization.</p>
+            <div class="space-y-4">
+                <h2 class="text-lg font-semibold">Machine Utilization Rate - Analytics</h2>
+                @php $data = $this->getMachineUtilizationData(); @endphp
+                @include('filament.admin.pages.machine-utilization-analytics')
+            </div>
         </x-filament::card>
     @endif
 @endif
 ```
 
-**View Template:** `resources/views/filament/admin/pages/machine-utilization.blade.php`
+**Dashboard View Template:** `resources/views/filament/admin/pages/machine-utilization.blade.php`
 
 Structure:
 1. **Factory-Wide Summary Cards**
@@ -480,6 +602,45 @@ Structure:
 4. **Legend**
    - Explains what each metric means
    - Helps users understand the data
+
+**Analytics View Template:** `resources/views/filament/admin/pages/machine-utilization-analytics.blade.php`
+
+Structure:
+1. **Period Header**
+   - Selected time period label
+   - Date range display
+   - Machines analyzed count
+
+2. **Summary Cards** (4 cards with comparison indicators)
+   - Scheduled Utilization % with trend
+   - Active Utilization % with trend
+   - Total Uptime Hours with trend
+   - Total Downtime Hours with trend
+
+3. **Daily Breakdown Table**
+   - Date column with formatted dates
+   - Scheduled Utilization % per day
+   - Active Utilization % per day
+   - Uptime/Downtime hours per day
+   - Units produced per day
+   - Work orders completed per day
+   - Machines tracked per day
+   - Pagination support (10 rows per page)
+
+4. **Comparison Analysis Section** (when enabled)
+   - 6 metric comparison cards:
+     - Scheduled Utilization comparison
+     - Active Utilization comparison
+     - Uptime Hours comparison
+     - Downtime Hours comparison
+     - Units Produced comparison
+     - Work Orders Completed comparison
+   - Each card shows:
+     - Current vs Previous values
+     - Difference (absolute)
+     - Percentage change
+     - Trend indicator (up/down arrow)
+     - Status (improved/declined) with color coding
 
 ---
 
@@ -724,12 +885,33 @@ Machine Utilization Rate KPI provides critical visibility into how effectively p
 
 **Next Steps:**
 - Use Dashboard mode daily for operational monitoring
+- Use Analytics mode for historical trend analysis
 - Investigate machines with < 40% utilization
 - Reduce gap between scheduled and active utilization
-- Plan for Analytics mode implementation for historical trend analysis
+- Enable comparison mode to track improvements over time
 
 ---
 
-**Documentation Version:** 1.0
-**Last Updated:** October 17, 2025
+## Version History
+
+### Version 2.0 (October 21, 2025)
+- ✅ Implemented Analytics Mode
+- ✅ Added historical data analysis from kpi_machine_daily table
+- ✅ Added period-over-period comparison feature
+- ✅ Added daily breakdown table with pagination
+- ✅ Added smart caching strategy
+- ✅ Created machine-utilization-analytics.blade.php view
+- ✅ Updated documentation
+
+### Version 1.0 (October 17, 2025)
+- ✅ Implemented Dashboard Mode
+- ✅ Real-time utilization tracking
+- ✅ Two-tier utilization calculation (Scheduled & Active)
+- ✅ Per-machine breakdown
+- ✅ Created machine-utilization.blade.php view
+
+---
+
+**Documentation Version:** 2.0
+**Last Updated:** October 21, 2025
 **Author:** ProdStream Development Team

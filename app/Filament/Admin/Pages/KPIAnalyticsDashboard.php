@@ -507,7 +507,7 @@ class KPIAnalyticsDashboard extends Page implements HasForms
     }
 
     /**
-     * Get work order status data (Dashboard mode only for now)
+     * Get work order status data based on current mode
      */
     public function getWorkOrderStatusData(): array
     {
@@ -517,13 +517,26 @@ class KPIAnalyticsDashboard extends Page implements HasForms
             return $this->getEmptyWorkOrderData();
         }
 
-        $service = new RealTimeKPIService($factory);
-        $data = $service->getCurrentWorkOrderStatus($this->skipCache);
+        if ($this->kpiMode === 'dashboard') {
+            $service = new RealTimeKPIService($factory);
+            $data = $service->getCurrentWorkOrderStatus($this->skipCache);
 
-        // Reset skip cache flag after fetching data
-        $this->skipCache = false;
+            // Reset skip cache flag after fetching data
+            $this->skipCache = false;
 
-        return $data;
+            return $data;
+        }
+
+        // Analytics mode - read from public properties
+        $service = new OperationalKPIService($factory);
+
+        return $service->getWorkOrderStatusAnalytics([
+            'time_period' => $this->timePeriod,
+            'date_from' => $this->dateFrom,
+            'date_to' => $this->dateTo,
+            'enable_comparison' => $this->enableComparison,
+            'comparison_type' => $this->comparisonType,
+        ]);
     }
 
     /**
@@ -610,6 +623,66 @@ class KPIAnalyticsDashboard extends Page implements HasForms
                 'on_track' => [],
             ],
             'updated_at' => now()->toDateTimeString(),
+        ];
+    }
+
+    /**
+     * Get machine utilization data based on current mode
+     */
+    public function getMachineUtilizationData(): array
+    {
+        $factory = Auth::user()->factory;
+
+        if (! $factory) {
+            return $this->getEmptyMachineUtilizationData();
+        }
+
+        if ($this->kpiMode === 'dashboard') {
+            $service = new RealTimeKPIService($factory);
+            $data = $service->getMachineUtilization($this->skipCache);
+
+            // Reset skip cache flag after fetching data
+            $this->skipCache = false;
+
+            return $data;
+        }
+
+        // Analytics mode - read from public properties
+        $service = new OperationalKPIService($factory);
+
+        return $service->getMachineUtilizationAnalytics([
+            'time_period' => $this->timePeriod,
+            'date_from' => $this->dateFrom,
+            'date_to' => $this->dateTo,
+            'enable_comparison' => $this->enableComparison,
+            'comparison_type' => $this->comparisonType,
+        ]);
+    }
+
+    /**
+     * Get empty machine utilization data structure
+     */
+    protected function getEmptyMachineUtilizationData(): array
+    {
+        return [
+            'primary_period' => [
+                'start_date' => now()->toDateString(),
+                'end_date' => now()->toDateString(),
+                'label' => 'No Data',
+                'daily_breakdown' => [],
+                'summary' => [
+                    'avg_scheduled_utilization' => 0,
+                    'avg_active_utilization' => 0,
+                    'total_uptime_hours' => 0,
+                    'total_downtime_hours' => 0,
+                    'total_planned_downtime_hours' => 0,
+                    'total_unplanned_downtime_hours' => 0,
+                    'total_units_produced' => 0,
+                    'total_work_orders_completed' => 0,
+                    'machines_analyzed' => 0,
+                    'days_analyzed' => 0,
+                ],
+            ],
         ];
     }
 

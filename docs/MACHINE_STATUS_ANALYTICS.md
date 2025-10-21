@@ -9,11 +9,10 @@
 4. [Data Sources](#data-sources)
 5. [Calculation Details](#calculation-details)
 6. [Data Population](#data-population)
-7. [Metric Implementation Guide](#metric-implementation-guide)
-8. [Time Periods](#time-periods)
-9. [Comparison Mode](#comparison-mode)
-10. [Use Cases & Examples](#use-cases--examples)
-11. [Future Enhancements](#future-enhancements)
+7. [Time Periods](#time-periods)
+8. [Comparison Mode](#comparison-mode)
+9. [Use Cases & Examples](#use-cases--examples)
+10. [Future Enhancements](#future-enhancements)
 
 ---
 
@@ -659,358 +658,15 @@ Hold:
 
 Analytics Mode supports the following time periods:
 
-**What counts as uptime:**
-- Work orders with status 'Start' (actively running)
-- Work orders with status 'Completed' (finished production)
-
-**What does NOT count:**
-- Work orders with status 'Hold' (counted as downtime)
-- Work orders with status 'Assigned' (not yet started)
-- Gaps between work orders (idle time)
-
-**Example:**
-```
-Machine-002 on Oct 14, 2025
-
-Work Orders:
-1. WO101: 06:00-14:00, Status: Completed → 8 hours uptime
-2. WO102: 14:30-22:00, Status: Start → 7.5 hours uptime
-3. WO103: 22:00-06:00 (next day), Status: Completed → 8 hours uptime (next day)
-
-Total Uptime for Oct 14: 8 + 7.5 = 15.5 hours
-```
-
----
-
-### 3. Downtime Hours
-
-**What it measures:** Total hours machines were not producing
-
-**Formula:**
-```
-Downtime Hours = Available Hours - Uptime Hours
-
-Or more precisely:
-Downtime Hours = Hold Time + Idle Time
-
-Where:
-- Hold Time = Sum of time work orders spent in 'Hold' status
-- Idle Time = Gaps between work orders within shift hours
-```
-
-**Types of Downtime:**
-- **Planned Downtime**: Scheduled maintenance, breaks (not tracked yet - shows 0)
-- **Unplanned Downtime**: Equipment failures, material shortages, quality issues
-
-**Current Implementation:**
-- All downtime is considered "unplanned"
-- `planned_downtime_hours` field = 0 (future enhancement)
-- `unplanned_downtime_hours` field = total downtime
-
-**Example:**
-```
-Machine-003 on Oct 14, 2025
-- Available: 24 hours
-- Uptime: 18 hours
-- Downtime: 24 - 18 = 6 hours
-
-Breakdown:
-- 2 hours in 'Hold' status (machine issue)
-- 4 hours idle (no work scheduled)
-```
-
----
-
-### 4. Units Produced
-
-**What it measures:** Total number of good units manufactured
-
-**Formula:**
-```
-Units Produced = Sum of ok_qtys from all work orders on that date
-```
-
-**Calculation:**
-```sql
-SELECT SUM(ok_qtys)
-FROM work_orders
-WHERE DATE(start_time) = '2025-10-14'
-  AND factory_id = 1
-  AND status IN ('Start', 'Completed', 'Hold')
-```
-
-**Note:** Only counts OK (good) quantities, excludes scrapped quantities
-
-**Example:**
-```
-Machine-004 on Oct 14, 2025
-
-Work Orders:
-- WO201: ok_qtys = 429, scrapped_qtys = 5
-- WO202: ok_qtys = 380, scrapped_qtys = 8
-- WO203: ok_qtys = 150, scrapped_qtys = 2
-
-Units Produced = 429 + 380 + 150 = 959 units
-(Scrapped quantities: 15 units - not counted here)
-```
-
----
-
-### 5. Work Orders Completed
-
-**What it measures:** Number of work orders fully finished
-
-**Formula:**
-```
-Work Orders Completed = COUNT of work orders where status = 'Completed'
-```
-
-**Calculation:**
-```sql
-SELECT COUNT(*)
-FROM work_orders
-WHERE DATE(start_time) = '2025-10-14'
-  AND factory_id = 1
-  AND status = 'Completed'
-```
-
-**What counts:**
-- Only work orders with status = 'Completed'
-
-**What does NOT count:**
-- 'Start' status (still running)
-- 'Hold' status (paused)
-- 'Assigned' status (not started yet)
-
----
-
-### 6. Quality Rate
-
-**What it measures:** Percentage of good units vs total units produced
-
-**Formula:**
-```
-Quality Rate = (OK Units / Total Units) × 100
-
-Where:
-- OK Units = Sum of ok_qtys
-- Total Units = Sum of (ok_qtys + scrapped_qtys)
-```
-
-**Example:**
-```
-Machine-005 on Oct 14, 2025
-
-Work Orders:
-- WO301: ok_qtys = 500, scrapped_qtys = 10
-- WO302: ok_qtys = 300, scrapped_qtys = 5
-
-OK Units: 500 + 300 = 800
-Total Units: 510 + 305 = 815
-Quality Rate: (800 / 815) × 100 = 98.16%
-```
-
-**Interpretation:**
-- **> 98%**: Excellent quality
-- **95-98%**: Good quality
-- **90-95%**: Acceptable (monitor closely)
-- **< 90%**: Poor quality (investigate root causes)
-
----
-
-### 7. Scrap Rate
-
-**What it measures:** Percentage of defective units
-
-**Formula:**
-```
-Scrap Rate = (Scrapped Units / Total Units) × 100
-
-Or:
-Scrap Rate = 100 - Quality Rate
-```
-
-**Example:**
-```
-Using same data as Quality Rate example:
-Scrap Rate = 100 - 98.16 = 1.84%
-```
-
----
-
-### 8. First Pass Yield (FPY)
-
-**What it measures:** Percentage of units produced correctly the first time
-
-**Formula:**
-```
-FPY = (Units Passed First Time / Total Units Started) × 100
-```
-
-**Data Source:** Calculated from `work_order_logs` table
-
-**Note:** Currently stored in logs but not displayed in Analytics Mode yet (future enhancement)
-
----
-
-### 9. Average Cycle Time
-
-**What it measures:** Average time to produce one unit
-
-**Formula:**
-```
-Average Cycle Time = Total Production Time / Total Units Produced
-
-Where:
-- Total Production Time = Sum of (end_time - start_time) for all work orders
-- Total Units Produced = Sum of ok_qtys
-```
-
-**Example:**
-```
-Machine-006 on Oct 14, 2025
-
-Work Orders:
-- WO401: 8 hours, produced 400 units
-- WO402: 6 hours, produced 300 units
-
-Total Time: 14 hours = 840 minutes
-Total Units: 700 units
-Average Cycle Time: 840 / 700 = 1.2 minutes per unit
-```
-
----
-
-### 10. Machine Count
-
-**What it measures:** Number of unique machines that had work orders during the period
-
-**Formula:**
-```
-Machine Count = COUNT(DISTINCT machine_id) from work orders in the period
-```
-
----
-
-## Data Sources
-
-### Primary Tables
-
-#### 1. `kpi_machine_daily` (Main source for Analytics)
-```
-Fields:
-- factory_id, machine_id, summary_date
-- utilization_rate, uptime_hours, downtime_hours
-- units_produced, work_orders_completed
-- quality_rate, scrap_rate, first_pass_yield
-- average_cycle_time
-- calculated_at (when aggregation was performed)
-```
-
-#### 2. `work_orders` (Raw data source)
-```
-Fields:
-- id, factory_id, machine_id, operator_id
-- start_time, end_time, status
-- qty, ok_qtys, scrapped_qtys
-- created_at, updated_at
-```
-
-### Supporting Tables
-
-#### 3. `shifts` (For calculating available time)
-```
-Fields:
-- factory_id, name
-- start_time, end_time
-```
-
-#### 4. `work_order_logs` (For status change tracking)
-```
-Fields:
-- work_order_id, status, changed_at
-- ok_qtys, scrapped_qtys, fpy
-```
-
-### Data Flow Diagram
-
-```
-┌─────────────────┐
-│  work_orders    │
-│  (raw data)     │
-└────────┬────────┘
-         │
-         │ Daily Aggregation
-         │ (artisan command)
-         ▼
-┌─────────────────┐
-│ kpi_machine_    │
-│    daily        │◄─── Analytics Mode queries this
-│ (aggregated)    │
-└─────────────────┘
-         │
-         │ Displayed in
-         ▼
-┌─────────────────┐
-│  Analytics UI   │
-│  (Blade View)   │
-└─────────────────┘
-```
-
 ---
 
 ## Calculation Details
 
-### Handling Work Orders That Span Multiple Days
-
-**Scenario:** Work order starts at 22:00 on Oct 14 and ends at 06:00 on Oct 15
-
-**Solution Options:**
-
-**Option A: Simple (Current Implementation)**
-- Assign entire work order to start_date (Oct 14)
-- Easier to calculate, but may skew single-day metrics
-
-**Option B: Proportional Split (Future Enhancement)**
-- Split duration between Oct 14 (8 hours) and Oct 15 (8 hours)
-- More accurate but complex calculation
-
-**Current Approach:** Option A (assign to start_date)
-
-### Calculating Available Time
-
-**Formula:**
-```
-Available Time per Machine = Number of Shifts × Hours per Shift
-
-Factory Example:
-- Shift 1: 06:00-14:00 (8 hours)
-- Shift 2: 14:00-22:00 (8 hours)
-- Shift 3: 22:00-06:00 (8 hours)
-- Total: 3 shifts × 8 hours = 24 hours per machine per day
-```
-
-**For Multiple Machines:**
-```
-If factory has 5 machines:
-Total Available Time per Day = 5 machines × 24 hours = 120 hours
-```
-
-### Handling Overlapping Work Orders
-
-**Scenario:** Machine has 2 work orders scheduled at same time (should not happen, but edge case)
-
-**Solution:**
-- Validation in work order creation prevents overlaps
-- If occurs, count actual duration only once
-- Log warning for investigation
-
 ### Rounding Rules
 
-- **Percentages**: Round to 2 decimal places (75.23%)
-- **Hours**: Round to 1 decimal place (18.5 hours)
-- **Counts**: No rounding, whole numbers only
-- **Cycle Time**: Round to 2 decimal places (1.25 minutes)
+- **Percentages**: Round to 1 decimal place (75.2%)
+- **Counts**: Round to 1 decimal place for averages (4.5 machines)
+- **Whole Numbers**: No rounding for daily counts
 
 ---
 
@@ -1197,519 +853,6 @@ Schedule::command('kpi:aggregate-machine-status')
 
 **For future reference:** If pre-aggregation is implemented, this section will document the aggregation command usage.
 
----
-
-## Metric Implementation Guide
-
-This section provides detailed technical implementation steps for calculating each metric in the `php artisan kpi:aggregate-daily` command.
-
-### Implementation Overview
-
-Each metric follows this pattern:
-1. **Query** - Fetch relevant work orders for the date/machine
-2. **Calculate** - Apply formula to compute the metric
-3. **Store** - Insert/update value in `kpi_machine_daily` table
-
----
-
-### Metric 1: Utilization Rate (Both Types)
-
-The system calculates **two separate utilization metrics** in the aggregation command.
-
----
-
-#### Metric 1.1: Scheduled Utilization (Factory View)
-
-**What It Calculates:** Percentage of available time with work orders scheduled (including hold periods)
-
-**Implementation Steps:**
-
-**Step 1: Query Work Orders**
-```php
-$workOrders = WorkOrder::where('factory_id', $factoryId)
-    ->where('machine_id', $machineId)
-    ->whereDate('start_time', $date)
-    ->whereIn('status', ['Start', 'Completed'])
-    ->get(['start_time', 'end_time']);
-```
-
-**Step 2: Calculate Total Scheduled Time**
-```php
-$totalProductionSeconds = 0;
-
-foreach ($workOrders as $wo) {
-    $start = Carbon::parse($wo->start_time);
-    $end = Carbon::parse($wo->end_time);
-
-    // If work order spans multiple days, only count time on the target date
-    $dayStart = Carbon::parse($date)->startOfDay();
-    $dayEnd = Carbon::parse($date)->endOfDay();
-
-    // Clip to day boundaries
-    $effectiveStart = $start->lt($dayStart) ? $dayStart->copy() : $start->copy();
-    $effectiveEnd = $end->gt($dayEnd) ? $dayEnd->copy() : $end->copy();
-
-    if ($effectiveEnd->gt($effectiveStart)) {
-        $totalProductionSeconds += $effectiveStart->diffInSeconds($effectiveEnd);
-    }
-}
-
-$totalProductionHours = $totalProductionSeconds / 3600;
-```
-
-**Important:** Use `$start->lt($dayStart) ? $dayStart->copy() : $start->copy()` instead of `$start->max($dayStart)` to avoid Carbon mutation issues.
-
-**Step 3: Calculate Available Time**
-```php
-// Get total shift hours per day for this factory
-$shifts = Shift::where('factory_id', $factoryId)->get();
-
-$availableHours = 0;
-foreach ($shifts as $shift) {
-    $start = Carbon::createFromTimeString($shift->start_time);
-    $end = Carbon::createFromTimeString($shift->end_time);
-
-    // Handle overnight shifts
-    if ($end->lt($start)) {
-        $end->addDay();
-    }
-
-    $availableHours += $end->diffInHours($start);
-}
-
-// For most factories with 3 shifts of 8 hours each:
-// $availableHours = 24
-```
-
-**Step 4: Calculate Utilization Rate**
-```php
-$utilizationRate = $availableHours > 0
-    ? round(($totalProductionHours / $availableHours) * 100, 2)
-    : 0.00;
-```
-
-**Step 5: Store in Database**
-```php
-DB::table('kpi_machine_daily')->upsert([
-    'factory_id' => $factoryId,
-    'machine_id' => $machineId,
-    'summary_date' => $date,
-    'utilization_rate' => $utilizationRate,
-    'calculated_at' => now(),
-    'created_at' => now(),
-    'updated_at' => now(),
-], ['factory_id', 'machine_id', 'summary_date'], // Unique keys
-['utilization_rate', 'calculated_at', 'updated_at']); // Update fields
-```
-
-#### Edge Cases to Handle
-
-**Case 1: No Work Orders**
-```php
-// If $workOrders->isEmpty()
-$utilizationRate = 0.00;
-```
-
-**Case 2: Work Order Spans Multiple Days**
-```php
-// WO starts at 22:00 on Oct 14 and ends at 06:00 on Oct 15
-// Only count 2 hours (22:00-24:00) for Oct 14
-// Count 6 hours (00:00-06:00) for Oct 15 (when processing Oct 15)
-
-$effectiveStart = max($wo->start_time, $date->startOfDay());
-$effectiveEnd = min($wo->end_time, $date->endOfDay());
-```
-
-**Case 3: Overlapping Work Orders (Should Not Happen)**
-```php
-// If detected, log warning but count all hours
-// Production validation should prevent this
-Log::warning("Overlapping work orders detected", [
-    'machine_id' => $machineId,
-    'date' => $date,
-    'work_orders' => $workOrders->pluck('id')
-]);
-```
-
-**Case 4: Utilization > 100%**
-```php
-// Should never happen, but cap at 100% if it does
-$utilizationRate = min($utilizationRate, 100.00);
-```
-
-#### Complete Method Example
-
-```php
-private function calculateUtilizationRate(
-    int $factoryId,
-    int $machineId,
-    string $date
-): float {
-    // Step 1: Get work orders
-    $workOrders = WorkOrder::where('factory_id', $factoryId)
-        ->where('machine_id', $machineId)
-        ->whereDate('start_time', $date)
-        ->whereIn('status', ['Start', 'Completed'])
-        ->get(['start_time', 'end_time']);
-
-    if ($workOrders->isEmpty()) {
-        return 0.00;
-    }
-
-    // Step 2: Calculate production time
-    $dayStart = Carbon::parse($date)->startOfDay();
-    $dayEnd = Carbon::parse($date)->endOfDay();
-    $totalSeconds = 0;
-
-    foreach ($workOrders as $wo) {
-        $start = Carbon::parse($wo->start_time)->max($dayStart);
-        $end = Carbon::parse($wo->end_time)->min($dayEnd);
-
-        if ($end->gt($start)) {
-            $totalSeconds += $end->diffInSeconds($start);
-        }
-    }
-
-    $productionHours = $totalSeconds / 3600;
-
-    // Step 3: Get available hours
-    $availableHours = $this->getAvailableHours($factoryId);
-
-    // Step 4: Calculate rate
-    $rate = $availableHours > 0
-        ? ($productionHours / $availableHours) * 100
-        : 0;
-
-    // Cap at 100%
-    return round(min($rate, 100), 2);
-}
-
-private function getAvailableHours(int $factoryId): float
-{
-    static $cache = [];
-
-    if (!isset($cache[$factoryId])) {
-        $shifts = Shift::where('factory_id', $factoryId)->get();
-        $hours = 0;
-
-        foreach ($shifts as $shift) {
-            $start = Carbon::createFromTimeString($shift->start_time);
-            $end = Carbon::createFromTimeString($shift->end_time);
-
-            if ($end->lt($start)) {
-                $end->addDay();
-            }
-
-            $hours += $end->diffInHours($start);
-        }
-
-        $cache[$factoryId] = $hours;
-    }
-
-    return $cache[$factoryId];
-}
-```
-
-#### Testing the Implementation
-
-**Test Case 1: Full Day Utilization**
-```php
-// Given:
-// - Machine-001 on Oct 14
-// - 3 shifts × 8 hours = 24 hours available
-// - WO1: 06:00-14:00 (8h, Completed)
-// - WO2: 14:00-22:00 (8h, Start)
-// - WO3: 22:00-06:00 (8h, Completed, next day)
-
-// Expected for Oct 14:
-// Production Time: 8 + 8 = 16 hours
-// Utilization: (16 / 24) × 100 = 66.67%
-
-$this->assertEquals(66.67, $utilizationRate);
-```
-
-**Test Case 2: No Production**
-```php
-// Given:
-// - Machine-002 on Oct 14
-// - No work orders scheduled
-
-// Expected:
-// Utilization: 0.00%
-
-$this->assertEquals(0.00, $utilizationRate);
-```
-
-**Test Case 3: Spanning Midnight**
-```php
-// Given:
-// - WO starts at 22:00 on Oct 14
-// - WO ends at 06:00 on Oct 15
-
-// Expected for Oct 14:
-// Count only 22:00-23:59:59 = 2 hours
-// Utilization: (2 / 24) × 100 = 8.33%
-
-$this->assertEquals(8.33, $utilizationRate);
-```
-
-#### Database Schema Reference
-
-```sql
-CREATE TABLE kpi_machine_daily (
-    factory_id INT NOT NULL,
-    machine_id INT NOT NULL,
-    summary_date DATE NOT NULL,
-    utilization_rate DECIMAL(5,2) NULL,  -- Example: 66.67
-    -- ... other fields
-    UNIQUE KEY unique_daily_kpi (factory_id, machine_id, summary_date)
-);
-```
-
-#### Performance Optimization
-
-**Use Eager Loading**
-```php
-$workOrders = WorkOrder::where('factory_id', $factoryId)
-    ->whereDate('start_time', $date)
-    ->with('machine:id,name')  // Only if needed for logging
-    ->get(['id', 'machine_id', 'start_time', 'end_time', 'status']);
-```
-
-**Batch Processing**
-```php
-// Process all machines for a date in one query
-$workOrders = WorkOrder::where('factory_id', $factoryId)
-    ->whereDate('start_time', $date)
-    ->whereIn('status', ['Start', 'Completed'])
-    ->get()
-    ->groupBy('machine_id');
-
-foreach ($workOrders as $machineId => $machineWorkOrders) {
-    $utilization = $this->calculateUtilizationForWorkOrders($machineWorkOrders);
-    // Store...
-}
-```
-
-**Cache Available Hours**
-```php
-// Don't query shifts table for every machine
-// Cache at factory level since all machines share same shifts
-private static $availableHoursCache = [];
-```
-
----
-
-#### Metric 1.2: Active Utilization (Operator View)
-
-**What It Calculates:** Percentage of available time machine was actively running (excludes hold periods)
-
-**Implementation Steps:**
-
-**Step 1: Query Work Orders and Logs**
-```php
-$workOrders = WorkOrder::where('factory_id', $factoryId)
-    ->where('machine_id', $machineId)
-    ->whereDate('start_time', $date)
-    ->whereIn('status', ['Start', 'Completed', 'Hold'])
-    ->get(['id', 'start_time', 'end_time']);
-```
-
-**Step 2: Calculate Active Time from Work Order Logs**
-```php
-$totalActiveSeconds = 0;
-$dayStart = Carbon::parse($date)->startOfDay();
-$dayEnd = Carbon::parse($date)->endOfDay();
-
-foreach ($workOrders as $wo) {
-    // Get all status change logs for this work order
-    $logs = WorkOrderLog::where('work_order_id', $wo->id)
-        ->orderBy('changed_at', 'asc')
-        ->get(['status', 'changed_at']);
-
-    if ($logs->isEmpty()) {
-        continue; // Skip if no logs
-    }
-
-    $previousLog = null;
-
-    foreach ($logs as $log) {
-        if ($previousLog && $previousLog->status === 'Start') {
-            // Machine was actively running from previousLog to current log
-            $startTime = Carbon::parse($previousLog->changed_at);
-            $endTime = Carbon::parse($log->changed_at);
-
-            // Clip to day boundaries
-            $effectiveStart = $startTime->lt($dayStart) ? $dayStart->copy() : $startTime->copy();
-            $effectiveEnd = $endTime->gt($dayEnd) ? $dayEnd->copy() : $endTime->copy();
-
-            if ($effectiveEnd->gt($effectiveStart)) {
-                $totalActiveSeconds += $effectiveStart->diffInSeconds($effectiveEnd);
-            }
-        }
-
-        $previousLog = $log;
-    }
-
-    // Handle ongoing work orders still in 'Start' status
-    if ($previousLog && $previousLog->status === 'Start') {
-        $startTime = Carbon::parse($previousLog->changed_at);
-        $endTime = now();
-
-        // Clip to day boundaries
-        $effectiveStart = $startTime->lt($dayStart) ? $dayStart->copy() : $startTime->copy();
-        $effectiveEnd = $endTime->gt($dayEnd) ? $dayEnd->copy() : $endTime->copy();
-
-        if ($effectiveEnd->gt($effectiveStart)) {
-            $totalActiveSeconds += $effectiveStart->diffInSeconds($effectiveEnd);
-        }
-    }
-}
-
-$activeHours = $totalActiveSeconds / 3600;
-```
-
-**Step 3: Calculate Active Utilization Rate**
-```php
-$availableHours = $this->getAvailableHours($factoryId);
-
-$activeUtilizationRate = $availableHours > 0
-    ? round(min(($activeHours / $availableHours) * 100, 100), 2)
-    : 0.00;
-```
-
-**Step 4: Store in Database**
-```php
-DB::table('kpi_machine_daily')->upsert([
-    'factory_id' => $factoryId,
-    'machine_id' => $machineId,
-    'summary_date' => $date,
-    'active_utilization_rate' => $activeUtilizationRate,
-    'calculated_at' => now(),
-], ['factory_id', 'machine_id', 'summary_date'],
-['active_utilization_rate', 'calculated_at', 'updated_at']);
-```
-
-#### Key Implementation Notes
-
-**Carbon Mutation Bug Prevention:**
-- Always use conditional logic instead of `max()` and `min()` methods
-- Carbon's `max()` and `min()` modify the original object even after `copy()`
-- Use: `$start->lt($dayStart) ? $dayStart->copy() : $start->copy()`
-- NOT: `$start->copy()->max($dayStart)` (this still mutates!)
-
-**Example Timeline Calculation:**
-```
-Work Order Timeline (from work_order_logs):
-10:00 - Status: Start
-12:00 - Status: Hold      → Active: 2 hours (10:00-12:00)
-14:00 - Status: Start
-16:00 - Status: Completed → Active: 2 hours (14:00-16:00)
-
-Total Active Time: 4 hours
-Scheduled Time: 6 hours (10:00-16:00)
-Hold Time: 2 hours (12:00-14:00)
-```
-
-**Database Schema:**
-```sql
-CREATE TABLE kpi_machine_daily (
-    ...
-    utilization_rate DECIMAL(5,2) NULL,         -- Scheduled Utilization
-    active_utilization_rate DECIMAL(5,2) NULL,  -- Active Utilization (NEW)
-    ...
-);
-```
-
-**Complete Method Example:**
-```php
-private function calculateActiveUtilization(
-    $workOrders,
-    Carbon $dayStart,
-    Carbon $dayEnd,
-    float $availableHours
-): array {
-    $totalActiveSeconds = 0;
-
-    foreach ($workOrders as $wo) {
-        $logs = WorkOrderLog::where('work_order_id', $wo->id)
-            ->orderBy('changed_at', 'asc')
-            ->get(['status', 'changed_at']);
-
-        if ($logs->isEmpty()) {
-            continue;
-        }
-
-        $previousLog = null;
-
-        foreach ($logs as $log) {
-            if ($previousLog && $previousLog->status === 'Start') {
-                $startTime = Carbon::parse($previousLog->changed_at);
-                $endTime = Carbon::parse($log->changed_at);
-
-                $effectiveStart = $startTime->lt($dayStart)
-                    ? $dayStart->copy()
-                    : $startTime->copy();
-                $effectiveEnd = $endTime->gt($dayEnd)
-                    ? $dayEnd->copy()
-                    : $endTime->copy();
-
-                if ($effectiveEnd->gt($effectiveStart)) {
-                    $totalActiveSeconds += $effectiveStart->diffInSeconds($effectiveEnd);
-                }
-            }
-
-            $previousLog = $log;
-        }
-
-        // Handle ongoing 'Start' status
-        if ($previousLog && $previousLog->status === 'Start') {
-            $startTime = Carbon::parse($previousLog->changed_at);
-            $endTime = now();
-
-            $effectiveStart = $startTime->lt($dayStart)
-                ? $dayStart->copy()
-                : $startTime->copy();
-            $effectiveEnd = $endTime->gt($dayEnd)
-                ? $dayEnd->copy()
-                : $endTime->copy();
-
-            if ($effectiveEnd->gt($effectiveStart)) {
-                $totalActiveSeconds += $effectiveStart->diffInSeconds($effectiveEnd);
-            }
-        }
-    }
-
-    $activeHours = round($totalActiveSeconds / 3600, 2);
-
-    $activeUtilizationRate = $availableHours > 0
-        ? round(min(($activeHours / $availableHours) * 100, 100), 2)
-        : 0.00;
-
-    return [
-        'active_utilization_rate' => $activeUtilizationRate,
-        'active_hours' => $activeHours,
-    ];
-}
-```
-
-**Testing Active Utilization:**
-```php
-// Test Case: Work Order with Hold
-// WO1: 10:00-16:00 (6 hours scheduled)
-// Logs:
-//   10:00 - Start
-//   12:00 - Hold (2 hours active)
-//   14:00 - Start
-//   16:00 - Completed (2 hours active)
-//
-// Expected:
-// Active Time: 4 hours
-// Scheduled Time: 6 hours
-// Active Utilization: (4 / 28) × 100 = 14.29%
-// Scheduled Utilization: (6 / 28) × 100 = 21.43%
-// Difference: 7.14% (2 hours in hold)
-```
 
 ---
 
@@ -1752,7 +895,7 @@ Analytics Mode supports the following time periods:
 - Best viewed at end of day for complete data
 
 **For Historical Periods:**
-- Shows finalized data from `kpi_machine_daily` table
+- Shows finalized data calculated on-demand
 - Data is stable and won't change
 - Better for reporting and analysis
 
@@ -1823,115 +966,84 @@ Comparison Period: Oct 1-14, 2024
 #### Summary Cards with Trends
 ```
 ┌─────────────────────────────────┐
-│ Avg Utilization                 │
-│ 75.5%  ↑ +5.2% vs Previous     │
-│        (70.3% previously)       │
+│ Avg Running                     │
+│ 4.5    ↑ +0.5 vs Previous      │
+│        (4.0 previously)         │
 └─────────────────────────────────┘
 
 ┌─────────────────────────────────┐
-│ Total Downtime                  │
-│ 58.5h  ↓ -12.3% vs Previous    │
-│        (66.8h previously)       │
+│ Avg Hold                        │
+│ 1.2    ↓ -0.3 vs Previous      │
+│        (1.5 previously)         │
 └─────────────────────────────────┘
 ```
 
 #### Trend Indicators
-- **↑ Green**: Improvement (higher is better for this metric)
-- **↓ Red**: Decline (lower is worse for this metric)
-- **↓ Green**: Improvement (lower is better for downtime/scrap rate)
-- **↑ Red**: Decline (higher is worse for downtime/scrap rate)
+- **↑ Green**: Improvement for Running machines (more is better)
+- **↓ Red**: Decline for Running machines (fewer is worse)
+- **↓ Green**: Improvement for Hold/Idle machines (fewer is better)
+- **↑ Red**: Decline for Hold/Idle machines (more is worse)
 
 #### Percentage Change Calculation
 ```
 Change % = ((Current - Previous) / Previous) × 100
 
 Example:
-Current Utilization: 75.5%
-Previous Utilization: 70.3%
-Change: ((75.5 - 70.3) / 70.3) × 100 = +7.4%
+Current Avg Running: 4.5 machines
+Previous Avg Running: 4.0 machines
+Change: ((4.5 - 4.0) / 4.0) × 100 = +12.5%
 ```
 
 ### Interpretation Guide
 
 #### Positive Trends (Good)
-- Utilization Rate ↑
-- Uptime Hours ↑
-- Units Produced ↑
-- Quality Rate ↑
-- Downtime Hours ↓
-- Scrap Rate ↓
+- Average Running ↑ (more machines producing)
+- Average Hold ↓ (fewer machines paused)
+- Average Idle ↓ (fewer machines without work)
 
 #### Negative Trends (Bad)
-- Utilization Rate ↓
-- Uptime Hours ↓
-- Units Produced ↓
-- Quality Rate ↓
-- Downtime Hours ↑
-- Scrap Rate ↑
+- Average Running ↓ (fewer machines producing)
+- Average Hold ↑ (more machines paused)
+- Average Idle ↑ (more machines without work)
 
 ---
 
 ## Use Cases & Examples
 
-### Use Case 1: Identifying Underutilized Machines
+### Use Case 1: Identifying Underused Machines
 
-**Scenario:** Factory manager wants to find machines not being used efficiently
+**Scenario:** Factory manager wants to find machines with low activity
 
 **Steps:**
 1. Navigate to Machine Status Analytics
 2. Select "This Month" as time period
-3. Review utilization rates for each machine
+3. Review daily breakdown to see average running vs idle machines
 
 **Sample Findings:**
 ```
-Machine-001: 85% utilization ✓ (Good)
-Machine-002: 78% utilization ✓ (Good)
-Machine-003: 42% utilization ✗ (Investigation needed)
-Machine-004: 90% utilization ✓ (Excellent)
-Machine-005: 38% utilization ✗ (Investigation needed)
+Average status over the month:
+- Running: 5.2 machines (65%)
+- Hold: 1.1 machines (14%)
+- Scheduled: 1.5 machines (19%)
+- Idle: 0.2 machines (3%)
+
+Daily patterns show:
+- Machines 1, 2, 4, 7, 8: Consistently running (good)
+- Machine 3: Frequently idle (investigation needed)
+- Machine 5: Often on hold (quality issues)
 ```
 
 **Actions:**
-- Investigate Machine-003 and Machine-005
-- Check if there's insufficient work scheduled
+- Investigate why Machine-003 is frequently idle
+- Check if there's insufficient work scheduled for this machine
 - Consider reassigning work orders to utilize idle capacity
+- Address quality issues causing Machine-005 to be on hold
 
 ---
 
-### Use Case 2: Tracking Quality Trends
+### Use Case 2: Week-over-Week Status Comparison
 
-**Scenario:** Quality manager wants to monitor defect rates over time
-
-**Steps:**
-1. Navigate to Machine Status Analytics
-2. Select "Last 30 Days"
-3. Review quality rate and scrap rate metrics
-4. Enable comparison with previous 30 days
-
-**Sample Findings:**
-```
-Current Period:
-- Quality Rate: 96.5%
-- Scrap Rate: 3.5%
-
-Previous Period:
-- Quality Rate: 98.2%
-- Scrap Rate: 1.8%
-
-Trend: ↓ Quality declining by -1.7%
-```
-
-**Actions:**
-- Investigate root causes of increased scrap
-- Check if new materials/operators were introduced
-- Review work orders with high scrap rates
-- Implement corrective actions
-
----
-
-### Use Case 3: Week-over-Week Performance Comparison
-
-**Scenario:** Production supervisor reviews weekly performance every Monday
+**Scenario:** Production supervisor reviews weekly machine status every Monday
 
 **Steps:**
 1. Navigate to Machine Status Analytics
@@ -1943,18 +1055,24 @@ Trend: ↓ Quality declining by -1.7%
 ```
 Last Week vs Previous Week:
 
-Utilization: 78.5% ↑ +3.2% (Good improvement)
-Uptime: 132h ↑ +8h (More productive time)
-Units Produced: 8,450 ↑ +850 units (10% increase)
-Work Orders Completed: 42 ↑ +4 (More completions)
-Downtime: 35h ↓ -5h (Less idle time)
+Avg Running: 5.1 machines ↑ +0.4 machines (+8.5%)
+  Previous: 4.7 machines
+
+Avg Hold: 1.2 machines ↓ -0.3 machines (-20%)
+  Previous: 1.5 machines
+
+Avg Scheduled: 1.8 machines → (stable)
+  Previous: 1.8 machines
+
+Avg Idle: 0.9 machines ↓ -0.1 machines (-10%)
+  Previous: 1.0 machines
 ```
 
-**Interpretation:** Strong week! Production increased, downtime reduced.
+**Interpretation:** Strong week! More machines running, fewer on hold and idle.
 
 ---
 
-### Use Case 4: Monthly Reporting to Management
+### Use Case 3: Monthly Status Reporting to Management
 
 **Scenario:** Factory manager prepares monthly performance report
 
@@ -1966,229 +1084,194 @@ Downtime: 35h ↓ -5h (Less idle time)
 
 **Sample Report Data:**
 ```
-September 2025 Performance Summary:
+September 2025 Machine Status Summary:
 
 Key Metrics:
-- Average Utilization: 74.8% (Target: 75% - Close to target)
-- Total Production: 28,450 units (+5.2% vs August)
-- Quality Rate: 97.3% (Target: 95% - Exceeding target)
-- Work Orders Completed: 142 (Target: 140 - On track)
-- Average Downtime: 6.2h/day (+0.8h vs August - Investigate)
+- Avg Running: 5.3 machines (66% of 8 total) - Target: 70%
+- Avg Hold: 1.2 machines (15% of total)
+- Avg Scheduled: 1.3 machines (16% of total)
+- Avg Idle: 0.2 machines (3% of total)
+
+Comparison with August:
+- Running: +0.4 machines (+8%) ✓ Improved
+- Hold: -0.2 machines (-14%) ✓ Fewer issues
+- Idle: -0.1 machines (-33%) ✓ Better capacity planning
 
 Highlights:
-✓ Production volume increased 5.2%
-✓ Quality exceeds target by 2.3%
-✗ Downtime increased - root cause analysis needed
+✓ More machines actively running
+✓ Fewer machines on hold (improved issue resolution)
+✓ Lower idle time (better work scheduling)
 
 Action Items:
-- Investigate increase in downtime on Machine-003 and Machine-007
-- Continue current quality practices
-- Schedule maintenance for machines with high failure rates
+- Continue improvement trend
+- Investigate remaining hold causes
+- Target 70% average running rate for next month
 ```
 
 ---
 
-### Use Case 5: Identifying Bottlenecks
+### Use Case 4: Identifying Status Patterns
 
 **Scenario:** Operations manager notices production delays
 
 **Steps:**
 1. Select "Last 7 Days"
 2. Review daily breakdown table
-3. Look for days with low utilization or high downtime
-4. Identify specific machines causing issues
+3. Look for days with unusual status patterns
+4. Identify specific issues causing delays
 
 **Sample Findings:**
 ```
 Daily Analysis (Oct 8-14):
 
-Oct 10: Utilization 58% (abnormally low)
-- Machine-002: 12 hours downtime (material shortage)
-- Machine-005: 8 hours downtime (equipment failure)
+Oct 10: Only 3 machines running (abnormally low)
+- 3 machines on hold (material shortage)
+- 2 machines idle (no work scheduled)
 
-Oct 12: Utilization 68% (below average)
-- Machine-007: 10 hours downtime (operator absence)
+Oct 12: Only 4 machines running (below average)
+- 2 machines on hold (equipment issues)
+- 2 machines scheduled but not started
 
-Pattern: Material shortages and equipment failures are main bottlenecks
+Pattern: Material shortages and equipment issues causing status problems
 ```
 
 **Actions:**
-- Improve material inventory management
-- Schedule preventive maintenance for Machine-005
-- Cross-train operators to cover absences
+- Improve material inventory management to reduce hold status
+- Schedule preventive maintenance to reduce equipment-related holds
+- Investigate work order scheduling to reduce idle machines
 
 ---
 
 ## Future Enhancements
 
-### Phase 1: Enhanced Downtime Tracking
+### Phase 1: Hold Reason Tracking
 
-**Planned Downtime vs Unplanned Downtime**
-- Currently all downtime is marked as "unplanned"
-- Add ability to schedule maintenance windows
-- Differentiate between:
-  - Planned: Scheduled maintenance, breaks, shift changes
-  - Unplanned: Failures, material shortages, quality holds
+**Enhanced Hold Analysis**
+- Currently holds are tracked by machine but not by reason
+- Add ability to categorize hold reasons:
+  - Material shortages
+  - Quality issues
+  - Equipment failures
+  - Operator breaks
+  - Tool changes
 
 **Impact:**
-- More accurate utilization calculations
-- Better maintenance planning
-- Identify truly problematic downtime
+- Identify most common hold causes
+- Better root cause analysis
+- Targeted improvement initiatives
 
 ---
 
-### Phase 2: OEE (Overall Equipment Effectiveness)
+### Phase 2: Historical Trend Charts
 
-**Formula:**
-```
-OEE = Availability × Performance × Quality
-
-Where:
-- Availability = Uptime / Planned Production Time
-- Performance = Actual Output / Theoretical Output
-- Quality = Good Units / Total Units
-```
-
-**Example:**
-```
-Machine-001 on Oct 14:
-- Availability: 90% (21.6h uptime / 24h available)
-- Performance: 85% (actual output vs ideal cycle time)
-- Quality: 98% (OK units / total units)
-
-OEE = 0.90 × 0.85 × 0.98 = 75.0%
-```
+**Visual Analytics:**
+- Line charts showing machine status trends over time
+- Day-by-day visualization of Running/Hold/Scheduled/Idle counts
+- Comparison overlays for different time periods
 
 **Display:**
-- New OEE metric card in summary section
-- Color coding: >85% (green), 60-85% (yellow), <60% (red)
-- Trend analysis over time
+- Interactive charts with hover tooltips
+- Export to image for reports
+- Drill-down to daily details
 
 ---
 
-### Phase 3: Maintenance Metrics
-
-**MTBF (Mean Time Between Failures)**
-```
-MTBF = Total Operating Time / Number of Failures
-```
-
-**MTTR (Mean Time To Repair)**
-```
-MTTR = Total Repair Time / Number of Repairs
-```
-
-**Requirements:**
-- Add `machine_failures` table to track breakdowns
-- Log failure timestamps and resolution times
-- Track failure types and root causes
-
----
-
-### Phase 4: Shift-Level Analytics
+### Phase 3: Shift-Level Status Analytics
 
 **Granular Analysis:**
-- Break down metrics by shift (Shift 1, Shift 2, Shift 3)
-- Compare shift performance
-- Identify if certain shifts consistently underperform
+- Break down machine status by shift (Shift 1, Shift 2, Shift 3)
+- Compare shift performance for status distribution
+- Identify if certain shifts have more holds or idle machines
 
 **Display:**
 ```
 Shift Performance (Oct 14, 2025):
 
-Shift 1 (6:00-14:00):  Utilization: 82%, Units: 3,200
-Shift 2 (14:00-22:00): Utilization: 75%, Units: 2,850
-Shift 3 (22:00-6:00):  Utilization: 68%, Units: 2,400
+Shift 1 (6:00-14:00):  Running: 5.2, Hold: 0.8, Scheduled: 1.5, Idle: 0.5
+Shift 2 (14:00-22:00): Running: 4.8, Hold: 1.2, Scheduled: 1.7, Idle: 0.3
+Shift 3 (22:00-6:00):  Running: 3.9, Hold: 1.8, Scheduled: 2.0, Idle: 0.3
 
-Insight: Shift 3 underperforming - investigate staffing/equipment issues
+Insight: Shift 3 has fewer running machines - investigate staffing/scheduling
 ```
 
 ---
 
-### Phase 5: Machine Performance Index
+### Phase 4: Machine-Specific Status History
 
-**Composite Score:**
-- Combine multiple metrics into single performance score
-- Weight factors: Utilization (40%), Quality (30%), Downtime (20%), Completions (10%)
-- Score range: 0-100
+**Per-Machine Analysis:**
+- View individual machine status history over time
+- Identify machines with frequent hold status
+- Track patterns for specific machines
 
-**Example:**
-```
-Machine-002 Performance Score: 87/100
-
-Breakdown:
-- Utilization: 85% → 34 points (out of 40)
-- Quality: 98% → 29.4 points (out of 30)
-- Downtime: Low → 18 points (out of 20)
-- Completions: 95% target → 9.5 points (out of 10)
-
-Rating: Excellent (85-100)
-```
+**Display:**
+- Timeline view showing status changes for a machine
+- Highlight problematic periods
+- Compare machine performance
 
 ---
 
-### Phase 6: Predictive Analytics
+### Phase 5: Predictive Analytics
 
 **Use Machine Learning to:**
-- Predict when machines are likely to fail
-- Forecast production output for next week/month
-- Recommend optimal work order scheduling
-- Identify early warning signs of quality issues
+- Predict which machines are likely to go on hold
+- Forecast machine status patterns based on historical data
+- Recommend optimal work order scheduling to minimize idle time
+- Identify early warning signs of recurring hold issues
 
 **Example:**
 ```
 Predictive Insights for Machine-003:
 
-⚠️ Warning: High probability (78%) of downtime event in next 48 hours
-   Based on: Recent vibration patterns, increased cycle time, past failure history
+⚠️ Warning: High probability (75%) of hold status in next 24 hours
+   Based on: Recent hold pattern, material delivery schedule, maintenance logs
 
-   Recommendation: Schedule preventive maintenance before Oct 16
+   Recommendation: Schedule material delivery or defer work orders
 ```
 
 ---
 
-### Phase 7: Alerts & Notifications
+### Phase 6: Alerts & Notifications
 
 **Real-time Monitoring:**
-- Email/SMS alerts when metrics fall below thresholds
+- Email/SMS alerts when machine status metrics fall below thresholds
 - Dashboard notifications for critical issues
-- Weekly summary reports
+- Weekly status summary reports
 
 **Example Rules:**
 ```
-Alert: Utilization below 50% for 2+ consecutive days
-Alert: Scrap rate exceeds 5%
-Alert: Machine downtime exceeds 8 hours/day
-Alert: Work order completions 20% below target
+Alert: Average running machines below 50% for 2+ consecutive days
+Alert: More than 3 machines on hold simultaneously
+Alert: Machine idle for more than 8 hours
+Alert: Scheduled machines exceeding capacity
 ```
 
 ---
 
-### Phase 8: Export & Reporting
+### Phase 7: Export & Reporting
 
 **Features:**
-- Export analytics data to Excel/CSV
-- Generate PDF reports with charts
+- Export machine status analytics data to Excel/CSV
+- Generate PDF reports with status distribution charts
 - Schedule automated email reports
 - API endpoints for external BI tools
 
 ---
 
-### Phase 9: Advanced Visualizations
+### Phase 8: Advanced Visualizations
 
 **Charts & Graphs:**
-- Utilization trend line chart
-- Downtime breakdown pie chart
-- Quality rate area chart
-- Work order completion bar chart
-- Heatmap showing machine utilization by hour/day
+- Machine status trend line chart (Running/Hold/Scheduled/Idle over time)
+- Status distribution pie chart
+- Heat map showing machine status by hour/day
+- Stacked bar chart for multi-machine comparison
+- Gantt chart for machine status timeline
 
 ---
 
-### Phase 10: Multi-Factory Comparison
+### Phase 9: Multi-Factory Comparison
 
 **For Organizations with Multiple Facilities:**
-- Compare performance across factories
+- Compare machine status distribution across factories
 - Identify best practices from top-performing sites
 - Benchmark factories against each other
 
@@ -2196,12 +1279,12 @@ Alert: Work order completions 20% below target
 ```
 Factory Performance Comparison (October 2025):
 
-Factory A: Avg Utilization 82% ⭐ Top Performer
-Factory B: Avg Utilization 75%
-Factory C: Avg Utilization 71%
+Factory A: Avg Running 72% ⭐ Top Performer
+Factory B: Avg Running 65%
+Factory C: Avg Running 58%
 
-Insight: Factory A achieves 11% higher utilization than Factory C
-Action: Study Factory A's practices and replicate across organization
+Insight: Factory A keeps 14% more machines running than Factory C
+Action: Study Factory A's scheduling and maintenance practices
 ```
 
 ---
