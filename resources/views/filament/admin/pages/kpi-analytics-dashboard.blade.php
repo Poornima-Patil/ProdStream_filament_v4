@@ -123,6 +123,7 @@
                                         Planned
                                     </span>
                                 @endif
+
                             </div>
                             <p class="text-sm text-gray-600 dark:text-gray-400">{{ $kpi['description'] }}</p>
                             <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
@@ -238,6 +239,7 @@
                                             <option value="all">All Statuses</option>
                                             <option value="running">Running Only</option>
                                             <option value="hold">Hold Only</option>
+                                            <option value="setup">Setup Only</option>
                                             <option value="scheduled">Scheduled Only</option>
                                             <option value="idle">Idle Only</option>
                                         </select>
@@ -254,7 +256,7 @@
                             </div>
 
                             {{-- Summary Cards at Top --}}
-                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                                 <div class="bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800 rounded-lg p-4">
                                     <div class="flex items-center justify-between">
                                         <div>
@@ -276,6 +278,18 @@
                                             </div>
                                         </div>
                                         <x-heroicon-o-pause-circle class="w-10 h-10 text-yellow-600 dark:text-yellow-400 opacity-50" />
+                                    </div>
+                                </div>
+
+                                <div class="bg-violet-50 dark:bg-violet-900/20 border-2 border-violet-200 dark:border-violet-800 rounded-lg p-4">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="text-xs font-medium text-violet-900 dark:text-violet-100 uppercase">Setup</div>
+                                            <div class="text-3xl font-bold text-violet-600 dark:text-violet-400 mt-1">
+                                                {{ $data['status_groups']['setup']['count'] ?? 0 }}
+                                            </div>
+                                        </div>
+                                        <x-heroicon-o-wrench-screwdriver class="w-10 h-10 text-violet-600 dark:text-violet-400 opacity-50" />
                                     </div>
                                 </div>
 
@@ -466,6 +480,86 @@
                                             </table>
                                             </div>
                                             <x-machine-table-pagination :pagination="$holdPagination" status="hold" />
+                                        @endif
+                                    </div>
+                                @endif
+
+                                {{-- Setup Machines Table --}}
+                                @if(!empty($data['status_groups']['setup']['machines']))
+                                    @php
+                                        $setupPagination = $this->getPaginatedMachines($data['status_groups']['setup']['machines'], 'setup');
+                                    @endphp
+                                    <div class="border border-violet-200 dark:border-violet-800 rounded-lg overflow-hidden">
+                                        <button
+                                            wire:click="toggleSection('setup')"
+                                            class="w-full bg-violet-50 dark:bg-violet-900/20 px-4 py-3 border-b border-violet-200 dark:border-violet-800 hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-colors">
+                                            <div class="flex items-center justify-between">
+                                                <h3 class="text-sm font-semibold text-violet-900 dark:text-violet-100 flex items-center gap-2">
+                                                    <x-heroicon-o-wrench-screwdriver class="w-5 h-5" />
+                                                    Setup Machines ({{ count($data['status_groups']['setup']['machines']) }})
+                                                </h3>
+                                                <x-dynamic-component
+                                                    :component="$setupExpanded ? 'heroicon-o-chevron-up' : 'heroicon-o-chevron-down'"
+                                                    class="w-5 h-5 text-violet-900 dark:text-violet-100" />
+                                            </div>
+                                        </button>
+                                        @if($setupExpanded)
+                                            <div class="overflow-x-auto">
+                                                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                                    <thead class="bg-gray-50 dark:bg-gray-800">
+                                                        <tr>
+                                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Machine</th>
+                                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Setup Work Order</th>
+                                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Part Number</th>
+                                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Operator</th>
+                                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Setup Duration</th>
+                                                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Scheduled Start</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                                                        @foreach($setupPagination['data'] as $machine)
+                                                            <tr class="hover:bg-violet-50 dark:hover:bg-violet-900/10">
+                                                                <td class="px-4 py-3">
+                                                                    <a href="{{ \App\Filament\Admin\Resources\MachineResource::getUrl('view', ['record' => $machine['id']]) }}"
+                                                                       class="font-medium text-sm text-primary-600 dark:text-primary-400 hover:underline"
+                                                                       wire:navigate>
+                                                                        {{ $machine['name'] }}
+                                                                    </a>
+                                                                    <div class="text-xs text-gray-500 dark:text-gray-400">{{ $machine['asset_id'] ?? 'N/A' }}</div>
+                                                                </td>
+                                                                <td class="px-4 py-3">
+                                                                    <a href="{{ \App\Filament\Admin\Resources\WorkOrderResource::getUrl('view', ['record' => $machine['primary_wo_id']]) }}"
+                                                                       class="text-sm font-mono font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                                                                       wire:navigate>
+                                                                        {{ $machine['primary_wo_number'] }}
+                                                                    </a>
+                                                                    @if(($machine['setup_wo_count'] ?? 0) > 1)
+                                                                        <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200 rounded mt-1">
+                                                                            +{{ ($machine['setup_wo_count'] ?? 0) - 1 }} more
+                                                                        </span>
+                                                                    @endif
+                                                                </td>
+                                                                <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                                                    {{ $machine['part_number'] }}
+                                                                </td>
+                                                                <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                                                    {{ $machine['operator'] }}
+                                                                </td>
+                                                                <td class="px-4 py-3">
+                                                                    <span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200 rounded">
+                                                                        <x-heroicon-o-clock class="w-3 h-3 mr-1" />
+                                                                        {{ $machine['setup_duration'] ?? 'Unknown' }}
+                                                                    </span>
+                                                                </td>
+                                                                <td class="px-4 py-3 text-right text-sm text-gray-900 dark:text-white">
+                                                                    {{ $machine['scheduled_start'] }}
+                                                                </td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <x-machine-table-pagination :pagination="$setupPagination" status="setup" />
                                         @endif
                                     </div>
                                 @endif
@@ -1051,8 +1145,7 @@
                                 <span class="text-sm text-gray-500 dark:text-gray-400">(Scheduled to start today)</span>
                             </div>
 
-                            {{-- Assigned Card --}}
-                            <div class="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+                            <div class="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-4">
                                 <div class="flex items-center justify-between">
                                     <div>
                                         <div class="text-xs font-medium text-blue-900 dark:text-blue-100 uppercase">Assigned</div>
@@ -1075,7 +1168,7 @@
                             </div>
 
                             {{-- Real-Time Status Cards --}}
-                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
                                 <div class="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                                     <div class="flex items-center justify-between">
                                         <div>
@@ -1086,6 +1179,19 @@
                                             <div class="text-xs text-yellow-700 dark:text-yellow-300 mt-1">Currently on hold</div>
                                         </div>
                                         <x-heroicon-o-pause-circle class="w-10 h-10 text-yellow-600 dark:text-yellow-400 opacity-50" />
+                                    </div>
+                                </div>
+
+                                <div class="bg-violet-50 dark:bg-violet-900/20 border-2 border-violet-200 dark:border-violet-800 rounded-lg p-4">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="text-xs font-medium text-violet-900 dark:text-violet-100 uppercase">Setup</div>
+                                            <div class="text-3xl font-bold text-violet-600 dark:text-violet-400 mt-1">
+                                                {{ $woData['status_distribution']['setup']['count'] ?? 0 }}
+                                            </div>
+                                            <div class="text-xs text-violet-700 dark:text-violet-300 mt-1">Currently in setup</div>
+                                        </div>
+                                        <x-heroicon-o-wrench-screwdriver class="w-10 h-10 text-violet-600 dark:text-violet-400 opacity-50" />
                                     </div>
                                 </div>
 
@@ -1284,6 +1390,79 @@
                                             </table>
                                         </div>
                                         <x-machine-table-pagination :pagination="$holdWOPagination" status="hold" wireMethod="gotoWOPage" />
+                                    @endif
+                                </div>
+                            @endif
+
+                            {{-- Setup Work Orders Table --}}
+                            @if(!empty($woData['status_distribution']['setup']['work_orders']))
+                                @php
+                                    $setupWOPagination = $this->getPaginatedWorkOrders($woData['status_distribution']['setup']['work_orders'], 'setup');
+                                @endphp
+                                <div class="border border-violet-200 dark:border-violet-800 rounded-lg overflow-hidden">
+                                    <button
+                                        wire:click="toggleWOSection('setup')"
+                                        class="w-full bg-violet-50 dark:bg-violet-900/20 px-4 py-3 border-b border-violet-200 dark:border-violet-800 hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-colors">
+                                        <div class="flex items-center justify-between">
+                                            <h3 class="text-sm font-semibold text-violet-900 dark:text-violet-100 flex items-center gap-2">
+                                                <x-heroicon-o-wrench-screwdriver class="w-5 h-5" />
+                                                Setup Work Orders ({{ count($woData['status_distribution']['setup']['work_orders']) }})
+                                            </h3>
+                                            <x-dynamic-component
+                                                :component="$woSetupExpanded ? 'heroicon-o-chevron-up' : 'heroicon-o-chevron-down'"
+                                                class="w-5 h-5 text-violet-900 dark:text-violet-100" />
+                                        </div>
+                                    </button>
+                                    @if($woSetupExpanded)
+                                        <div class="overflow-x-auto">
+                                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                                <thead class="bg-gray-50 dark:bg-gray-800">
+                                                    <tr>
+                                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">WO Number</th>
+                                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Machine</th>
+                                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Part Number</th>
+                                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Operator</th>
+                                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Setup Duration</th>
+                                                        <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Scheduled Start</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                                                    @foreach($setupWOPagination['data'] as $wo)
+                                                        <tr class="hover:bg-violet-50 dark:hover:bg-violet-900/10">
+                                                            <td class="px-4 py-3">
+                                                                <a href="{{ \App\Filament\Admin\Resources\WorkOrderResource::getUrl('view', ['record' => $wo['id']]) }}"
+                                                                   class="text-sm font-mono font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                                                                   wire:navigate>
+                                                                    {{ $wo['wo_number'] }}
+                                                                </a>
+                                                            </td>
+                                                            <td class="px-4 py-3">
+                                                                <div class="font-medium text-sm text-gray-900 dark:text-white">
+                                                                    {{ $wo['machine_name'] }}
+                                                                </div>
+                                                                <div class="text-xs text-gray-500 dark:text-gray-400">{{ $wo['machine_asset_id'] }}</div>
+                                                            </td>
+                                                            <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                                                {{ $wo['part_number'] }}
+                                                            </td>
+                                                            <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                                                {{ $wo['operator'] }}
+                                                            </td>
+                                                            <td class="px-4 py-3">
+                                                                <span class="inline-flex items-center px-2 py-1 text-xs font-medium bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200 rounded">
+                                                                    <x-heroicon-o-clock class="w-3 h-3 mr-1" />
+                                                                    {{ $wo['setup_duration'] ?? 'Unknown' }}
+                                                                </span>
+                                                            </td>
+                                                            <td class="px-4 py-3 text-sm text-right text-violet-700 dark:text-violet-300 font-medium">
+                                                                {{ $wo['scheduled_start'] ?? 'Not scheduled' }}
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <x-machine-table-pagination :pagination="$setupWOPagination" status="setup" wireMethod="gotoWOPage" />
                                     @endif
                                 </div>
                             @endif
@@ -1540,6 +1719,357 @@
                         </div>
                     </div>
                 </x-filament::card>
+                @endif
+            @endif
+
+            {{-- Setup Time KPI Content --}}
+            @if($selectedKPI === 'setup_time')
+                <x-filament::card>
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-xl font-bold">Setup Time per Machine</h2>
+                            <button
+                                wire:click="refreshData"
+                                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                                wire:loading.attr="disabled"
+                            >
+                                <x-heroicon-o-arrow-path class="w-4 h-4" wire:loading.class="animate-spin" wire:target="refreshData" />
+                                <span>Refresh</span>
+                            </button>
+                        </div>
+
+                        @if($kpiMode === 'dashboard')
+                            @php
+                                $woData = $this->getWorkOrderStatusData();
+                                $setupGroup = $woData['status_distribution']['setup'] ?? ['count' => 0, 'work_orders' => []];
+                                $setupWorkOrders = $setupGroup['work_orders'] ?? [];
+                                $now = now();
+                                $durations = [];
+
+                                foreach ($setupWorkOrders as $woEntry) {
+                                    if (! empty($woEntry['setup_since'])) {
+                                        $durations[] = \Carbon\Carbon::parse($woEntry['setup_since'])->diffInMinutes($now);
+                                    }
+                                }
+
+                                $totalSetups = count($setupWorkOrders);
+                                $activeSetups = count($durations);
+                                $totalDurationMinutes = array_sum($durations);
+                                $avgDurationMinutes = $activeSetups > 0 ? round($totalDurationMinutes / $activeSetups) : 0;
+                                $longestDurationMinutes = $activeSetups > 0 ? max($durations) : 0;
+
+                                $formatMinutes = static function (int $minutes): string {
+                                    if ($minutes < 60) {
+                                        return $minutes . ' min';
+                                    }
+
+                                    $hours = intdiv($minutes, 60);
+                                    $mins = $minutes % 60;
+
+                                    return trim(($hours ? $hours . 'h' : '') . ($mins ? ' ' . $mins . 'm' : ''));
+                                };
+                            @endphp
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div class="bg-violet-50 dark:bg-violet-900/20 border-2 border-violet-200 dark:border-violet-800 rounded-lg p-4">
+                                    <div class="text-xs font-medium text-violet-900 dark:text-violet-100 uppercase">In Setup Now</div>
+                                    <div class="text-3xl font-bold text-violet-600 dark:text-violet-400 mt-1">
+                                        {{ $totalSetups }}
+                                    </div>
+                                    <p class="text-xs text-violet-700 dark:text-violet-300 mt-1">
+                                        Work orders currently preparing machines
+                                    </p>
+                                </div>
+
+                                <div class="bg-violet-50 dark:bg-violet-900/20 border-2 border-violet-200 dark:border-violet-800 rounded-lg p-4">
+                                    <div class="text-xs font-medium text-violet-900 dark:text-violet-100 uppercase">Average Duration</div>
+                                    <div class="text-3xl font-bold text-violet-600 dark:text-violet-400 mt-1">
+                                        {{ $activeSetups > 0 ? $formatMinutes($avgDurationMinutes) : 'N/A' }}
+                                    </div>
+                                    <p class="text-xs text-violet-700 dark:text-violet-300 mt-1">
+                                        Across setups with captured start times
+                                    </p>
+                                </div>
+
+                                <div class="bg-violet-50 dark:bg-violet-900/20 border-2 border-violet-200 dark:border-violet-800 rounded-lg p-4">
+                                    <div class="text-xs font-medium text-violet-900 dark:text-violet-100 uppercase">Longest Active Setup</div>
+                                    <div class="text-3xl font-bold text-violet-600 dark:text-violet-400 mt-1">
+                                        {{ $activeSetups > 0 ? $formatMinutes($longestDurationMinutes) : 'N/A' }}
+                                    </div>
+                                    <p class="text-xs text-violet-700 dark:text-violet-300 mt-1">
+                                        Since machine entered setup
+                                    </p>
+                                </div>
+
+                                <div class="bg-violet-50 dark:bg-violet-900/20 border-2 border-violet-200 dark:border-violet-800 rounded-lg p-4">
+                                    <div class="text-xs font-medium text-violet-900 dark:text-violet-100 uppercase">Total Active Setup Time</div>
+                                    <div class="text-3xl font-bold text-violet-600 dark:text-violet-400 mt-1">
+                                        {{ $activeSetups > 0 ? $formatMinutes($totalDurationMinutes) : '0 min' }}
+                                    </div>
+                                    <p class="text-xs text-violet-700 dark:text-violet-300 mt-1">
+                                        Combined for current setups
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h4 class="text-md font-semibold text-gray-900 dark:text-gray-100 my-3">
+                                    Active Setup Work Orders
+                                </h4>
+
+                                @if(!empty($setupWorkOrders))
+                                    <div class="border border-violet-200 dark:border-violet-800 rounded-lg overflow-hidden">
+                                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                            <thead class="bg-gray-50 dark:bg-gray-800">
+                                                <tr>
+                                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">WO Number</th>
+                                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Machine</th>
+                                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Part</th>
+                                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Operator</th>
+                                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Setup Since</th>
+                                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Scheduled Start</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                                                @foreach($setupWorkOrders as $wo)
+                                                    <tr class="hover:bg-violet-50 dark:hover:bg-violet-900/10">
+                                                        <td class="px-4 py-3">
+                                                            <a href="{{ \App\Filament\Admin\Resources\WorkOrderResource::getUrl('view', ['record' => $wo['id']]) }}"
+                                                               class="text-sm font-mono font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                                                               wire:navigate>
+                                                                {{ $wo['wo_number'] }}
+                                                            </a>
+                                                        </td>
+                                                        <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                                            <div class="font-medium">{{ $wo['machine_name'] ?? 'N/A' }}</div>
+                                                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ $wo['machine_asset_id'] ?? 'N/A' }}</div>
+                                                        </td>
+                                                        <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                                            {{ $wo['part_number'] ?? 'N/A' }}
+                                                        </td>
+                                                        <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                                            {{ $wo['operator'] ?? 'Unassigned' }}
+                                                        </td>
+                                                        <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                                            @if(!empty($wo['setup_since']))
+                                                                @php $since = \Carbon\Carbon::parse($wo['setup_since']); @endphp
+                                                                <div>{{ $since->diffForHumans(null, true) }} ago</div>
+                                                                <div class="text-xs text-gray-500 dark:text-gray-400">
+                                                                    {{ $since->format('M d, H:i') }}
+                                                                </div>
+                                                            @else
+                                                                <span class="text-xs text-gray-500 dark:text-gray-400">{{ $wo['setup_duration'] ?? 'N/A' }}</span>
+                                                            @endif
+                                                        </td>
+                                                        <td class="px-4 py-3 text-sm text-right text-violet-700 dark:text-violet-300 font-medium">
+                                                            {{ $wo['scheduled_start'] ?? 'Not scheduled' }}
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                @else
+                                    <div class="text-center py-6 text-sm text-gray-500 dark:text-gray-400">
+                                        No machines are currently in setup.
+                                    </div>
+                                @endif
+                            </div>
+                        @else
+                            @php
+                                $setupAnalytics = $this->getSetupTimeAnalyticsData();
+                            @endphp
+
+                            @include('filament.admin.pages.setup-time-analytics', ['data' => $setupAnalytics])
+                        @endif
+                    </div>
+                </x-filament::card>
+            @endif
+
+            {{-- Defect Rate KPI Content --}}
+            @if($selectedKPI === 'defect_rate')
+                @php
+                    $defectData = $this->getDefectRateData();
+                @endphp
+
+                @if($kpiMode === 'dashboard')
+                    <x-filament::card>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h2 class="text-xl font-bold">Defect Rate</h2>
+                                <button
+                                    wire:click="refreshData"
+                                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+                                    wire:loading.attr="disabled"
+                                >
+                                    <x-heroicon-o-arrow-path class="w-4 h-4" wire:loading.class="animate-spin" wire:target="refreshData" />
+                                    <span>Refresh</span>
+                                </button>
+                            </div>
+
+                            @php
+                                $defectSummary = $defectData['summary'] ?? [];
+                                $defectRows = $defectData['work_orders_paginated'] ?? [];
+                                $defectPagination = $defectData['pagination'] ?? null;
+                            @endphp
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                                <x-filament::card>
+                                    <div class="space-y-2">
+                                        <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                            Defective WOs Today
+                                        </h4>
+                                        <div class="text-3xl font-bold text-red-600 dark:text-red-400">
+                                            {{ number_format($defectSummary['defective_work_orders'] ?? 0) }}
+                                        </div>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                                            Running work orders with recorded scrap today
+                                        </p>
+                                    </div>
+                                </x-filament::card>
+
+                                <x-filament::card>
+                                    <div class="space-y-2">
+                                        <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                            Total Scrap Today
+                                        </h4>
+                                        <div class="text-3xl font-bold text-red-600 dark:text-red-400">
+                                            {{ number_format($defectSummary['total_scrap_today'] ?? 0) }}
+                                        </div>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                                            Units scrapped across all active WOs
+                                        </p>
+                                    </div>
+                                </x-filament::card>
+
+                                <x-filament::card>
+                                    <div class="space-y-2">
+                                        <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                            Avg Defect Rate
+                                        </h4>
+                                        <div class="text-3xl font-bold text-red-600 dark:text-red-400">
+                                            {{ number_format($defectSummary['avg_defect_rate'] ?? 0, 2) }}%
+                                        </div>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                                            Weighted by units produced today
+                                        </p>
+                                    </div>
+                                </x-filament::card>
+
+                                <x-filament::card>
+                                    <div class="space-y-2">
+                                        <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                            Worst Defect Rate
+                                        </h4>
+                                        <div class="text-3xl font-bold text-red-600 dark:text-red-400">
+                                            {{ number_format($defectSummary['worst_defect_rate'] ?? 0, 2) }}%
+                                        </div>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                                            Highest defect rate among today&apos;s WOs
+                                        </p>
+                                    </div>
+                                </x-filament::card>
+
+                                <x-filament::card>
+                                    <div class="space-y-2">
+                                        <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                            Total Produced Today
+                                        </h4>
+                                        <div class="text-3xl font-bold text-gray-900 dark:text-white">
+                                            {{ number_format($defectSummary['total_produced_today'] ?? 0) }}
+                                        </div>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                                            Ok + scrap units logged today
+                                        </p>
+                                    </div>
+                                </x-filament::card>
+                            </div>
+
+                            <div class="space-y-4">
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                                    Work Orders With Scrap Recorded Today
+                                </h3>
+
+                                @if(!empty($defectRows))
+                                    <div class="overflow-x-auto">
+                                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                            <thead class="bg-gray-50 dark:bg-gray-800">
+                                                <tr>
+                                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Work Order</th>
+                                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Machine</th>
+                                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Operator</th>
+                                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Scrap Today</th>
+                                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Produced Today</th>
+                                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Defect Rate</th>
+                                                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Cumulative Rate</th>
+                                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Last Scrap</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                                                @foreach($defectRows as $row)
+                                                    <tr class="hover:bg-red-50 dark:hover:bg-red-900/10">
+                                                        <td class="px-4 py-3 text-sm font-mono font-medium text-primary-600 dark:text-primary-400">
+                                                            <a href="{{ \App\Filament\Admin\Resources\WorkOrderResource::getUrl('view', ['record' => $row['id']]) }}"
+                                                               wire:navigate>
+                                                                {{ $row['wo_number'] ?? 'N/A' }}
+                                                            </a>
+                                                        </td>
+                                                        <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                                            <div class="font-medium">{{ $row['machine_name'] ?? 'N/A' }}</div>
+                                                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ $row['machine_asset_id'] ?? 'N/A' }}</div>
+                                                        </td>
+                                                        <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                                            {{ $row['operator'] ?? 'Unassigned' }}
+                                                        </td>
+                                                        <td class="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                                                            {{ number_format($row['scrap_today'] ?? 0) }}
+                                                        </td>
+                                                        <td class="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                                                            {{ number_format($row['produced_today'] ?? 0) }}
+                                                        </td>
+                                                        <td class="px-4 py-3 text-sm text-right text-red-600 dark:text-red-400 font-medium">
+                                                            {{ number_format($row['defect_rate_today'] ?? 0, 2) }}%
+                                                        </td>
+                                                        <td class="px-4 py-3 text-sm text-right text-gray-900 dark:text-white">
+                                                            {{ number_format($row['cumulative_defect_rate'] ?? 0, 2) }}%
+                                                        </td>
+                                                        <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                                            @if(!empty($row['last_scrap_at']))
+                                                                <div>{{ \Carbon\Carbon::parse($row['last_scrap_at'])->format('M d, H:i') }}</div>
+                                                                <div class="text-xs text-gray-500 dark:text-gray-400">{{ $row['last_scrap_human'] ?? '' }}</div>
+                                                            @else
+                                                                <span class="text-xs text-gray-500 dark:text-gray-400">No scrap logged yet</span>
+                                                            @endif
+                                                        </td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    @if($defectPagination)
+                                        <x-machine-table-pagination :pagination="$defectPagination" status="defect" wireMethod="gotoDefectPage" />
+                                    @endif
+                                @else
+                                    <div class="text-center py-6 text-sm text-gray-500 dark:text-gray-400">
+                                        No scrap has been recorded yet today.
+                                    </div>
+                                @endif
+                            </div>
+
+                            <div class="text-xs text-gray-500 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-4 flex items-center justify-between">
+                                <span>Total Work Orders Listed: {{ number_format($defectSummary['defective_work_orders'] ?? 0) }}</span>
+                                <span>Last Updated: {{ \Carbon\Carbon::parse($defectData['updated_at'] ?? now())->diffForHumans() }}</span>
+                            </div>
+                        </div>
+                    </x-filament::card>
+                @else
+                    <x-filament::card>
+                        <div class="space-y-4">
+                            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Defect Rate - Analytics</h2>
+                            @include('filament.admin.pages.defect-rate-analytics', ['data' => $defectData])
+                        </div>
+                    </x-filament::card>
                 @endif
             @endif
 

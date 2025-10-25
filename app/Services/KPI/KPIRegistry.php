@@ -111,8 +111,8 @@ class KPIRegistry
                     'id' => 'defect_rate',
                     'name' => 'Defect Rate',
                     'description' => 'Percentage of defective units produced',
-                    'tier' => 1,
-                    'status' => 'planned',
+                    'tier' => 2,
+                    'status' => 'active',
                     'icon' => 'heroicon-o-exclamation-triangle',
                 ],
                 [

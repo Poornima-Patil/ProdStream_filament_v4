@@ -4,6 +4,8 @@ namespace App\Services\KPI;
 
 use App\Models\Factory;
 use App\Models\KPI\MachineDaily;
+use App\Models\KPI\MachineStatusDaily;
+use App\Models\Machine;
 use Carbon\Carbon;
 
 class OperationalKPIService extends BaseKPIService
@@ -15,7 +17,7 @@ class OperationalKPIService extends BaseKPIService
 
     /**
      * Get machine status analytics with historical data and comparisons
-     * Returns historical breakdown of machine status distribution (Running/Hold/Scheduled/Idle)
+     * Returns historical breakdown of machine status distribution (Running/Setup/Hold/Scheduled/Idle)
      */
     public function getMachineStatusAnalytics(array $options): array
     {
@@ -28,7 +30,7 @@ class OperationalKPIService extends BaseKPIService
 
         [$startDate, $endDate] = $this->getDateRange($period, $dateFrom, $dateTo);
 
-        $cacheKey = "machine_status_analytics_{$period}_".md5(json_encode($options));
+        $cacheKey = "machine_status_analytics_v2_{$period}_".md5(json_encode($options));
         $cacheTTL = $this->getCacheTTL($period);
 
         return $this->getCachedKPI($cacheKey, function () use ($startDate, $endDate, $enableComparison, $comparisonType, $options) {
@@ -71,86 +73,128 @@ class OperationalKPIService extends BaseKPIService
 
     /**
      * Fetch machine status distribution history
-     * Returns daily breakdown of machines by status: Running, Hold, Scheduled, Idle
+     * Returns daily breakdown of machines by status: Running, Setup, Hold, Scheduled, Idle
      */
     protected function fetchMachineStatusDistribution(Carbon $startDate, Carbon $endDate): array
     {
-        $totalMachines = \App\Models\Machine::where('factory_id', $this->factory->id)->count();
+        $records = MachineStatusDaily::where('factory_id', $this->factory->id)
+            ->whereBetween('summary_date', [$startDate->toDateString(), $endDate->toDateString()])
+            ->get()
+            ->keyBy(fn ($record) => Carbon::parse($record->summary_date)->toDateString());
 
-        // Initialize daily breakdown
         $dailyBreakdown = [];
         $current = $startDate->copy();
 
+        $totalRunning = 0;
+        $totalSetup = 0;
+        $totalHold = 0;
+        $totalScheduled = 0;
+        $totalIdle = 0;
+        $totalMachinesSum = 0;
+
         while ($current->lte($endDate)) {
             $dateStr = $current->toDateString();
-            $dayStart = $current->copy()->startOfDay();
-            $dayEnd = $current->copy()->endOfDay();
 
-            // Get work orders for this day
-            $workOrders = \App\Models\WorkOrder::where('factory_id', $this->factory->id)
-                ->whereBetween('start_time', [$dayStart, $dayEnd])
-                ->whereIn('status', ['Start', 'Assigned', 'Hold', 'Completed'])
-                ->get(['id', 'machine_id', 'status']);
+            if ($records->has($dateStr)) {
+                $record = $records->get($dateStr);
+                $dayData = [
+                    'running' => (int) $record->running_count,
+                    'setup' => (int) $record->setup_count,
+                    'hold' => (int) $record->hold_count,
+                    'scheduled' => (int) $record->scheduled_count,
+                    'idle' => (int) $record->idle_count,
+                    'total_machines' => (int) $record->total_machines,
+                ];
+            } else {
+                $calculated = $this->calculateMachineStatusForDate($current);
+                $dayData = [
+                    'running' => $calculated['running'],
+                    'setup' => $calculated['setup'],
+                    'hold' => $calculated['hold'],
+                    'scheduled' => $calculated['scheduled'],
+                    'idle' => $calculated['idle'],
+                    'total_machines' => $calculated['total_machines'],
+                ];
+            }
 
-            // Group machines by status
-            $machinesRunning = $workOrders->where('status', 'Start')->pluck('machine_id')->unique()->count();
-            $machinesOnHold = $workOrders->where('status', 'Hold')->pluck('machine_id')->unique()->count();
-            $machinesScheduled = $workOrders->where('status', 'Assigned')->pluck('machine_id')->unique()->count();
+            $dayRecord = array_merge(['date' => $dateStr], $dayData);
+            $dailyBreakdown[] = $dayRecord;
 
-            // Machines with any work orders (Running, Hold, or Scheduled)
-            $machinesWithWork = $workOrders->pluck('machine_id')->unique()->count();
-            $machinesIdle = $totalMachines - $machinesWithWork;
-
-            $dailyBreakdown[] = [
-                'date' => $dateStr,
-                'running' => $machinesRunning,
-                'hold' => $machinesOnHold,
-                'scheduled' => $machinesScheduled,
-                'idle' => $machinesIdle,
-                'total_machines' => $totalMachines,
-            ];
+            $totalRunning += $dayData['running'];
+            $totalSetup += $dayData['setup'];
+            $totalHold += $dayData['hold'];
+            $totalScheduled += $dayData['scheduled'];
+            $totalIdle += $dayData['idle'];
+            $totalMachinesSum += $dayData['total_machines'];
 
             $current->addDay();
         }
 
-        // Calculate summary statistics
-        $totalRunning = 0;
-        $totalHold = 0;
-        $totalScheduled = 0;
-        $totalIdle = 0;
         $daysCount = count($dailyBreakdown);
-
-        foreach ($dailyBreakdown as $day) {
-            $totalRunning += $day['running'];
-            $totalHold += $day['hold'];
-            $totalScheduled += $day['scheduled'];
-            $totalIdle += $day['idle'];
-        }
+        $averageDenominator = $totalMachinesSum > 0 ? $totalMachinesSum : 0;
 
         $summary = [
             'avg_running' => $daysCount > 0 ? round($totalRunning / $daysCount, 1) : 0,
+            'avg_setup' => $daysCount > 0 ? round($totalSetup / $daysCount, 1) : 0,
             'avg_hold' => $daysCount > 0 ? round($totalHold / $daysCount, 1) : 0,
             'avg_scheduled' => $daysCount > 0 ? round($totalScheduled / $daysCount, 1) : 0,
             'avg_idle' => $daysCount > 0 ? round($totalIdle / $daysCount, 1) : 0,
-            'total_machines' => $totalMachines,
+            'total_machines' => $daysCount > 0 ? (int) round($totalMachinesSum / $daysCount) : 0,
             'days_analyzed' => $daysCount,
-            'avg_running_pct' => $totalMachines > 0 && $daysCount > 0
-                ? round(($totalRunning / ($totalMachines * $daysCount)) * 100, 1)
+            'avg_running_pct' => $averageDenominator > 0
+                ? round(($totalRunning / $averageDenominator) * 100, 1)
                 : 0,
-            'avg_hold_pct' => $totalMachines > 0 && $daysCount > 0
-                ? round(($totalHold / ($totalMachines * $daysCount)) * 100, 1)
+            'avg_setup_pct' => $averageDenominator > 0
+                ? round(($totalSetup / $averageDenominator) * 100, 1)
                 : 0,
-            'avg_scheduled_pct' => $totalMachines > 0 && $daysCount > 0
-                ? round(($totalScheduled / ($totalMachines * $daysCount)) * 100, 1)
+            'avg_hold_pct' => $averageDenominator > 0
+                ? round(($totalHold / $averageDenominator) * 100, 1)
                 : 0,
-            'avg_idle_pct' => $totalMachines > 0 && $daysCount > 0
-                ? round(($totalIdle / ($totalMachines * $daysCount)) * 100, 1)
+            'avg_scheduled_pct' => $averageDenominator > 0
+                ? round(($totalScheduled / $averageDenominator) * 100, 1)
+                : 0,
+            'avg_idle_pct' => $averageDenominator > 0
+                ? round(($totalIdle / $averageDenominator) * 100, 1)
                 : 0,
         ];
 
         return [
             'daily' => $dailyBreakdown,
             'summary' => $summary,
+        ];
+    }
+
+    protected function calculateMachineStatusForDate(Carbon $date): array
+    {
+        $dayStart = $date->copy()->startOfDay();
+        $dayEnd = $date->copy()->endOfDay();
+
+        $totalMachines = Machine::where('factory_id', $this->factory->id)->count();
+
+        $workOrders = \App\Models\WorkOrder::where('factory_id', $this->factory->id)
+            ->where(function ($query) use ($dayStart, $dayEnd) {
+                $query->whereIn('status', ['Start', 'Setup', 'Hold'])
+                    ->orWhere(function ($scheduledQuery) use ($dayStart, $dayEnd) {
+                        $scheduledQuery->whereIn('status', ['Assigned', 'Completed'])
+                            ->whereBetween('start_time', [$dayStart, $dayEnd]);
+                    });
+            })
+            ->get(['id', 'machine_id', 'status']);
+
+        $runningMachines = $workOrders->where('status', 'Start')->pluck('machine_id')->unique()->count();
+        $setupMachines = $workOrders->where('status', 'Setup')->pluck('machine_id')->unique()->count();
+        $holdMachines = $workOrders->where('status', 'Hold')->pluck('machine_id')->unique()->count();
+        $scheduledMachines = $workOrders->where('status', 'Assigned')->pluck('machine_id')->unique()->count();
+        $machinesWithWork = $workOrders->pluck('machine_id')->unique()->count();
+        $idleMachines = max($totalMachines - $machinesWithWork, 0);
+
+        return [
+            'running' => $runningMachines,
+            'setup' => $setupMachines,
+            'hold' => $holdMachines,
+            'scheduled' => $scheduledMachines,
+            'idle' => $idleMachines,
+            'total_machines' => $totalMachines,
         ];
     }
 
@@ -170,6 +214,17 @@ class OperationalKPIService extends BaseKPIService
                 ),
                 'trend' => ($current['avg_running'] ?? 0) > ($previous['avg_running'] ?? 0) ? 'up' : 'down',
                 'status' => ($current['avg_running'] ?? 0) > ($previous['avg_running'] ?? 0) ? 'improved' : 'declined',
+            ],
+            'setup' => [
+                'current' => $current['avg_setup'] ?? 0,
+                'previous' => $previous['avg_setup'] ?? 0,
+                'difference' => round(($current['avg_setup'] ?? 0) - ($previous['avg_setup'] ?? 0), 1),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['avg_setup'] ?? 0,
+                    $previous['avg_setup'] ?? 0
+                ),
+                'trend' => ($current['avg_setup'] ?? 0) > ($previous['avg_setup'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['avg_setup'] ?? 0) < ($previous['avg_setup'] ?? 0) ? 'improved' : 'declined',
             ],
             'hold' => [
                 'current' => $current['avg_hold'] ?? 0,
@@ -515,7 +570,7 @@ class OperationalKPIService extends BaseKPIService
         $cacheKey = "work_order_status_analytics_{$period}_".md5(json_encode($options));
         $cacheTTL = $this->getCacheTTL($period);
 
-        return $this->getCachedKPI($cacheKey, function () use ($startDate, $endDate, $enableComparison, $comparisonType, $options, $period) {
+        return $this->getCachedKPI($cacheKey, function () use ($startDate, $endDate, $enableComparison, $comparisonType, $period) {
             // Fetch primary period data
             $primaryData = $this->fetchWorkOrderStatusDistribution($startDate, $endDate);
 
@@ -584,9 +639,10 @@ class OperationalKPIService extends BaseKPIService
             ->get();
 
         $statusDistribution = [
-            'hold' => ['count' => 0, 'work_orders' => []],
-            'start' => ['count' => 0, 'work_orders' => []],
             'assigned' => ['count' => 0, 'work_orders' => []],
+            'setup' => ['count' => 0, 'work_orders' => []],
+            'start' => ['count' => 0, 'work_orders' => []],
+            'hold' => ['count' => 0, 'work_orders' => []],
             'completed' => ['count' => 0, 'work_orders' => []],
             'closed' => ['count' => 0, 'work_orders' => []],
         ];
@@ -594,6 +650,7 @@ class OperationalKPIService extends BaseKPIService
         // Track which statuses each work order had during the period
         $workOrderStatusCounts = [
             'assigned' => 0,
+            'setup' => 0,
             'start' => 0,
             'hold' => 0,
             'completed' => 0,
@@ -608,7 +665,7 @@ class OperationalKPIService extends BaseKPIService
             }
 
             // Get all unique statuses this work order had during the period
-            $statuses = $logs->pluck('status')->unique()->map(fn($s) => strtolower($s));
+            $statuses = $logs->pluck('status')->unique()->map(fn ($s) => strtolower($s));
 
             foreach ($statuses as $status) {
                 if (! isset($statusDistribution[$status])) {
@@ -653,6 +710,14 @@ class OperationalKPIService extends BaseKPIService
                         ? $wo->end_time->diffForHumans()
                         : 'N/A';
                 } elseif ($status === 'assigned') {
+                    $woData['scheduled_start'] = $wo->start_time
+                        ? $wo->start_time->format('M d, H:i')
+                        : 'Not scheduled';
+                } elseif ($status === 'setup') {
+                    $woData['setup_since'] = $statusLog?->changed_at?->toDateTimeString();
+                    $woData['setup_duration'] = $statusLog?->changed_at
+                        ? now()->diffForHumans($statusLog->changed_at, true)
+                        : 'Unknown';
                     $woData['scheduled_start'] = $wo->start_time
                         ? $wo->start_time->format('M d, H:i')
                         : 'Not scheduled';
@@ -709,11 +774,13 @@ class OperationalKPIService extends BaseKPIService
             'summary' => [
                 'total' => $totalWorkOrders,
                 'assigned_count' => $workOrderStatusCounts['assigned'],
+                'setup_count' => $workOrderStatusCounts['setup'],
                 'start_count' => $workOrderStatusCounts['start'],
                 'hold_count' => $workOrderStatusCounts['hold'],
                 'completed_count' => $workOrderStatusCounts['completed'],
                 'closed_count' => $workOrderStatusCounts['closed'],
                 'assigned_pct' => $totalWorkOrders > 0 ? round(($workOrderStatusCounts['assigned'] / $totalWorkOrders) * 100, 1) : 0,
+                'setup_pct' => $totalWorkOrders > 0 ? round(($workOrderStatusCounts['setup'] / $totalWorkOrders) * 100, 1) : 0,
                 'start_pct' => $totalWorkOrders > 0 ? round(($workOrderStatusCounts['start'] / $totalWorkOrders) * 100, 1) : 0,
                 'hold_pct' => $totalWorkOrders > 0 ? round(($workOrderStatusCounts['hold'] / $totalWorkOrders) * 100, 1) : 0,
                 'completed_pct' => $totalWorkOrders > 0 ? round(($workOrderStatusCounts['completed'] / $totalWorkOrders) * 100, 1) : 0,
@@ -748,6 +815,17 @@ class OperationalKPIService extends BaseKPIService
                 ),
                 'trend' => ($current['assigned_count'] ?? 0) > ($previous['assigned_count'] ?? 0) ? 'up' : 'down',
                 'status' => 'neutral', // Assigned is neither good nor bad
+            ],
+            'setup' => [
+                'current' => $current['setup_count'] ?? 0,
+                'previous' => $previous['setup_count'] ?? 0,
+                'difference' => ($current['setup_count'] ?? 0) - ($previous['setup_count'] ?? 0),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['setup_count'] ?? 0,
+                    $previous['setup_count'] ?? 0
+                ),
+                'trend' => ($current['setup_count'] ?? 0) > ($previous['setup_count'] ?? 0) ? 'up' : 'down',
+                'status' => 'neutral', // Setup is neither good nor bad
             ],
             'start' => [
                 'current' => $current['start_count'] ?? 0,
@@ -814,7 +892,7 @@ class OperationalKPIService extends BaseKPIService
         $cacheKey = "machine_utilization_analytics_{$period}_".md5(json_encode($options));
         $cacheTTL = $this->getCacheTTL($period);
 
-        return $this->getCachedKPI($cacheKey, function () use ($startDate, $endDate, $enableComparison, $comparisonType, $options, $period) {
+        return $this->getCachedKPI($cacheKey, function () use ($startDate, $endDate, $enableComparison, $comparisonType, $period) {
             // Fetch primary period data
             $primaryData = $this->fetchMachineUtilizationData($startDate, $endDate);
 
@@ -1016,7 +1094,7 @@ class OperationalKPIService extends BaseKPIService
 
         [$startDate, $endDate] = $this->getDateRange($period, $dateFrom, $dateTo);
 
-        $cacheKey = "setup_time_analytics_{$period}_".md5(json_encode($options));
+        $cacheKey = "setup_time_analytics_v2_{$period}_".md5(json_encode($options));
         $cacheTTL = $this->getCacheTTL($period);
 
         return $this->getCachedKPI($cacheKey, function () use ($startDate, $endDate, $enableComparison, $comparisonType, $options, $machineFilter) {
@@ -1060,14 +1138,16 @@ class OperationalKPIService extends BaseKPIService
     }
 
     /**
-     * Fetch setup time distribution for a date range
-     * Calculates setup time from work_order_logs by finding gap between 'Assigned' and 'Start'
+     * Fetch setup time distribution for a date range.
+     * Calculates setup time using the gap between the most recent 'Setup' status and the next 'Start'.
+     * Falls back to the latest 'Assigned' status when historical data has no 'Setup' entry.
      */
     protected function fetchSetupTimeDistribution(Carbon $startDate, Carbon $endDate, ?int $machineFilter = null): array
     {
-        // Get all Assigned status logs in the date range
-        $assignedLogs = \App\Models\WorkOrderLog::where('status', 'Assigned')
-            ->whereBetween('changed_at', [$startDate->startOfDay(), $endDate->endOfDay()])
+        // Collect all start logs within the analysis window.
+        $startLogs = \App\Models\WorkOrderLog::where('status', 'Start')
+            ->whereBetween('changed_at', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+            ->orderBy('changed_at', 'asc')
             ->get(['work_order_id', 'changed_at']);
 
         $dailyBreakdown = [];
@@ -1075,24 +1155,59 @@ class OperationalKPIService extends BaseKPIService
         $totalSetupMinutes = 0;
         $totalSetups = 0;
 
-        foreach ($assignedLogs as $assignedLog) {
-            // Find corresponding first 'Start' log AFTER this Assigned log
-            $startLog = \App\Models\WorkOrderLog::where('work_order_id', $assignedLog->work_order_id)
-                ->where('status', 'Start')
-                ->where('changed_at', '>', $assignedLog->changed_at)
-                ->orderBy('changed_at', 'asc')
-                ->first(['work_order_id', 'changed_at']);
+        foreach ($startLogs as $startLog) {
+            // Identify the most recent 'Setup' before this Start.
+            $setupLog = \App\Models\WorkOrderLog::where('work_order_id', $startLog->work_order_id)
+                ->where('status', 'Setup')
+                ->where('changed_at', '<', $startLog->changed_at)
+                ->orderBy('changed_at', 'desc')
+                ->first(['work_order_id', 'changed_at', 'status']);
 
-            if (!$startLog) {
-                continue; // WO not yet started
+            if (! $setupLog) {
+                // Fallback for historical data without Setup status.
+                $hasAnySetup = \App\Models\WorkOrderLog::where('work_order_id', $startLog->work_order_id)
+                    ->where('status', 'Setup')
+                    ->where('changed_at', '<', $startLog->changed_at)
+                    ->exists();
+
+                if (! $hasAnySetup) {
+                    $setupLog = \App\Models\WorkOrderLog::where('work_order_id', $startLog->work_order_id)
+                        ->where('status', 'Assigned')
+                        ->where('changed_at', '<', $startLog->changed_at)
+                        ->orderBy('changed_at', 'desc')
+                        ->first(['work_order_id', 'changed_at', 'status']);
+                }
             }
 
-            // Calculate setup time in minutes
-            $setupMinutes = $assignedLog->changed_at->diffInMinutes($startLog->changed_at);
+            if (! $setupLog) {
+                continue; // No setup information available for this start.
+            }
 
-            // Get work order details
-            $workOrder = \App\Models\WorkOrder::find($assignedLog->work_order_id, ['id', 'machine_id', 'factory_id']);
-            if (!$workOrder || $workOrder->factory_id !== $this->factory->id) {
+            // Only consider setups that occurred within the requested window.
+            if (! $setupLog->changed_at->between($startDate->copy()->startOfDay(), $endDate->copy()->endOfDay())) {
+                continue;
+            }
+
+            // Ignore subsequent starts that occur without a new setup.
+            $priorStartExists = \App\Models\WorkOrderLog::where('work_order_id', $startLog->work_order_id)
+                ->where('status', 'Start')
+                ->where('changed_at', '>', $setupLog->changed_at)
+                ->where('changed_at', '<', $startLog->changed_at)
+                ->exists();
+
+            if ($priorStartExists) {
+                continue;
+            }
+
+            // Calculate setup time in minutes.
+            $setupMinutes = $setupLog->changed_at->diffInMinutes($startLog->changed_at);
+            if ($setupMinutes < 0) {
+                continue;
+            }
+
+            // Get work order details (for factory and machine scope).
+            $workOrder = \App\Models\WorkOrder::find($startLog->work_order_id, ['id', 'machine_id', 'factory_id']);
+            if (! $workOrder || $workOrder->factory_id !== $this->factory->id) {
                 continue;
             }
 
@@ -1101,10 +1216,10 @@ class OperationalKPIService extends BaseKPIService
                 continue;
             }
 
-            $date = $assignedLog->changed_at->toDateString();
+            $date = $setupLog->changed_at->toDateString();
 
             // Initialize daily breakdown for this date
-            if (!isset($dailyBreakdown[$date])) {
+            if (! isset($dailyBreakdown[$date])) {
                 $dailyBreakdown[$date] = [
                     'date' => $date,
                     'total_setup_time' => 0,
@@ -1125,7 +1240,7 @@ class OperationalKPIService extends BaseKPIService
             $totalSetups += 1;
 
             // Initialize machine breakdown
-            if (!isset($machineBreakdown[$workOrder->machine_id])) {
+            if (! isset($machineBreakdown[$workOrder->machine_id])) {
                 $machine = \App\Models\Machine::find($workOrder->machine_id, ['id', 'name', 'assetId']);
                 $machineBreakdown[$workOrder->machine_id] = [
                     'machine_id' => $workOrder->machine_id,
@@ -1254,6 +1369,337 @@ class OperationalKPIService extends BaseKPIService
     }
 
     /**
+     * Get defect rate analytics with historical comparisons
+     */
+    public function getDefectRateAnalytics(array $options): array
+    {
+        $period = $options['time_period'] ?? 'yesterday';
+        $enableComparison = $options['enable_comparison'] ?? false;
+        $comparisonType = $options['comparison_type'] ?? 'previous_period';
+        $machineFilter = $options['machine_id'] ?? null;
+
+        $dateFrom = isset($options['date_from']) ? Carbon::parse($options['date_from']) : null;
+        $dateTo = isset($options['date_to']) ? Carbon::parse($options['date_to']) : null;
+
+        [$startDate, $endDate] = $this->getDateRange($period, $dateFrom, $dateTo);
+
+        $cacheKey = "defect_rate_analytics_{$period}_".md5(json_encode($options));
+        $cacheTTL = $this->getCacheTTL($period);
+
+        return $this->getCachedKPI($cacheKey, function () use ($startDate, $endDate, $enableComparison, $comparisonType, $machineFilter, $options) {
+            $primaryData = $this->fetchDefectRateDistribution($startDate, $endDate, $machineFilter);
+
+            $result = [
+                'primary_period' => [
+                    'start_date' => $startDate->toDateString(),
+                    'end_date' => $endDate->toDateString(),
+                    'label' => $this->getPeriodLabel($options['time_period'] ?? 'yesterday', $startDate, $endDate),
+                    'daily_breakdown' => $primaryData['daily'],
+                    'machine_breakdown' => $primaryData['by_machine'],
+                    'work_order_breakdown' => $primaryData['by_work_order'],
+                    'summary' => $primaryData['summary'],
+                ],
+            ];
+
+            if ($enableComparison) {
+                [$compStart, $compEnd] = $this->getComparisonDateRange($startDate, $endDate, $comparisonType);
+
+                $comparisonData = $this->fetchDefectRateDistribution($compStart, $compEnd, $machineFilter);
+
+                $result['comparison_period'] = [
+                    'start_date' => $compStart->toDateString(),
+                    'end_date' => $compEnd->toDateString(),
+                    'label' => $this->getPeriodLabel($comparisonType, $compStart, $compEnd),
+                    'daily_breakdown' => $comparisonData['daily'],
+                    'machine_breakdown' => $comparisonData['by_machine'],
+                    'work_order_breakdown' => $comparisonData['by_work_order'],
+                    'summary' => $comparisonData['summary'],
+                ];
+
+                $result['comparison_analysis'] = $this->calculateDefectRateComparison(
+                    $primaryData['summary'],
+                    $comparisonData['summary']
+                );
+            }
+
+            return $result;
+        }, $cacheTTL);
+    }
+
+    /**
+     * Aggregate defect rate metrics for the supplied window
+     */
+    protected function fetchDefectRateDistribution(Carbon $startDate, Carbon $endDate, ?int $machineFilter = null): array
+    {
+        $logs = \App\Models\WorkOrderLog::query()
+            ->whereBetween('changed_at', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
+            ->whereRaw('(ok_qtys + scrapped_qtys) > 0')
+            ->whereHas('workOrder', function ($query) use ($machineFilter) {
+                $query->where('factory_id', $this->factory->id);
+
+                if ($machineFilter) {
+                    $query->where('machine_id', $machineFilter);
+                }
+            })
+            ->with([
+                'workOrder:id,unique_id,machine_id,factory_id,start_time,ok_qtys,scrapped_qtys',
+                'workOrder.machine:id,name,assetId',
+            ])
+            ->orderBy('changed_at')
+            ->get();
+
+        $daily = [];
+        $dailyWorkOrders = [];
+        $machineBreakdown = [];
+        $workOrderTotals = [];
+        $totalScrap = 0;
+        $totalOk = 0;
+
+        foreach ($logs as $log) {
+            $workOrder = $log->workOrder;
+
+            if (! $workOrder || $workOrder->factory_id !== $this->factory->id) {
+                continue;
+            }
+
+            $scrap = max(0, (int) $log->scrapped_qtys);
+            $ok = max(0, (int) $log->ok_qtys);
+            $produced = $scrap + $ok;
+
+            if ($produced <= 0) {
+                continue;
+            }
+
+            $date = $log->changed_at->toDateString();
+
+            if (! isset($daily[$date])) {
+                $daily[$date] = [
+                    'date' => $date,
+                    'scrap_qty' => 0,
+                    'ok_qty' => 0,
+                    'produced_qty' => 0,
+                    'scrap_work_orders' => [],
+                ];
+            }
+
+            $daily[$date]['scrap_qty'] += $scrap;
+            $daily[$date]['ok_qty'] += $ok;
+            $daily[$date]['produced_qty'] += $produced;
+
+            if ($scrap > 0) {
+                $daily[$date]['scrap_work_orders'][$workOrder->id] = true;
+            }
+
+            if (! isset($dailyWorkOrders[$date][$workOrder->id])) {
+                $dailyWorkOrders[$date][$workOrder->id] = [
+                    'work_order_id' => $workOrder->id,
+                    'work_order_number' => $workOrder->unique_id ?? 'N/A',
+                    'machine_name' => $workOrder->machine?->name ?? 'Unknown',
+                    'machine_asset_id' => $workOrder->machine?->assetId,
+                    'scrap_qty' => 0,
+                    'ok_qty' => 0,
+                ];
+            }
+
+            $dailyWorkOrders[$date][$workOrder->id]['scrap_qty'] += $scrap;
+            $dailyWorkOrders[$date][$workOrder->id]['ok_qty'] += $ok;
+
+            $machineId = $workOrder->machine_id;
+
+            if (! isset($machineBreakdown[$machineId])) {
+                $machineBreakdown[$machineId] = [
+                    'machine_id' => $machineId,
+                    'machine_name' => $workOrder->machine?->name ?? 'Unknown',
+                    'asset_id' => $workOrder->machine?->assetId,
+                    'scrap_qty' => 0,
+                    'ok_qty' => 0,
+                    'produced_qty' => 0,
+                    'scrap_work_orders' => [],
+                ];
+            }
+
+            $machineBreakdown[$machineId]['scrap_qty'] += $scrap;
+            $machineBreakdown[$machineId]['ok_qty'] += $ok;
+            $machineBreakdown[$machineId]['produced_qty'] += $produced;
+
+            if ($scrap > 0) {
+                $machineBreakdown[$machineId]['scrap_work_orders'][$workOrder->id] = true;
+            }
+
+            if (! isset($workOrderTotals[$workOrder->id])) {
+                $workOrderTotals[$workOrder->id] = [
+                    'work_order_id' => $workOrder->id,
+                    'work_order_number' => $workOrder->unique_id ?? 'N/A',
+                    'machine_id' => $machineId,
+                    'machine_name' => $workOrder->machine?->name ?? 'Unknown',
+                    'machine_asset_id' => $workOrder->machine?->assetId,
+                    'scrap_qty' => 0,
+                    'ok_qty' => 0,
+                    'produced_qty' => 0,
+                    'last_scrap_at' => null,
+                ];
+            }
+
+            $workOrderTotals[$workOrder->id]['scrap_qty'] += $scrap;
+            $workOrderTotals[$workOrder->id]['ok_qty'] += $ok;
+            $workOrderTotals[$workOrder->id]['produced_qty'] += $produced;
+
+            if ($scrap > 0) {
+                $lastScrapAt = $workOrderTotals[$workOrder->id]['last_scrap_at'];
+
+                if (! $lastScrapAt || $log->changed_at->gt($lastScrapAt)) {
+                    $workOrderTotals[$workOrder->id]['last_scrap_at'] = $log->changed_at->copy();
+                }
+            }
+
+            $totalScrap += $scrap;
+            $totalOk += $ok;
+        }
+
+        ksort($daily);
+        $dailyBreakdown = [];
+
+        foreach ($daily as $date => $day) {
+            $produced = $day['produced_qty'];
+            $defectRate = $produced > 0 ? round(($day['scrap_qty'] / $produced) * 100, 2) : 0;
+            $defectiveWorkOrders = count($day['scrap_work_orders']);
+
+            $worst = null;
+
+            foreach ($dailyWorkOrders[$date] ?? [] as $wo) {
+                $woProduced = $wo['scrap_qty'] + $wo['ok_qty'];
+                $woRate = $woProduced > 0 ? round(($wo['scrap_qty'] / $woProduced) * 100, 2) : 0;
+
+                if (! $worst || $woRate > $worst['defect_rate'] || ($woRate === $worst['defect_rate'] && $wo['scrap_qty'] > $worst['scrap_qty'])) {
+                    $worst = [
+                        'work_order_id' => $wo['work_order_id'],
+                        'work_order_number' => $wo['work_order_number'],
+                        'machine_name' => $wo['machine_name'],
+                        'machine_asset_id' => $wo['machine_asset_id'],
+                        'defect_rate' => $woRate,
+                        'scrap_qty' => $wo['scrap_qty'],
+                    ];
+                }
+            }
+
+            $dailyBreakdown[] = [
+                'date' => $date,
+                'scrap_qty' => $day['scrap_qty'],
+                'ok_qty' => $day['ok_qty'],
+                'produced_qty' => $produced,
+                'defect_rate' => $defectRate,
+                'defective_work_orders' => $defectiveWorkOrders,
+                'worst_work_order' => $worst,
+            ];
+        }
+
+        foreach ($machineBreakdown as &$machine) {
+            $produced = $machine['produced_qty'];
+            $machine['defect_rate'] = $produced > 0 ? round(($machine['scrap_qty'] / $produced) * 100, 2) : 0;
+            $machine['defective_work_orders'] = count($machine['scrap_work_orders']);
+            unset($machine['scrap_work_orders']);
+        }
+        unset($machine);
+
+        usort($machineBreakdown, fn ($a, $b) => $b['scrap_qty'] <=> $a['scrap_qty']);
+        $machineBreakdown = array_values($machineBreakdown);
+
+        foreach ($workOrderTotals as &$wo) {
+            $produced = $wo['produced_qty'];
+            $wo['defect_rate'] = $produced > 0 ? round(($wo['scrap_qty'] / $produced) * 100, 2) : 0;
+            $wo['last_scrap_at'] = $wo['last_scrap_at'] ? $wo['last_scrap_at']->toDateTimeString() : null;
+        }
+        unset($wo);
+
+        usort($workOrderTotals, function ($a, $b) {
+            if ($b['defect_rate'] === $a['defect_rate']) {
+                return $b['scrap_qty'] <=> $a['scrap_qty'];
+            }
+
+            return $b['defect_rate'] <=> $a['defect_rate'];
+        });
+
+        $workOrderBreakdown = array_values($workOrderTotals);
+
+        $totalProduced = $totalScrap + $totalOk;
+        $avgDefectRate = $totalProduced > 0 ? round(($totalScrap / $totalProduced) * 100, 2) : 0;
+        $worstDefectRate = ! empty($workOrderBreakdown) ? ($workOrderBreakdown[0]['defect_rate'] ?? 0) : 0;
+        $workOrdersWithScrap = count(array_filter($workOrderBreakdown, fn ($wo) => $wo['scrap_qty'] > 0));
+        $machinesWithScrap = count(array_filter($machineBreakdown, fn ($machine) => $machine['scrap_qty'] > 0));
+
+        $summary = [
+            'total_scrap_qty' => $totalScrap,
+            'total_ok_qty' => $totalOk,
+            'total_produced_qty' => $totalProduced,
+            'avg_defect_rate' => $avgDefectRate,
+            'worst_defect_rate' => $worstDefectRate,
+            'work_orders_with_scrap' => $workOrdersWithScrap,
+            'machines_with_scrap' => $machinesWithScrap,
+            'days_analyzed' => count($dailyBreakdown),
+        ];
+
+        return [
+            'daily' => $dailyBreakdown,
+            'by_machine' => $machineBreakdown,
+            'by_work_order' => $workOrderBreakdown,
+            'summary' => $summary,
+        ];
+    }
+
+    /**
+     * Compare defect rate metrics between two periods
+     */
+    protected function calculateDefectRateComparison(array $current, array $previous): array
+    {
+        return [
+            'total_scrap_qty' => [
+                'current' => $current['total_scrap_qty'] ?? 0,
+                'previous' => $previous['total_scrap_qty'] ?? 0,
+                'difference' => ($current['total_scrap_qty'] ?? 0) - ($previous['total_scrap_qty'] ?? 0),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['total_scrap_qty'] ?? 0,
+                    $previous['total_scrap_qty'] ?? 0
+                ),
+                'trend' => ($current['total_scrap_qty'] ?? 0) > ($previous['total_scrap_qty'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['total_scrap_qty'] ?? 0) < ($previous['total_scrap_qty'] ?? 0) ? 'improved' : 'declined',
+            ],
+            'avg_defect_rate' => [
+                'current' => $current['avg_defect_rate'] ?? 0,
+                'previous' => $previous['avg_defect_rate'] ?? 0,
+                'difference' => round(($current['avg_defect_rate'] ?? 0) - ($previous['avg_defect_rate'] ?? 0), 2),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['avg_defect_rate'] ?? 0,
+                    $previous['avg_defect_rate'] ?? 0
+                ),
+                'trend' => ($current['avg_defect_rate'] ?? 0) > ($previous['avg_defect_rate'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['avg_defect_rate'] ?? 0) < ($previous['avg_defect_rate'] ?? 0) ? 'improved' : 'declined',
+            ],
+            'work_orders_with_scrap' => [
+                'current' => $current['work_orders_with_scrap'] ?? 0,
+                'previous' => $previous['work_orders_with_scrap'] ?? 0,
+                'difference' => ($current['work_orders_with_scrap'] ?? 0) - ($previous['work_orders_with_scrap'] ?? 0),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['work_orders_with_scrap'] ?? 0,
+                    $previous['work_orders_with_scrap'] ?? 0
+                ),
+                'trend' => ($current['work_orders_with_scrap'] ?? 0) > ($previous['work_orders_with_scrap'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['work_orders_with_scrap'] ?? 0) < ($previous['work_orders_with_scrap'] ?? 0) ? 'improved' : 'declined',
+            ],
+            'total_produced_qty' => [
+                'current' => $current['total_produced_qty'] ?? 0,
+                'previous' => $previous['total_produced_qty'] ?? 0,
+                'difference' => ($current['total_produced_qty'] ?? 0) - ($previous['total_produced_qty'] ?? 0),
+                'percentage_change' => $this->calculatePercentageChange(
+                    $current['total_produced_qty'] ?? 0,
+                    $previous['total_produced_qty'] ?? 0
+                ),
+                'trend' => ($current['total_produced_qty'] ?? 0) > ($previous['total_produced_qty'] ?? 0) ? 'up' : 'down',
+                'status' => ($current['total_produced_qty'] ?? 0) >= ($previous['total_produced_qty'] ?? 0) ? 'improved' : 'declined',
+            ],
+        ];
+    }
+
+    /**
      * Get all operational KPIs (implements abstract method)
      */
     public function getKPIs(array $options = []): array
@@ -1263,9 +1709,11 @@ class OperationalKPIService extends BaseKPIService
             'work_order_status' => $this->getWorkOrderStatusAnalytics($options),
             'machine_utilization' => $this->getMachineUtilizationAnalytics($options),
             'setup_time' => $this->getSetupTimeAnalytics($options),
+            'defect_rate' => $this->getDefectRateAnalytics($options),
             // Future: Add more Tier 2 KPIs here
             // 'production_throughput' => $this->getProductionThroughputAnalytics($options),
             // 'operator_performance' => $this->getOperatorPerformanceAnalytics($options),
         ];
     }
+
 }

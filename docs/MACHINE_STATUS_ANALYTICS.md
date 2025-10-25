@@ -674,46 +674,46 @@ Analytics Mode supports the following time periods:
 
 ### How Analytics Data is Updated
 
-**Important:** Machine Status Analytics data is **NOT pre-aggregated or updated in the background**. Instead, it uses an **on-demand calculation with caching** approach.
+**Important:** Machine Status Analytics data is now **pre-aggregated** via the `kpi:aggregate-daily` command. Each factory/day snapshot is persisted to `kpi_machine_status_daily`. Analytics reads from this table first and only falls back to live computation when a day has not yet been materialised (for example, “today” before the job runs or immediately after a forced refresh).
 
-### On-Demand Calculation (Current Implementation)
+### Pre-Aggregated Calculation (Current Implementation)
 
 When a user views Machine Status Analytics:
 
-1. **User Opens Analytics Mode** → Triggers `getMachineStatusAnalytics()` method
-2. **Cache Check** → System checks if data exists in cache
-3. **If Cached** → Returns cached data immediately (fast)
-4. **If Not Cached** → Queries `work_orders` table directly and calculates metrics
-5. **Store in Cache** → Saves results for subsequent requests
-6. **Return Data** → Displays analytics to user
+1. **User Opens Analytics Mode** → Triggers `getMachineStatusAnalytics()` method.
+2. **Cache Check** → System checks if the request is already cached.
+3. **If Cached** → Returns cached data immediately.
+4. **If Not Cached** → Loads rows from `kpi_machine_status_daily` for the requested range.
+5. **Fallback** → Missing dates are computed on demand (matching the legacy behaviour) and returned.
+6. **Store in Cache** → Saves results for subsequent requests.
 
 **Flow Diagram:**
 
 ```
 User Views Analytics
        ↓
-Check Cache (TenantKPICache)
+Check Cache (TenantKPICache tier_2)
        ↓
-   Cached? ─── Yes ──→ Return Cached Data (Fast!) ✓
+   Cached? ── Yes ──→ Return Cached Data ✓
        ↓
       No
        ↓
-Query work_orders table directly
+Load kpi_machine_status_daily rows
        ↓
-Loop through each day in date range
-       ↓
-Calculate machine status distribution
+Fallback? ── Any missing dates ──→ Compute from work_orders (legacy path)
        ↓
 Build summary statistics
        ↓
 Store in cache (with TTL)
        ↓
-Return fresh data to user
+Return data to user
 ```
 
 ### Cache Implementation
 
 **Cache Store:** Custom `kpi_cache` store (separate from default Laravel cache)
+
+**Persistence Table:** `kpi_machine_status_daily` (populated by `kpi:aggregate-daily`)
 
 **Cache Class:** `App\Support\TenantKPICache`
 

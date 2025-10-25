@@ -73,7 +73,7 @@
                     <div>
                         <h3 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Factory Analytics</h3>
                         <p class="text-sm text-gray-600 dark:text-gray-400">
-                            Showing KPIs for <span class="font-medium text-blue-600 dark:text-blue-400">{{ $currentFactory->name }}</span> 
+                            Showing KPIs for <span class="font-medium text-blue-600 dark:text-blue-400">{{ $currentFactory->name }}</span>
                             from <span class="font-medium">{{ $this->getDateRangeLabel() }}</span>
                         </p>
                     </div>
@@ -92,7 +92,7 @@
                         <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white leading-tight">Work Order Completion Rate</h3>
                         <div class="w-3 h-3 rounded-full {{ $this->getStatusColor($kpis['work_order_completion_rate']['status']) }} flex-shrink-0"></div>
                     </div>
-                    
+
                     {{-- Main Value --}}
                     <div class="flex items-baseline mb-2 flex-wrap">
                         <span class="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">{{ $kpis['work_order_completion_rate']['rate'] }}%</span>
@@ -102,12 +102,12 @@
                             </span>
                         @endif
                     </div>
-                    
+
                     {{-- Details --}}
                     <div class="text-sm text-gray-600 dark:text-gray-400 mb-3">
                         {{ $kpis['work_order_completion_rate']['completed_orders'] }} of {{ $kpis['work_order_completion_rate']['total_orders'] }} orders completed
                     </div>
-                    
+
                     {{-- Status Text --}}
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-1 sm:space-y-0">
                         <span class="text-sm font-medium {{ $this->getTrendColor($kpis['work_order_completion_rate']['trend']) }}">
@@ -120,7 +120,7 @@
 
             {{-- Net Production Throughput (Efficiency Oriented) 1 - Real KPI --}}
             @if(isset($kpis['quality_rate']))
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 hover:shadow-md dark:hover:shadow-lg hover:shadow-gray-200 dark:hover:shadow-gray-900/50 transition-shadow cursor-pointer"
+                <div class="bg  -white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 hover:shadow-md dark:hover:shadow-lg hover:shadow-gray-200 dark:hover:shadow-gray-900/50 transition-shadow cursor-pointer"
                      wire:click="viewKPIDetails('quality_rate')">
                     {{-- Status Indicator --}}
                     <div class="flex items-center justify-between mb-3 sm:mb-4">
@@ -204,24 +204,24 @@
                         <div class="absolute top-2 sm:top-3 right-2 sm:right-3 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 text-xs font-medium px-2 py-1 rounded-full">
                             Coming Soon
                         </div>
-                        
+
                         {{-- Header --}}
                         <div class="flex items-center justify-between mb-3 sm:mb-4 pr-16 sm:pr-20">
                             <h3 class="text-base sm:text-lg font-semibold text-gray-500 dark:text-gray-400 leading-tight">{{ $kpis[$kpiKey]['name'] }}</h3>
                             <div class="w-3 h-3 rounded-full bg-gray-300 dark:bg-gray-600 flex-shrink-0"></div>
                         </div>
-                        
+
                         {{-- Placeholder Value --}}
                         <div class="flex items-baseline mb-2">
                             <span class="text-2xl sm:text-3xl font-bold text-gray-400 dark:text-gray-500">--</span>
                             <span class="ml-1 text-base sm:text-lg text-gray-400 dark:text-gray-500">{{ $kpis[$kpiKey]['unit'] }}</span>
                         </div>
-                        
+
                         {{-- Placeholder Details --}}
                         <div class="text-sm text-gray-400 dark:text-gray-500 mb-3">
                             Data will be available when implemented
                         </div>
-                        
+
                         {{-- Status --}}
                         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-1 sm:space-y-0">
                             <span class="text-sm font-medium text-gray-400 dark:text-gray-500">Pending Implementation</span>
@@ -275,31 +275,31 @@
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
             <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick Actions</h3>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                <button wire:click="exportKPIs" 
+                <button wire:click="exportKPIs"
                         class="flex items-center justify-center px-3 sm:px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
                     <svg class="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                     </svg>
                     <span class="truncate">Export Report</span>
                 </button>
-                
-                <button wire:click="viewKPIDetails('work_orders')" 
+
+                <button wire:click="viewKPIDetails('work_orders')"
                         class="flex items-center justify-center px-3 sm:px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
                     <svg class="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                     </svg>
                     <span class="truncate">View Work Orders</span>
                 </button>
-                
-                <button wire:click="viewKPIDetails('machines')" 
+
+                <button wire:click="viewKPIDetails('machines')"
                         class="flex items-center justify-center px-3 sm:px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
                     <svg class="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
                     </svg>
                     <span class="truncate">Machine Status</span>
                 </button>
-                
-                <button wire:click="viewKPIDetails('quality')" 
+
+                <button wire:click="viewKPIDetails('quality')"
                         class="flex items-center justify-center px-3 sm:px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors">
                     <svg class="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -311,7 +311,7 @@
     </div>
 
     {{-- Loading Overlay --}}
-    <div wire:loading.flex wire:target="loadKPIs,refreshDashboard" 
+    <div wire:loading.flex wire:target="loadKPIs,refreshDashboard"
          class="fixed inset-0 bg-gray-500 bg-opacity-50 dark:bg-gray-900 dark:bg-opacity-75 flex items-center justify-center z-50 p-4">
         <div class="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 flex items-center space-x-3 shadow-lg max-w-sm w-full">
             <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 dark:border-indigo-400 flex-shrink-0"></div>
@@ -374,11 +374,11 @@
         Livewire.on('notify', function (data) {
             // Fix: Handle data as array (Livewire passes it as array)
             const notification_data = Array.isArray(data) ? data[0] : data;
-            
+
             console.log('Notification data fixed:', notification_data);
             console.log('Type:', notification_data.type);
             console.log('Message:', notification_data.message);
-            
+
             // Only show notification if there's actually a message
             if (notification_data.message && notification_data.message.trim().length > 0) {
                 const notification = document.createElement('div');
@@ -386,7 +386,7 @@
                 notification.className = 'fixed top-4 right-4 p-4 rounded-md shadow-lg dark:shadow-xl z-50 text-white bg-blue-600 dark:bg-blue-500 border border-blue-700 dark:border-blue-400';
                 notification.textContent = notification_data.message;
                 document.body.appendChild(notification);
-                
+
                 setTimeout(() => {
                     notification.remove();
                 }, 3000);

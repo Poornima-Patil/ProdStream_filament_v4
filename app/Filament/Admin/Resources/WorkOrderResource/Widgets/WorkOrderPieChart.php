@@ -3,14 +3,12 @@
 namespace App\Filament\Admin\Resources\WorkOrderResource\Widgets;
 
 use App\Filament\Admin\Resources\WorkOrderResource\Pages\ListWorkOrders;
+use Filament\Facades\Filament;
 use Filament\Support\RawJs;
 use Filament\Widgets\ChartWidget;
 use Filament\Widgets\Concerns\InteractsWithPageTable;
-use Filament\Facades\Filament;
 
-class
-
-WorkOrderPieChart extends ChartWidget
+class WorkOrderPieChart extends ChartWidget
 {
     use InteractsWithPageTable;
 
@@ -22,7 +20,7 @@ WorkOrderPieChart extends ChartWidget
 
     protected function getData(): array
     {
-        $statuses = ['Assigned', 'Start', 'Hold', 'Completed', 'Closed'];
+        $statuses = ['Assigned', 'Setup', 'Start', 'Hold', 'Completed', 'Closed'];
         $counts = [];
         $statusColors = config('work_order_status');
         $isDark = Filament::getTheme() === 'dark';
@@ -30,6 +28,7 @@ WorkOrderPieChart extends ChartWidget
         $colors = $isDark && isset($statusColors['dark'])
             ? [
                 $statusColors['dark']['assigned'],
+                $statusColors['dark']['setup'],
                 $statusColors['dark']['start'],
                 $statusColors['dark']['hold'],
                 $statusColors['dark']['completed'],
@@ -37,6 +36,7 @@ WorkOrderPieChart extends ChartWidget
             ]
             : [
                 $statusColors['assigned'],
+                $statusColors['setup'],
                 $statusColors['start'],
                 $statusColors['hold'],
                 $statusColors['completed'],

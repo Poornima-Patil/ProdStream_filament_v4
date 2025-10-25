@@ -2,53 +2,48 @@
 
 namespace App\Filament\Admin\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\Select;
-use App\Models\PartNumber;
-use App\Models\Bom;
-use Closure;
-use Filament\Forms\Components\TextInput;
-use Exception;
-use Filament\Forms\Components\DateTimePicker;
-use Carbon\Carbon;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\Placeholder;
-use Illuminate\Support\HtmlString;
-use Illuminate\Support\Facades\Log;
-use Filament\Forms\Components\Repeater;
-use Filament\Schemas\Components\Grid;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\TrashedFilter;
-use Filament\Actions\ActionGroup;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
-use Filament\Actions\Action;
-use Filament\Forms\Components\Textarea;
-use Filament\Tables\Enums\RecordActionsPosition;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Admin\Resources\WorkOrderResource\Pages\ListWorkOrders;
 use App\Filament\Admin\Resources\WorkOrderResource\Pages\CreateWorkOrder;
 use App\Filament\Admin\Resources\WorkOrderResource\Pages\EditWorkOrder;
+use App\Filament\Admin\Resources\WorkOrderResource\Pages\ListWorkOrders;
 use App\Filament\Admin\Resources\WorkOrderResource\Pages\ViewWorkOrder;
-use App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderProgress;
 use App\Filament\Admin\Resources\WorkOrderResource\Widgets\SimpleWorkOrderGantt;
-use App\Filament\Admin\Resources\WorkOrderResource\Pages;
+use App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderProgress;
+use App\Models\Bom;
 use App\Models\InfoMessage;
 use App\Models\Machine;
 use App\Models\Operator;
+use App\Models\PartNumber;
 use App\Models\User;
 use App\Models\WorkOrder;
-use App\Models\WorkOrderDependency;
-use App\Models\WorkOrderBatch;
-use Filament\Forms;
+use Carbon\Carbon;
+use Closure;
+use Exception;
+use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\HtmlString;
 
 class WorkOrderResource extends Resource
 {
@@ -56,9 +51,9 @@ class WorkOrderResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-clipboard-document-list';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Process Operations';
+    protected static string|\UnitEnum|null $navigationGroup = 'Process Operations';
 
     public static function form(Schema $schema): Schema
     {
@@ -118,95 +113,93 @@ class WorkOrderResource extends Resource
                     ->searchable()
                     ->disabled(! $isAdminOrManager),
 
-            
+                // ...existing code...
+                Select::make('machine_id')
+                    ->label('Machine')
+                    ->options(function (callable $get) {
+                        $bomId = $get('bom_id');
+                        $user = Auth::user();
 
+                        if (! $bomId) {
+                            return [];
+                        }
 
-// ...existing code...
-Select::make('machine_id')
-    ->label('Machine')
-    ->options(function (callable $get) {
-        $bomId = $get('bom_id');
-        $user = Auth::user();
+                        $bom = Bom::find($bomId);
+                        $machineGroupId = $bom?->machine_group_id;
 
-        if (! $bomId) {
-            return [];
-        }
+                        // Fetch all active machines in the factory
+                        $allMachines = Machine::where('factory_id', $user->factory_id)
+                            ->active()
+                            ->get();
 
-        $bom = Bom::find($bomId);
-        $machineGroupId = $bom?->machine_group_id;
+                        // Mark machines in the group as green, others as red
+                        return $allMachines->mapWithKeys(function ($machine) use ($machineGroupId) {
+                            $inGroup = $machine->machine_group_id == $machineGroupId;
+                            $color = $inGroup ? '🟢' : '🔴';
+                            $label = "{$color} Asset ID: {$machine->assetId} - Name: {$machine->name}";
 
-        // Fetch all active machines in the factory
-        $allMachines = Machine::where('factory_id', $user->factory_id)
-            ->active()
-            ->get();
+                            return [(int) $machine->id => $label];
+                        })->toArray();
+                    })
+                    ->reactive()
+                    ->required()
+                    ->searchable()
+                    ->disabled(! $isAdminOrManager)
+                    ->helperText(function (callable $get) {
+                        $machineId = $get('machine_id');
+                        $bomId = $get('bom_id');
+                        if ($machineId && $bomId) {
+                            $bom = Bom::find($bomId);
+                            $machine = Machine::find($machineId);
+                            if ($bom && $machine && $machine->machine_group_id != $bom->machine_group_id) {
+                                return '⚠️ This Machine is not as per BOM Specifications.';
+                            }
+                        }
 
-        // Mark machines in the group as green, others as red
-        return $allMachines->mapWithKeys(function ($machine) use ($machineGroupId) {
-            $inGroup = $machine->machine_group_id == $machineGroupId;
-            $color = $inGroup ? '🟢' : '🔴';
-            $label = "{$color} Asset ID: {$machine->assetId} - Name: {$machine->name}";
-            return [(int) $machine->id => $label];
-        })->toArray();
-    })
-    ->reactive()
-    ->required()
-    ->searchable()
-    ->disabled(! $isAdminOrManager)
-    ->helperText(function (callable $get) {
-        $machineId = $get('machine_id');
-        $bomId = $get('bom_id');
-        if ($machineId && $bomId) {
-            $bom = Bom::find($bomId);
-            $machine = Machine::find($machineId);
-            if ($bom && $machine && $machine->machine_group_id != $bom->machine_group_id) {
-                return "⚠️ This Machine is not as per BOM Specifications.";
-            }
-        }
-        return null;
-    })
-    ->rules([
-        function (callable $get) {
-            return function (string $attribute, $value, Closure $fail) use ($get) {
-                $bomId = $get('bom_id');
-                if ($bomId && $value) {
-                    $bom = Bom::find($bomId);
-                    $machine = Machine::find($value);
-                    if ($bom && $machine && $machine->machine_group_id != $bom->machine_group_id) {
-                        $fail('This Machine is not as per BOM Specifications.');
-                    }
-                }
-                // ...existing validation logic for scheduling...
-                $startTime = $get('start_time');
-                $endTime = $get('end_time');
-                if ($value && $startTime && $endTime) {
-                    $errorMessage = self::getSchedulingValidationError($get, $value, $startTime, $endTime);
-                    if ($errorMessage) {
-                        $fail($errorMessage);
-                    }
-                }
-            };
-        },
-    ])
-    ->afterStateUpdated(function (callable $get, callable $set, $state) {
-        // Show warning if machine is not as per BOM
-        $bomId = $get('bom_id');
-        if ($bomId && $state) {
-            $bom = Bom::find($bomId);
-            $machine = Machine::find($state);
-            if ($bom && $machine && $machine->machine_group_id != $bom->machine_group_id) {
-                Notification::make()
-                    ->title('Warning')
-                    ->body('This Machine is not as per BOM Specifications.')
-                    ->warning()
-                    ->send();
-            }
-        }
-        // Only validate if all required fields are filled and this is not the initial load
-        if ($state && $get('start_time') && $get('end_time')) {
-            self::validateMachineScheduling($get, $set);
-        }
-    }),
- 
+                        return null;
+                    })
+                    ->rules([
+                        function (callable $get) {
+                            return function (string $attribute, $value, Closure $fail) use ($get) {
+                                $bomId = $get('bom_id');
+                                if ($bomId && $value) {
+                                    $bom = Bom::find($bomId);
+                                    $machine = Machine::find($value);
+                                    if ($bom && $machine && $machine->machine_group_id != $bom->machine_group_id) {
+                                        $fail('This Machine is not as per BOM Specifications.');
+                                    }
+                                }
+                                // ...existing validation logic for scheduling...
+                                $startTime = $get('start_time');
+                                $endTime = $get('end_time');
+                                if ($value && $startTime && $endTime) {
+                                    $errorMessage = self::getSchedulingValidationError($get, $value, $startTime, $endTime);
+                                    if ($errorMessage) {
+                                        $fail($errorMessage);
+                                    }
+                                }
+                            };
+                        },
+                    ])
+                    ->afterStateUpdated(function (callable $get, callable $set, $state) {
+                        // Show warning if machine is not as per BOM
+                        $bomId = $get('bom_id');
+                        if ($bomId && $state) {
+                            $bom = Bom::find($bomId);
+                            $machine = Machine::find($state);
+                            if ($bom && $machine && $machine->machine_group_id != $bom->machine_group_id) {
+                                Notification::make()
+                                    ->title('Warning')
+                                    ->body('This Machine is not as per BOM Specifications.')
+                                    ->warning()
+                                    ->send();
+                            }
+                        }
+                        // Only validate if all required fields are filled and this is not the initial load
+                        if ($state && $get('start_time') && $get('end_time')) {
+                            self::validateMachineScheduling($get, $set);
+                        }
+                    }),
 
                 TextInput::make('qty')
                     ->label('Quantity')
@@ -259,122 +252,123 @@ Select::make('machine_id')
                         $totalSeconds = $cycleTimeInSeconds * $qty;
                         $set('time_to_complete', self::convertSecondsToTime($totalSeconds));
                     }),
-Select::make('operator_id')
-    ->label('Operator')
-    ->disabled(! $isAdminOrManager)
-    ->options(function (callable $get) {
-        $bomId = $get('bom_id'); // Get selected BOM ID
+                Select::make('operator_id')
+                    ->label('Operator')
+                    ->disabled(! $isAdminOrManager)
+                    ->options(function (callable $get) {
+                        $bomId = $get('bom_id'); // Get selected BOM ID
 
-        if (! $bomId) {
-            return []; // No BOM selected, return empty options
-        }
+                        if (! $bomId) {
+                            return []; // No BOM selected, return empty options
+                        }
 
-        // Get the operator proficiency ID from the BOM's linked Purchase Order
-        $operatorProficiencyId = Bom::find($bomId)->operator_proficiency_id;
+                        // Get the operator proficiency ID from the BOM's linked Purchase Order
+                        $operatorProficiencyId = Bom::find($bomId)->operator_proficiency_id;
 
-        // Get all operators for the factory
-        $factoryId = Auth::user()->factory_id; // Get the logged-in user's factory_id
+                        // Get all operators for the factory
+                        $factoryId = Auth::user()->factory_id; // Get the logged-in user's factory_id
 
-        return Operator::where('factory_id', $factoryId)
-            ->with(['user', 'shift'])
-            ->get()
-            ->mapWithKeys(function ($operator) use ($operatorProficiencyId) {
-                $shiftInfo = $operator->shift
-                    ? " ({$operator->shift->name}: {$operator->shift->start_time}-{$operator->shift->end_time})"
-                    : '';
-                $isMatch = $operator->operator_proficiency_id == $operatorProficiencyId;
-                $color = $isMatch ? '🟢' : '🔴';
-                $label = "{$color} {$operator->user->first_name} {$operator->user->last_name}{$shiftInfo}";
-                return [$operator->id => $label];
-            });
-    })
-    ->searchable()
-    ->required()
-    ->reactive()
-    ->helperText(function (callable $get) {
-        $operatorId = $get('operator_id');
-        $bomId = $get('bom_id');
-        if ($operatorId && $bomId) {
-            $bom = Bom::find($bomId);
-            $operator = Operator::find($operatorId);
-            if ($bom && $operator && $operator->operator_proficiency_id != $bom->operator_proficiency_id) {
-                return "⚠️ The Operator's Profiency does not match with the BOM specifications.";
-            }
-        }
-        // ...existing helperText logic for shift conflicts...
-        $startTime = $get('start_time');
-        $endTime = $get('end_time');
-        $factoryId = Auth::user()->factory_id ?? null;
+                        return Operator::where('factory_id', $factoryId)
+                            ->with(['user', 'shift'])
+                            ->get()
+                            ->mapWithKeys(function ($operator) use ($operatorProficiencyId) {
+                                $shiftInfo = $operator->shift
+                                    ? " ({$operator->shift->name}: {$operator->shift->start_time}-{$operator->shift->end_time})"
+                                    : '';
+                                $isMatch = $operator->operator_proficiency_id == $operatorProficiencyId;
+                                $color = $isMatch ? '🟢' : '🔴';
+                                $label = "{$color} {$operator->user->first_name} {$operator->user->last_name}{$shiftInfo}";
 
-        if (! $operatorId || ! $startTime || ! $endTime || ! $factoryId) {
-            return null;
-        }
+                                return [$operator->id => $label];
+                            });
+                    })
+                    ->searchable()
+                    ->required()
+                    ->reactive()
+                    ->helperText(function (callable $get) {
+                        $operatorId = $get('operator_id');
+                        $bomId = $get('bom_id');
+                        if ($operatorId && $bomId) {
+                            $bom = Bom::find($bomId);
+                            $operator = Operator::find($operatorId);
+                            if ($bom && $operator && $operator->operator_proficiency_id != $bom->operator_proficiency_id) {
+                                return "⚠️ The Operator's Profiency does not match with the BOM specifications.";
+                            }
+                        }
+                        // ...existing helperText logic for shift conflicts...
+                        $startTime = $get('start_time');
+                        $endTime = $get('end_time');
+                        $factoryId = Auth::user()->factory_id ?? null;
 
-        try {
-            $validation = WorkOrder::validateScheduling([
-                'machine_id' => $get('machine_id'),
-                'operator_id' => $operatorId,
-                'factory_id' => $factoryId,
-                'start_time' => $startTime,
-                'end_time' => $endTime,
-                'status' => $get('status'),
-                'id' => $get('id'),
-            ]);
+                        if (! $operatorId || ! $startTime || ! $endTime || ! $factoryId) {
+                            return null;
+                        }
 
-            // Check for shift conflicts and show prominent warning
-            if (! empty($validation['shift_conflicts'])) {
-                $shiftConflict = $validation['shift_conflicts'][0];
+                        try {
+                            $validation = WorkOrder::validateScheduling([
+                                'machine_id' => $get('machine_id'),
+                                'operator_id' => $operatorId,
+                                'factory_id' => $factoryId,
+                                'start_time' => $startTime,
+                                'end_time' => $endTime,
+                                'status' => $get('status'),
+                                'id' => $get('id'),
+                            ]);
 
-                return '⚠️ SHIFT CONFLICT: '.$shiftConflict['message'];
-            }
-        } catch (Exception $e) {
-            return null;
-        }
+                            // Check for shift conflicts and show prominent warning
+                            if (! empty($validation['shift_conflicts'])) {
+                                $shiftConflict = $validation['shift_conflicts'][0];
 
-        return null;
-    })
-    ->rules([
-        function (callable $get) {
-            return function (string $attribute, $value, Closure $fail) use ($get) {
-                $bomId = $get('bom_id');
-                if ($bomId && $value) {
-                    $bom = Bom::find($bomId);
-                    $operator = Operator::find($value);
-                    if ($bom && $operator && $operator->operator_proficiency_id != $bom->operator_proficiency_id) {
-                        $fail("The Operator's Profiency does not match with the BOM specifications.");
-                    }
-                }
-                $startTime = $get('start_time');
-                $endTime = $get('end_time');
+                                return '⚠️ SHIFT CONFLICT: '.$shiftConflict['message'];
+                            }
+                        } catch (Exception $e) {
+                            return null;
+                        }
 
-                if ($value && $startTime && $endTime) {
-                    $errorMessage = self::getOperatorSchedulingValidationError($get, $value, $startTime, $endTime);
-                    if ($errorMessage) {
-                        $fail($errorMessage);
-                    }
-                }
-            };
-        },
-    ])
-    ->afterStateUpdated(function (callable $get, callable $set, $state) {
-        // Only show warning if proficiency does not match
-        $bomId = $get('bom_id');
-        if ($bomId && $state) {
-            $bom = Bom::find($bomId);
-            $operator = Operator::find($state);
-            if ($bom && $operator && $operator->operator_proficiency_id != $bom->operator_proficiency_id) {
-                Notification::make()
-                    ->title('Warning')
-                    ->body("The Operator's Profiency does not match with the BOM specifications.")
-                    ->warning()
-                    ->send();
-            }
-        }
-        // Only validate if all required fields are filled and this is not the initial load
-        if ($state && $get('start_time') && $get('end_time')) {
-            self::validateOperatorScheduling($get, $set);
-        }
-    }),  
+                        return null;
+                    })
+                    ->rules([
+                        function (callable $get) {
+                            return function (string $attribute, $value, Closure $fail) use ($get) {
+                                $bomId = $get('bom_id');
+                                if ($bomId && $value) {
+                                    $bom = Bom::find($bomId);
+                                    $operator = Operator::find($value);
+                                    if ($bom && $operator && $operator->operator_proficiency_id != $bom->operator_proficiency_id) {
+                                        $fail("The Operator's Profiency does not match with the BOM specifications.");
+                                    }
+                                }
+                                $startTime = $get('start_time');
+                                $endTime = $get('end_time');
+
+                                if ($value && $startTime && $endTime) {
+                                    $errorMessage = self::getOperatorSchedulingValidationError($get, $value, $startTime, $endTime);
+                                    if ($errorMessage) {
+                                        $fail($errorMessage);
+                                    }
+                                }
+                            };
+                        },
+                    ])
+                    ->afterStateUpdated(function (callable $get, callable $set, $state) {
+                        // Only show warning if proficiency does not match
+                        $bomId = $get('bom_id');
+                        if ($bomId && $state) {
+                            $bom = Bom::find($bomId);
+                            $operator = Operator::find($state);
+                            if ($bom && $operator && $operator->operator_proficiency_id != $bom->operator_proficiency_id) {
+                                Notification::make()
+                                    ->title('Warning')
+                                    ->body("The Operator's Profiency does not match with the BOM specifications.")
+                                    ->warning()
+                                    ->send();
+                            }
+                        }
+                        // Only validate if all required fields are filled and this is not the initial load
+                        if ($state && $get('start_time') && $get('end_time')) {
+                            self::validateOperatorScheduling($get, $set);
+                        }
+                    }),
                 TextInput::make('time_to_complete')
                     ->label('Approx time required')
                     ->hint('Time is calculated based on the cycle time provided in the Part number')
@@ -424,13 +418,13 @@ Select::make('operator_id')
                     ->required()
                     ->disabled(! $isAdminOrManager)
                     ->label('Planned Start Time')
-                    ->minDate(fn (string $operation): ?\Carbon\Carbon => $operation === 'create' ? now()->startOfDay() : null) 
+                    ->minDate(fn (string $operation): ?\Carbon\Carbon => $operation === 'create' ? now()->startOfDay() : null)
                     ->seconds(false) // Cleaner UI without seconds
                     ->native(false) // Better custom picker
                     ->displayFormat('d M Y, H:i') // "21 Jul 2025, 14:30"
                     ->timezone('Asia/Kolkata')
                     ->live(onBlur: true)
-                    
+
                     ->rules([
                         function (callable $get) {
                             return function (string $attribute, $value, Closure $fail) use ($get) {
@@ -454,7 +448,7 @@ Select::make('operator_id')
                     }),
                 DateTimePicker::make('end_time')
                     ->label('Planned End Time')
-                    ->minDate(fn (string $operation): ?\Carbon\Carbon => $operation === 'create' ? now()->startOfDay() : null) 
+                    ->minDate(fn (string $operation): ?\Carbon\Carbon => $operation === 'create' ? now()->startOfDay() : null)
                     ->disabled(! $isAdminOrManager)
                     ->seconds(false) // Cleaner UI without seconds
                     ->native(false) // Better custom picker
@@ -968,14 +962,14 @@ Select::make('operator_id')
                         Placeholder::make('batch_status')
                             ->label('Current Batch Status')
                             ->content(function ($record) {
-                                if (!$record || !$record->usesBatchSystem()) {
+                                if (! $record || ! $record->usesBatchSystem()) {
                                     return new HtmlString('<div class="text-gray-500 italic">Individual work order - no batch system</div>');
                                 }
 
                                 $currentBatch = $record->getCurrentBatch();
                                 $batchProgress = $record->getBatchProgress();
 
-                                if (!$currentBatch) {
+                                if (! $currentBatch) {
                                     return new HtmlString(
                                         '<div class="bg-blue-50 border border-blue-200 rounded-lg p-3">'.
                                             '<div class="flex items-center text-blue-800 font-semibold mb-2">'.
@@ -1025,7 +1019,7 @@ Select::make('operator_id')
                         Placeholder::make('key_status')
                             ->label('Key Requirements & Availability')
                             ->content(function ($record) {
-                                if (!$record || !$record->usesBatchSystem()) {
+                                if (! $record || ! $record->usesBatchSystem()) {
                                     return new HtmlString('<div class="text-gray-500 italic">No key system for individual work orders</div>');
                                 }
 
@@ -1072,7 +1066,7 @@ Select::make('operator_id')
                                         $content .= '<span class="text-gray-600">Latest Key:</span> '.htmlspecialchars($keyInfo['available_keys'][0]['key_code']).' ('.htmlspecialchars($keyInfo['available_keys'][0]['quantity_produced']).' units)<br>';
                                     }
 
-                                    if (!$keyInfo['is_satisfied']) {
+                                    if (! $keyInfo['is_satisfied']) {
                                         $content .= '<span class="text-gray-600 italic">Wait for '.htmlspecialchars($keyInfo['predecessor_name']).' to complete batches</span><br>';
                                     }
 
@@ -1105,6 +1099,7 @@ Select::make('operator_id')
                         // Default options for non-operators
                         return [
                             'Assigned' => 'Assigned',
+                            'Setup' => 'Setup',
                             'Start' => 'Start',
                             'Hold' => 'Hold',
                             'Completed' => 'Completed',
@@ -1112,7 +1107,7 @@ Select::make('operator_id')
                         ];
                     })
                     ->disabled(function ($record) {
-                        if (!$record || !$record->usesBatchSystem()) {
+                        if (! $record || ! $record->usesBatchSystem()) {
                             return false; // Individual work orders - allow status changes
                         }
 
@@ -1120,18 +1115,18 @@ Select::make('operator_id')
                         $currentBatch = $record->getCurrentBatch();
 
                         // Disable if no active batch in progress (applies to ALL users including Super Admin)
-                        return !$currentBatch || $currentBatch->status !== 'in_progress';
+                        return ! $currentBatch || $currentBatch->status !== 'in_progress';
                     })
                     ->rules([
                         function (callable $get) {
                             return function (string $attribute, $value, Closure $fail) use ($get) {
                                 $recordId = $get('id');
-                                if (!$recordId) {
+                                if (! $recordId) {
                                     return; // Skip validation for new records
                                 }
 
                                 $record = WorkOrder::find($recordId);
-                                if (!$record) {
+                                if (! $record) {
                                     return;
                                 }
 
@@ -1139,16 +1134,16 @@ Select::make('operator_id')
                                 if ($record->usesBatchSystem()) {
                                     $canChange = $record->canOperatorChangeStatus($value);
 
-                                    if (!$canChange['can_change']) {
+                                    if (! $canChange['can_change']) {
                                         $message = $canChange['reason'];
 
                                         if ($canChange['required_action'] === 'start_new_batch') {
                                             $message .= '. Use the "Start New Batch" action button instead.';
                                         } elseif ($canChange['required_action'] === 'wait_for_keys') {
                                             $keysInfo = $record->getRequiredKeysInfo();
-                                            $missingFromWOs = array_filter($keysInfo, fn($info) => !$info['is_satisfied']);
-                                            $woNames = array_map(fn($info) => $info['predecessor_name'], $missingFromWOs);
-                                            $message .= '. Wait for these work orders to complete batches: ' . implode(', ', $woNames);
+                                            $missingFromWOs = array_filter($keysInfo, fn ($info) => ! $info['is_satisfied']);
+                                            $woNames = array_map(fn ($info) => $info['predecessor_name'], $missingFromWOs);
+                                            $message .= '. Wait for these work orders to complete batches: '.implode(', ', $woNames);
                                         }
 
                                         $fail($message);
@@ -1172,17 +1167,17 @@ Select::make('operator_id')
                         },
                     ])
                     ->helperText(function ($record) {
-                        if (!$record || !$record->usesBatchSystem()) {
+                        if (! $record || ! $record->usesBatchSystem()) {
                             return null;
                         }
 
                         $currentBatch = $record->getCurrentBatch();
-                        if (!$currentBatch) {
+                        if (! $currentBatch) {
                             return '🎯 Grouped work order: Use "Start New Batch" action to begin production';
                         }
 
                         if ($currentBatch->status === 'in_progress') {
-                            return '⚡ Batch #' . $currentBatch->batch_number . ' is in progress - you can change status';
+                            return '⚡ Batch #'.$currentBatch->batch_number.' is in progress - you can change status';
                         }
 
                         return '📋 No active batch - start a new batch to enable status changes';
@@ -1210,7 +1205,6 @@ Select::make('operator_id')
                             self::validateMachineScheduling($get, $set);
                         }
                     }),
-
 
                 TextInput::make('material_batch')
                     ->label('Material Batch ID')
@@ -1268,7 +1262,7 @@ Select::make('operator_id')
                             ->collapsible()
                             ->itemLabel(
                                 fn (array $state): ?string => ($state['ok_quantity'] ?? 0) > 0 || ($state['scrapped_quantity'] ?? 0) > 0
-                                    ? "OK: " . ($state['ok_quantity'] ?? 0) . ", Scrapped: " . ($state['scrapped_quantity'] ?? 0)
+                                    ? 'OK: '.($state['ok_quantity'] ?? 0).', Scrapped: '.($state['scrapped_quantity'] ?? 0)
                                     : null
                             )
                             ->live()
@@ -1422,6 +1416,7 @@ Select::make('operator_id')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'Assigned' => 'gray',
+                        'Setup' => 'primary',
                         'Start' => 'warning',
                         'Hold' => 'danger',
                         'Completed' => 'success',
@@ -1518,11 +1513,11 @@ Select::make('operator_id')
                     // Batch Management Actions
                     Action::make('start_batch')
                         ->label(function (WorkOrder $record) {
-                            if (!$record->usesBatchSystem()) {
+                            if (! $record->usesBatchSystem()) {
                                 return 'Start New Batch';
                             }
 
-                            if (!$record->is_dependency_root && !$record->hasRequiredKeys()) {
+                            if (! $record->is_dependency_root && ! $record->hasRequiredKeys()) {
                                 return 'Start New Batch (Keys Required)';
                             }
 
@@ -1535,11 +1530,11 @@ Select::make('operator_id')
                         })
                         ->icon('heroicon-o-play')
                         ->color(function (WorkOrder $record) {
-                            if (!$record->usesBatchSystem()) {
+                            if (! $record->usesBatchSystem()) {
                                 return 'success';
                             }
 
-                            if (!$record->is_dependency_root && !$record->hasRequiredKeys()) {
+                            if (! $record->is_dependency_root && ! $record->hasRequiredKeys()) {
                                 return 'warning'; // Yellow for waiting on keys
                             }
 
@@ -1558,7 +1553,7 @@ Select::make('operator_id')
                             }
 
                             // Disable if keys are required but not available
-                            if (!$record->is_dependency_root && !$record->hasRequiredKeys()) {
+                            if (! $record->is_dependency_root && ! $record->hasRequiredKeys()) {
                                 return true;
                             }
 
@@ -1566,7 +1561,7 @@ Select::make('operator_id')
                         })
                         ->visible(function (WorkOrder $record) {
                             // Only show for WorkOrders that use batch system
-                            if (!$record->usesBatchSystem()) {
+                            if (! $record->usesBatchSystem()) {
                                 return false;
                             }
 
@@ -1574,21 +1569,21 @@ Select::make('operator_id')
                             return $record->work_order_group_id !== null;
                         })
                         ->tooltip(function (WorkOrder $record) {
-                            if (!$record->usesBatchSystem()) {
+                            if (! $record->usesBatchSystem()) {
                                 return null;
                             }
 
                             $currentBatch = $record->getCurrentBatch();
                             if ($currentBatch && $currentBatch->status === 'in_progress') {
-                                return 'Complete current batch #' . $currentBatch->batch_number . ' before starting a new one';
+                                return 'Complete current batch #'.$currentBatch->batch_number.' before starting a new one';
                             }
 
-                            if (!$record->is_dependency_root && !$record->hasRequiredKeys()) {
+                            if (! $record->is_dependency_root && ! $record->hasRequiredKeys()) {
                                 $keysInfo = $record->getRequiredKeysInfo();
-                                $missingFromWOs = array_filter($keysInfo, fn($info) => !$info['is_satisfied']);
-                                $woNames = array_map(fn($info) => $info['predecessor_name'], $missingFromWOs);
+                                $missingFromWOs = array_filter($keysInfo, fn ($info) => ! $info['is_satisfied']);
+                                $woNames = array_map(fn ($info) => $info['predecessor_name'], $missingFromWOs);
 
-                                return 'Waiting for keys from: ' . implode(', ', $woNames);
+                                return 'Waiting for keys from: '.implode(', ', $woNames);
                             }
 
                             if ($record->is_dependency_root) {
@@ -1608,7 +1603,7 @@ Select::make('operator_id')
                             ];
 
                             // For non-root work orders, add key selection
-                            if (!$record->is_dependency_root) {
+                            if (! $record->is_dependency_root) {
                                 $dependencies = \App\Models\WorkOrderDependency::where('successor_work_order_id', $record->id)
                                     ->where('work_order_group_id', $record->work_order_group_id)
                                     ->with('predecessor')
@@ -1618,17 +1613,18 @@ Select::make('operator_id')
                                     $availableKeys = $dependency->predecessor->getAvailableKeys();
 
                                     if ($availableKeys->isEmpty()) {
-                                        $formFields[] = \Filament\Forms\Components\Placeholder::make('no_keys_' . $dependency->predecessor_work_order_id)
-                                            ->label('Required Keys from ' . $dependency->predecessor->unique_id)
-                                            ->content('❌ No keys available from ' . $dependency->predecessor->unique_id . '. Complete predecessor work orders first to generate keys.');
+                                        $formFields[] = \Filament\Forms\Components\Placeholder::make('no_keys_'.$dependency->predecessor_work_order_id)
+                                            ->label('Required Keys from '.$dependency->predecessor->unique_id)
+                                            ->content('❌ No keys available from '.$dependency->predecessor->unique_id.'. Complete predecessor work orders first to generate keys.');
                                     } else {
-                                        $formFields[] = Select::make('selected_keys.' . $dependency->predecessor_work_order_id)
-                                            ->label('Select Key from ' . $dependency->predecessor->unique_id)
+                                        $formFields[] = Select::make('selected_keys.'.$dependency->predecessor_work_order_id)
+                                            ->label('Select Key from '.$dependency->predecessor->unique_id)
                                             ->options(function () use ($dependency) {
                                                 // Always fetch fresh available keys to prevent stale data
                                                 $freshAvailableKeys = $dependency->predecessor->fresh()->getAvailableKeys();
+
                                                 return $freshAvailableKeys->mapWithKeys(function ($key) {
-                                                    return [$key->id => $key->key_code . ' (' . $key->quantity_produced . ' units) - Available'];
+                                                    return [$key->id => $key->key_code.' ('.$key->quantity_produced.' units) - Available'];
                                                 });
                                             })
                                             ->required()
@@ -1647,7 +1643,7 @@ Select::make('operator_id')
                                 $keysRequired = [];
                                 $selectedKeys = [];
 
-                                if (!$record->is_dependency_root) {
+                                if (! $record->is_dependency_root) {
                                     $dependencies = \App\Models\WorkOrderDependency::where('successor_work_order_id', $record->id)
                                         ->where('work_order_group_id', $record->work_order_group_id)
                                         ->with('predecessor')
@@ -1658,7 +1654,7 @@ Select::make('operator_id')
                                             'work_order_id' => $dependency->predecessor_work_order_id,
                                             'dependency_type' => $dependency->dependency_type,
                                             'quantity_needed' => 1, // One key per batch
-                                            'work_order_name' => $dependency->predecessor->unique_id
+                                            'work_order_name' => $dependency->predecessor->unique_id,
                                         ];
 
                                         // Get selected key for this dependency
@@ -1670,8 +1666,8 @@ Select::make('operator_id')
                                     // Validate that keys are available and not already consumed
                                     foreach ($selectedKeys as $keyId) {
                                         $key = \App\Models\WorkOrderBatchKey::find($keyId);
-                                        if (!$key || !$key->isAvailable()) {
-                                            throw new \Exception("Selected key is no longer available. Please refresh and try again.");
+                                        if (! $key || ! $key->isAvailable()) {
+                                            throw new \Exception('Selected key is no longer available. Please refresh and try again.');
                                         }
                                     }
                                 }
@@ -1679,14 +1675,14 @@ Select::make('operator_id')
                                 // Create the batch
                                 $batch = $record->createBatch($data['planned_quantity'], $keysRequired);
 
-                                if (!$batch) {
+                                if (! $batch) {
                                     throw new \Exception('Failed to create batch');
                                 }
 
                                 // Start the batch immediately (which will consume the keys)
                                 $batchStarted = $batch->startBatch($selectedKeys);
 
-                                if (!$batchStarted) {
+                                if (! $batchStarted) {
                                     // If starting failed, delete the batch
                                     $batch->delete();
                                     throw new \Exception('Failed to start batch. Keys may no longer be available.');
@@ -1694,8 +1690,8 @@ Select::make('operator_id')
 
                                 \Filament\Notifications\Notification::make()
                                     ->title('Batch Started Successfully')
-                                    ->body("Batch #{$batch->batch_number} has been started and is now in progress." .
-                                           (!empty($selectedKeys) ? " Consumed " . count($selectedKeys) . " key(s)." : ""))
+                                    ->body("Batch #{$batch->batch_number} has been started and is now in progress.".
+                                           (! empty($selectedKeys) ? ' Consumed '.count($selectedKeys).' key(s).' : ''))
                                     ->success()
                                     ->send();
 
@@ -1713,8 +1709,11 @@ Select::make('operator_id')
                         ->icon('heroicon-o-check-circle')
                         ->color('warning')
                         ->visible(function (WorkOrder $record) {
-                            if (!$record->usesBatchSystem()) return false;
+                            if (! $record->usesBatchSystem()) {
+                                return false;
+                            }
                             $currentBatch = $record->getCurrentBatch();
+
                             return $currentBatch && $currentBatch->status === 'in_progress';
                         })
                         ->form([
@@ -1725,18 +1724,20 @@ Select::make('operator_id')
                                 ->minValue(1)
                                 ->helperText(function (WorkOrder $record) {
                                     $batch = $record->getCurrentBatch();
+
                                     return $batch ? "Maximum: {$batch->planned_quantity} units" : '';
                                 })
                                 ->rules(function (WorkOrder $record) {
                                     $batch = $record->getCurrentBatch();
                                     $maxQty = $batch ? $batch->planned_quantity : 999;
+
                                     return ["max:{$maxQty}"];
                                 }),
                         ])
                         ->action(function (array $data, WorkOrder $record) {
                             try {
                                 $currentBatch = $record->getCurrentBatch();
-                                if (!$currentBatch || $currentBatch->status !== 'in_progress') {
+                                if (! $currentBatch || $currentBatch->status !== 'in_progress') {
                                     throw new \Exception('No batch in progress to complete');
                                 }
 
@@ -1745,7 +1746,7 @@ Select::make('operator_id')
                                 if ($success) {
                                     // Check if a key was generated
                                     $generatedKey = $currentBatch->fresh()->batchKey;
-                                    $keyMessage = $generatedKey ? " Key generated: {$generatedKey->key_code}" : "";
+                                    $keyMessage = $generatedKey ? " Key generated: {$generatedKey->key_code}" : '';
 
                                     \Filament\Notifications\Notification::make()
                                         ->title('Batch Completed Successfully')
@@ -1810,7 +1811,7 @@ Select::make('operator_id')
                             self::sendAlert($data, $record);
                         })
                         ->button(),
-                ])->size('sm')->tooltip('Action')->dropdownPlacement('right')
+                ])->size('sm')->tooltip('Action')->dropdownPlacement('right'),
             ], position: RecordActionsPosition::BeforeColumns)
             ->headerActions([])
             ->toolbarActions([

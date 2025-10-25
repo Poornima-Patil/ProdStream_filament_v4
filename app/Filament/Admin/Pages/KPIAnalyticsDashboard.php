@@ -47,12 +47,14 @@ class KPIAnalyticsDashboard extends Page implements HasForms
 
     public string $searchQuery = '';
 
-    public string $statusFilter = 'all'; // 'all', 'running', 'hold', 'scheduled', 'idle'
+    public string $statusFilter = 'all'; // 'all', 'running', 'setup', 'hold', 'scheduled', 'idle'
 
     // Pagination properties for each status group
     public int $runningPage = 1;
 
     public int $holdPage = 1;
+
+    public int $setupPage = 1;
 
     public int $scheduledPage = 1;
 
@@ -60,10 +62,14 @@ class KPIAnalyticsDashboard extends Page implements HasForms
 
     public int $perPage = 10;
 
+    public int $defectPage = 1;
+
     // Collapsible section states
     public bool $runningExpanded = true;
 
     public bool $holdExpanded = true;
+
+    public bool $setupExpanded = true;
 
     public bool $scheduledExpanded = true;
 
@@ -71,6 +77,8 @@ class KPIAnalyticsDashboard extends Page implements HasForms
 
     // Work Order Status pagination properties
     public int $woHoldPage = 1;
+
+    public int $woSetupPage = 1;
 
     public int $woStartPage = 1;
 
@@ -82,6 +90,8 @@ class KPIAnalyticsDashboard extends Page implements HasForms
 
     // Work Order Status collapsible section states
     public bool $woHoldExpanded = true;
+
+    public bool $woSetupExpanded = true;
 
     public bool $woStartExpanded = true;
 
@@ -187,6 +197,7 @@ class KPIAnalyticsDashboard extends Page implements HasForms
     {
         $this->runningPage = 1;
         $this->holdPage = 1;
+        $this->setupPage = 1;
         $this->scheduledPage = 1;
         $this->idlePage = 1;
     }
@@ -199,6 +210,7 @@ class KPIAnalyticsDashboard extends Page implements HasForms
         match ($section) {
             'running' => $this->runningExpanded = ! $this->runningExpanded,
             'hold' => $this->holdExpanded = ! $this->holdExpanded,
+            'setup' => $this->setupExpanded = ! $this->setupExpanded,
             'scheduled' => $this->scheduledExpanded = ! $this->scheduledExpanded,
             'idle' => $this->idleExpanded = ! $this->idleExpanded,
             default => null,
@@ -212,6 +224,7 @@ class KPIAnalyticsDashboard extends Page implements HasForms
     {
         match ($section) {
             'hold' => $this->woHoldExpanded = ! $this->woHoldExpanded,
+            'setup' => $this->woSetupExpanded = ! $this->woSetupExpanded,
             'start' => $this->woStartExpanded = ! $this->woStartExpanded,
             'assigned' => $this->woAssignedExpanded = ! $this->woAssignedExpanded,
             'completed' => $this->woCompletedExpanded = ! $this->woCompletedExpanded,
@@ -228,6 +241,7 @@ class KPIAnalyticsDashboard extends Page implements HasForms
         match ($status) {
             'running' => $this->runningPage = max(1, $page),
             'hold' => $this->holdPage = max(1, $page),
+            'setup' => $this->setupPage = max(1, $page),
             'scheduled' => $this->scheduledPage = max(1, $page),
             'idle' => $this->idlePage = max(1, $page),
             default => null,
@@ -241,12 +255,21 @@ class KPIAnalyticsDashboard extends Page implements HasForms
     {
         match ($status) {
             'hold' => $this->woHoldPage = max(1, $page),
+            'setup' => $this->woSetupPage = max(1, $page),
             'start' => $this->woStartPage = max(1, $page),
             'assigned' => $this->woAssignedPage = max(1, $page),
             'completed' => $this->woCompletedPage = max(1, $page),
             'closed' => $this->woClosedPage = max(1, $page),
             default => null,
         };
+    }
+
+    /**
+     * Navigate defect rate table pagination
+     */
+    public function gotoDefectPage(string $status, int $page): void
+    {
+        $this->defectPage = max(1, $page);
     }
 
     /**
@@ -257,6 +280,7 @@ class KPIAnalyticsDashboard extends Page implements HasForms
         $page = match ($status) {
             'running' => $this->runningPage,
             'hold' => $this->holdPage,
+            'setup' => $this->setupPage,
             'scheduled' => $this->scheduledPage,
             'idle' => $this->idlePage,
             default => 1,
@@ -287,6 +311,7 @@ class KPIAnalyticsDashboard extends Page implements HasForms
     {
         $page = match ($status) {
             'hold' => $this->woHoldPage,
+            'setup' => $this->woSetupPage,
             'start' => $this->woStartPage,
             'assigned' => $this->woAssignedPage,
             'completed' => $this->woCompletedPage,
@@ -498,6 +523,7 @@ class KPIAnalyticsDashboard extends Page implements HasForms
             'status_groups' => [
                 'running' => ['count' => 0, 'machines' => []],
                 'hold' => ['count' => 0, 'machines' => []],
+                'setup' => ['count' => 0, 'machines' => []],
                 'scheduled' => ['count' => 0, 'machines' => []],
                 'idle' => ['count' => 0, 'machines' => []],
             ],
@@ -540,6 +566,71 @@ class KPIAnalyticsDashboard extends Page implements HasForms
     }
 
     /**
+     * Get setup time analytics data (analytics mode only)
+     */
+    public function getSetupTimeAnalyticsData(): array
+    {
+        $factory = Auth::user()->factory;
+
+        if (! $factory || $this->kpiMode !== 'analytics') {
+            return $this->getEmptySetupAnalyticsData();
+        }
+
+        $service = new OperationalKPIService($factory);
+
+        return $service->getSetupTimeAnalytics([
+            'time_period' => $this->timePeriod,
+            'date_from' => $this->dateFrom,
+            'date_to' => $this->dateTo,
+            'enable_comparison' => $this->enableComparison,
+            'comparison_type' => $this->comparisonType,
+        ]);
+    }
+
+    /**
+     * Empty setup analytics structure
+     */
+    protected function getEmptySetupAnalyticsData(): array
+    {
+        return [
+            'primary_period' => null,
+            'comparison_period' => null,
+            'comparison_analysis' => null,
+        ];
+    }
+
+    /**
+     * Get defect rate data based on current mode
+     */
+    public function getDefectRateData(): array
+    {
+        $factory = Auth::user()->factory;
+
+        if (! $factory) {
+            return $this->getEmptyDefectDashboardData();
+        }
+
+        if ($this->kpiMode === 'dashboard') {
+            $service = new RealTimeKPIService($factory);
+            $data = $service->getCurrentDefectRate($this->skipCache);
+
+            $this->skipCache = false;
+
+            return $this->applyDefectPagination($data);
+        }
+
+        $service = new OperationalKPIService($factory);
+
+        return $service->getDefectRateAnalytics([
+            'time_period' => $this->timePeriod,
+            'date_from' => $this->dateFrom,
+            'date_to' => $this->dateTo,
+            'enable_comparison' => $this->enableComparison,
+            'comparison_type' => $this->comparisonType,
+        ]);
+    }
+
+    /**
      * Get empty work order data structure
      */
     protected function getEmptyWorkOrderData(): array
@@ -547,12 +638,101 @@ class KPIAnalyticsDashboard extends Page implements HasForms
         return [
             'status_distribution' => [
                 'hold' => ['count' => 0, 'work_orders' => []],
+                'setup' => ['count' => 0, 'work_orders' => []],
                 'start' => ['count' => 0, 'work_orders' => []],
                 'assigned' => ['count' => 0, 'work_orders' => []],
                 'completed' => ['count' => 0, 'work_orders' => []],
                 'closed' => ['count' => 0, 'work_orders' => []],
             ],
             'total_work_orders' => 0,
+            'updated_at' => now()->toDateTimeString(),
+        ];
+    }
+
+    /**
+     * Apply pagination to defect rate dashboard results
+     */
+    protected function applyDefectPagination(array $data): array
+    {
+        $workOrders = $data['work_orders'] ?? [];
+        $pagination = $this->getPaginatedDefectWorkOrders($workOrders);
+
+        $data['work_orders'] = $workOrders;
+        $data['work_orders_paginated'] = $pagination['data'];
+        $data['pagination'] = $pagination;
+
+        if (! isset($data['summary'])) {
+            $data['summary'] = [
+                'defective_work_orders' => 0,
+                'total_scrap_today' => 0,
+                'total_produced_today' => 0,
+                'avg_defect_rate' => 0,
+                'worst_defect_rate' => 0,
+            ];
+        }
+
+        $data['updated_at'] = $data['updated_at'] ?? now()->toDateTimeString();
+
+        return $data;
+    }
+
+    /**
+     * Paginate defect rate work orders
+     */
+    protected function getPaginatedDefectWorkOrders(array $workOrders): array
+    {
+        $total = count($workOrders);
+        $perPage = $this->perPage;
+        $totalPages = $total > 0 ? (int) ceil($total / $perPage) : 1;
+        $page = min(max(1, $this->defectPage), $totalPages);
+
+        $offset = ($page - 1) * $perPage;
+        $paginated = $total > 0 ? array_slice($workOrders, $offset, $perPage) : [];
+
+        // Ensure current page is valid when data shrinks
+        if ($total > 0 && empty($paginated) && $page > 1) {
+            $this->defectPage = 1;
+
+            return $this->getPaginatedDefectWorkOrders($workOrders);
+        }
+
+        $this->defectPage = $total > 0 ? $page : 1;
+
+        return [
+            'data' => $paginated,
+            'current_page' => $this->defectPage,
+            'total_pages' => $totalPages,
+            'total' => $total,
+            'per_page' => $perPage,
+            'from' => $total > 0 ? $offset + 1 : 0,
+            'to' => $total > 0 ? min($offset + $perPage, $total) : 0,
+        ];
+    }
+
+    /**
+     * Empty defect dashboard structure
+     */
+    protected function getEmptyDefectDashboardData(): array
+    {
+        return [
+            'summary' => [
+                'defective_work_orders' => 0,
+                'total_scrap_today' => 0,
+                'total_produced_today' => 0,
+                'avg_defect_rate' => 0,
+                'worst_defect_rate' => 0,
+            ],
+            'work_orders' => [],
+            'work_orders_paginated' => [],
+            'pagination' => [
+                'data' => [],
+                'current_page' => 1,
+                'total_pages' => 1,
+                'total' => 0,
+                'per_page' => $this->perPage,
+                'from' => 0,
+                'to' => 0,
+            ],
             'updated_at' => now()->toDateTimeString(),
         ];
     }

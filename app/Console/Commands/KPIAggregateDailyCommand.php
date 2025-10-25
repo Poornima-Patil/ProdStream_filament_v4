@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use App\Models\Factory;
 use App\Models\KPI\MachineDaily;
+use App\Models\KPI\MachineStatusDaily;
+use App\Models\Machine;
 use App\Models\Shift;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderLog;
@@ -107,16 +109,15 @@ class KPIAggregateDailyCommand extends Command
     {
         $dateString = $date->toDateString();
 
-        // Check if data already exists
+        $shouldAggregateMachineDaily = true;
         if (! $force) {
             $existingCount = MachineDaily::where('factory_id', $factory->id)
                 ->whereDate('summary_date', $date)
                 ->count();
 
             if ($existingCount > 0) {
-                $this->line("  ⏭️  {$dateString}: Skipping (data exists, use --force to re-aggregate)");
-
-                return;
+                $shouldAggregateMachineDaily = false;
+                $this->line("  ⏭️  {$dateString}: Machine utilization already aggregated (use --force to overwrite)");
             }
         }
 
@@ -127,41 +128,46 @@ class KPIAggregateDailyCommand extends Command
             ->with('machine:id,name,assetId')
             ->get();
 
-        if ($workOrders->isEmpty()) {
-            $this->line("  ℹ️  {$dateString}: No work orders found");
-
-            return;
+        if ($shouldAggregateMachineDaily && $workOrders->isEmpty()) {
+            $this->line("  ℹ️  {$dateString}: No work orders found for utilization aggregation");
         }
 
-        // Group by machine
-        $workOrdersByMachine = $workOrders->groupBy('machine_id');
         $machinesProcessed = 0;
 
-        // Get available hours for this factory
-        $availableHours = $this->getAvailableHours($factory);
+        if ($shouldAggregateMachineDaily && $workOrders->isNotEmpty()) {
+            // Group by machine
+            $workOrdersByMachine = $workOrders->groupBy('machine_id');
 
-        foreach ($workOrdersByMachine as $machineId => $machineWorkOrders) {
-            try {
-                $this->aggregateMachineDay($factory, $machineId, $date, $machineWorkOrders, $availableHours);
-                $machinesProcessed++;
-                $stats['total_records']++;
-            } catch (\Exception $e) {
-                $this->error("  ❌ Error processing machine {$machineId} on {$dateString}: {$e->getMessage()}");
-                Log::error('KPI aggregation error', [
-                    'factory_id' => $factory->id,
-                    'machine_id' => $machineId,
-                    'date' => $dateString,
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                ]);
-                $stats['errors']++;
+            // Get available hours for this factory
+            $availableHours = $this->getAvailableHours($factory);
+
+            foreach ($workOrdersByMachine as $machineId => $machineWorkOrders) {
+                try {
+                    $this->aggregateMachineDay($factory, $machineId, $date, $machineWorkOrders, $availableHours);
+                    $machinesProcessed++;
+                    $stats['total_records']++;
+                } catch (\Exception $e) {
+                    $this->error("  ❌ Error processing machine {$machineId} on {$dateString}: {$e->getMessage()}");
+                    Log::error('KPI aggregation error', [
+                        'factory_id' => $factory->id,
+                        'machine_id' => $machineId,
+                        'date' => $dateString,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+                    $stats['errors']++;
+                }
             }
+
+            $stats['total_machines'] = max($stats['total_machines'], $workOrdersByMachine->count());
         }
 
-        $stats['total_days']++;
-        $stats['total_machines'] = max($stats['total_machines'], $workOrdersByMachine->count());
+        // Aggregate machine status summary for analytics
+        $this->aggregateMachineStatusSummary($factory, $date, null, $force);
 
-        $this->line("  ✅ {$dateString}: Processed {$machinesProcessed} machines");
+        $stats['total_days']++;
+
+        $this->line("  ✅ {$dateString}: Machine utilization processed {$machinesProcessed} machines; machine status summary stored");
     }
 
     protected function aggregateMachineDay(
@@ -200,6 +206,65 @@ class KPIAggregateDailyCommand extends Command
                 'quality_rate' => $qualityData['quality_rate'],
                 'scrap_rate' => $qualityData['scrap_rate'],
                 'first_pass_yield' => $qualityData['first_pass_yield'],
+                'calculated_at' => now(),
+            ]
+        );
+    }
+
+    protected function aggregateMachineStatusSummary(Factory $factory, Carbon $date, $workOrders, bool $force): void
+    {
+        if (! $force) {
+            $exists = MachineStatusDaily::where('factory_id', $factory->id)
+                ->whereDate('summary_date', $date)
+                ->exists();
+
+            if ($exists) {
+                return;
+            }
+        }
+
+        $dayStart = $date->copy()->startOfDay();
+        $dayEnd = $date->copy()->endOfDay();
+
+        $totalMachines = Machine::where('factory_id', $factory->id)->count();
+
+        // If work orders were not provided (e.g., skipped utilization), fetch minimal data for status summary
+        if ($workOrders === null) {
+            $workOrders = WorkOrder::where('factory_id', $factory->id)
+                ->where(function ($query) use ($dayStart, $dayEnd) {
+                    $query->whereIn('status', ['Start', 'Setup', 'Hold'])
+                        ->orWhere(function ($scheduledQuery) use ($dayStart, $dayEnd) {
+                            $scheduledQuery->whereIn('status', ['Assigned', 'Completed'])
+                                ->whereBetween('start_time', [$dayStart, $dayEnd]);
+                        });
+                })
+                ->get(['id', 'machine_id', 'status']);
+        }
+
+        $workOrders = $workOrders instanceof \Illuminate\Support\Collection
+            ? $workOrders
+            : collect($workOrders);
+
+        $runningMachines = $workOrders->where('status', 'Start')->pluck('machine_id')->unique();
+        $setupMachines = $workOrders->where('status', 'Setup')->pluck('machine_id')->unique();
+        $holdMachines = $workOrders->where('status', 'Hold')->pluck('machine_id')->unique();
+        $scheduledMachines = $workOrders->where('status', 'Assigned')->pluck('machine_id')->unique();
+        $machinesWithWork = $workOrders->pluck('machine_id')->unique();
+
+        $idleCount = max($totalMachines - $machinesWithWork->count(), 0);
+
+        MachineStatusDaily::updateOrCreate(
+            [
+                'factory_id' => $factory->id,
+                'summary_date' => $date->toDateString(),
+            ],
+            [
+                'running_count' => $runningMachines->count(),
+                'setup_count' => $setupMachines->count(),
+                'hold_count' => $holdMachines->count(),
+                'scheduled_count' => $scheduledMachines->count(),
+                'idle_count' => $idleCount,
+                'total_machines' => $totalMachines,
                 'calculated_at' => now(),
             ]
         );

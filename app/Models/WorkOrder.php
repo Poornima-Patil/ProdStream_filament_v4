@@ -177,7 +177,6 @@ class WorkOrder extends Model
         return $log;
     }
 
-
     // Define the relationship with InfoMessage
     public function infoMessages()
     {
@@ -234,7 +233,7 @@ class WorkOrder extends Model
     public function scopeActive($query, int $factoryId)
     {
         return $query->where('factory_id', $factoryId)
-            ->whereIn('status', ['Assigned', 'Start', 'Hold']);
+            ->whereIn('status', ['Assigned', 'Setup', 'Start', 'Hold']);
     }
 
     /**
@@ -317,7 +316,7 @@ class WorkOrder extends Model
                 'work_orders.start_time',
                 'work_orders.end_time',
                 'work_orders.created_at',
-                'work_orders.updated_at'
+                'work_orders.updated_at',
             ]);
     }
 
@@ -329,7 +328,7 @@ class WorkOrder extends Model
         return $query->with([
             'machine:id,name,assetId',
             'operator.user:id,first_name,last_name',
-            'workOrderGroup:id,name,status'
+            'workOrderGroup:id,name,status',
         ]);
     }
 
@@ -341,15 +340,14 @@ class WorkOrder extends Model
         return $query->with([
             'batches' => function ($q) {
                 $q->select('id', 'work_order_id', 'batch_number', 'status', 'planned_quantity', 'actual_quantity')
-                  ->orderBy('batch_number');
+                    ->orderBy('batch_number');
             },
             'batchKeys' => function ($q) {
                 $q->where('is_consumed', false)
-                  ->select('id', 'work_order_id', 'key_code', 'quantity_produced', 'is_consumed');
-            }
+                    ->select('id', 'work_order_id', 'key_code', 'quantity_produced', 'is_consumed');
+            },
         ]);
     }
-
 
     /**
      * Cursor pagination for large datasets
@@ -420,8 +418,8 @@ class WorkOrder extends Model
      * Check for scheduling conflicts when planning a new Work Order
      *
      * @param  int  $machineId
-     * @param Carbon $newStartTime
-     * @param Carbon $newEndTime
+     * @param  Carbon  $newStartTime
+     * @param  Carbon  $newEndTime
      * @param  int  $factoryId  - Factory ID for multi-tenancy
      * @param  int|null  $excludeWorkOrderId  - Exclude current WO when updating
      * @return array
@@ -434,7 +432,7 @@ class WorkOrder extends Model
         // Include all active statuses that have scheduled times
         $existingWorkOrders = self::where('machine_id', $machineId)
             ->where('factory_id', $factoryId) // Multi-tenancy: filter by factory
-            ->whereIn('status', ['Assigned', 'Start', 'Hold']) // Include Hold status as they may resume
+            ->whereIn('status', ['Assigned', 'Setup', 'Start', 'Hold']) // Include Setup and Hold status as they may resume
             ->whereNotNull('start_time') // Only check WOs with scheduled times
             ->whereNotNull('end_time')
             ->when($excludeWorkOrderId, function ($query) use ($excludeWorkOrderId) {
@@ -909,8 +907,6 @@ class WorkOrder extends Model
 
     /**
      * Check if all dependencies for this work order are satisfied
-     *
-     * @return bool
      */
     public function areDependenciesSatisfied(): bool
     {
@@ -931,7 +927,7 @@ class WorkOrder extends Model
 
         // Check if all dependencies are satisfied
         foreach ($dependencies as $dependency) {
-            if (!$dependency->is_satisfied) {
+            if (! $dependency->is_satisfied) {
                 return false;
             }
         }
@@ -956,7 +952,7 @@ class WorkOrder extends Model
     public function updateStatusBasedOnDependencies(): bool
     {
         // Only process work orders that are in a group and currently waiting
-        if (!$this->work_order_group_id || $this->status !== 'Waiting') {
+        if (! $this->work_order_group_id || $this->status !== 'Waiting') {
             return false;
         }
 
@@ -980,7 +976,7 @@ class WorkOrder extends Model
 
             $this->update([
                 'status' => 'Assigned',
-                'dependency_status' => 'ready'
+                'dependency_status' => 'ready',
             ]);
 
             Log::info('Work order status updated from Waiting to Assigned due to dependency satisfaction', [
@@ -1007,12 +1003,10 @@ class WorkOrder extends Model
     /**
      * Process dependency chain updates when this work order's quantities change
      * This should be called when ok_qtys or scrapped_qtys are updated
-     *
-     * @return void
      */
     public function processDependencyChainUpdates(): void
     {
-        if (!$this->work_order_group_id) {
+        if (! $this->work_order_group_id) {
             return;
         }
 
@@ -1039,17 +1033,15 @@ class WorkOrder extends Model
     /**
      * Initialize work order statuses in a group based on dependencies
      * Called when a work order group is activated
-     *
-     * @return void
      */
     public function initializeGroupWorkOrderStatuses(): void
     {
-        if (!$this->work_order_group_id) {
+        if (! $this->work_order_group_id) {
             return;
         }
 
         $group = $this->workOrderGroup;
-        if (!$group) {
+        if (! $group) {
             return;
         }
 
@@ -1061,20 +1053,20 @@ class WorkOrder extends Model
                 // Root work orders start as Assigned
                 $workOrder->update([
                     'status' => 'Assigned',
-                    'dependency_status' => 'ready'
+                    'dependency_status' => 'ready',
                 ]);
             } else {
                 // Non-root work orders start as Waiting until dependencies are satisfied
                 $workOrder->update([
                     'status' => 'Waiting',
-                    'dependency_status' => 'blocked'
+                    'dependency_status' => 'blocked',
                 ]);
             }
         }
 
         Log::info('Initialized work order statuses for group', [
             'group_id' => $group->id,
-            'work_orders_count' => $workOrders->count()
+            'work_orders_count' => $workOrders->count(),
         ]);
     }
 
@@ -1091,7 +1083,7 @@ class WorkOrder extends Model
      */
     public function getAvailableKeys()
     {
-        if (!$this->usesBatchSystem()) {
+        if (! $this->usesBatchSystem()) {
             return collect();
         }
 
@@ -1103,7 +1095,7 @@ class WorkOrder extends Model
      */
     public function createBatch(int $plannedQuantity, array $keysRequired = []): ?WorkOrderBatch
     {
-        if (!$this->usesBatchSystem()) {
+        if (! $this->usesBatchSystem()) {
             return null; // Only grouped work orders use batches
         }
 
@@ -1137,7 +1129,7 @@ class WorkOrder extends Model
      */
     public function getTotalBatchQuantity(): int
     {
-        if (!$this->usesBatchSystem()) {
+        if (! $this->usesBatchSystem()) {
             return $this->ok_qtys ?? 0; // Use traditional quantity for individual WOs
         }
 
@@ -1151,7 +1143,7 @@ class WorkOrder extends Model
      */
     public function getBatchProgress(): array
     {
-        if (!$this->usesBatchSystem()) {
+        if (! $this->usesBatchSystem()) {
             return [
                 'total_planned' => $this->qty,
                 'total_completed' => $this->ok_qtys ?? 0,
@@ -1180,7 +1172,7 @@ class WorkOrder extends Model
      */
     public function canStartNewBatch(): bool
     {
-        if (!$this->usesBatchSystem()) {
+        if (! $this->usesBatchSystem()) {
             return false; // Individual work orders don't use batches
         }
 
@@ -1191,7 +1183,7 @@ class WorkOrder extends Model
         }
 
         // For dependency-based work orders, check if dependencies are satisfied
-        if ($this->work_order_group_id && !$this->is_dependency_root) {
+        if ($this->work_order_group_id && ! $this->is_dependency_root) {
             return $this->areDependenciesSatisfied() && $this->hasRequiredKeys();
         }
 
@@ -1203,7 +1195,7 @@ class WorkOrder extends Model
      */
     public function hasRequiredKeys(): bool
     {
-        if (!$this->usesBatchSystem() || $this->is_dependency_root) {
+        if (! $this->usesBatchSystem() || $this->is_dependency_root) {
             return true; // Root work orders don't need keys
         }
 
@@ -1230,7 +1222,7 @@ class WorkOrder extends Model
         $result = [
             'can_change' => true,
             'reason' => null,
-            'required_action' => null
+            'required_action' => null,
         ];
 
         // For grouped work orders, enforce batch system
@@ -1238,13 +1230,13 @@ class WorkOrder extends Model
             $currentBatch = $this->getCurrentBatch();
 
             if ($newStatus === 'Start') {
-                if (!$currentBatch || $currentBatch->status !== 'in_progress') {
+                if (! $currentBatch || $currentBatch->status !== 'in_progress') {
                     $result['can_change'] = false;
                     $result['reason'] = 'No active batch in progress';
                     $result['required_action'] = 'start_new_batch';
                 }
             } elseif (in_array($newStatus, ['Hold', 'Completed'])) {
-                if (!$currentBatch || $currentBatch->status !== 'in_progress') {
+                if (! $currentBatch || $currentBatch->status !== 'in_progress') {
                     $result['can_change'] = false;
                     $result['reason'] = 'No active batch to hold/complete';
                     $result['required_action'] = 'start_new_batch';
@@ -1307,9 +1299,12 @@ class WorkOrder extends Model
                     break;
             }
         } else {
-            // Individual work orders - traditional status options
+            // Individual work orders - traditional status options with Setup
             switch ($currentStatus) {
                 case 'Assigned':
+                    $options['Setup'] = 'Setup';
+                    break;
+                case 'Setup':
                     $options['Start'] = 'Start';
                     break;
                 case 'Start':
@@ -1333,7 +1328,7 @@ class WorkOrder extends Model
      */
     public function getRequiredKeysInfo(): array
     {
-        if (!$this->usesBatchSystem() || $this->is_dependency_root) {
+        if (! $this->usesBatchSystem() || $this->is_dependency_root) {
             return [];
         }
 
@@ -1359,7 +1354,7 @@ class WorkOrder extends Model
                         'generated_at' => $key->generated_at,
                     ];
                 }),
-                'is_satisfied' => $availableKeys->isNotEmpty()
+                'is_satisfied' => $availableKeys->isNotEmpty(),
             ];
         }
 
@@ -1385,6 +1380,7 @@ class WorkOrder extends Model
     {
         if ($this->usesBatchSystem()) {
             $progress = $this->getBatchProgress();
+
             return $progress['total_completed'] >= $this->qty;
         }
 
@@ -1398,7 +1394,7 @@ class WorkOrder extends Model
     public function autoGenerateBatchKeysFromQuantities(): void
     {
         // Only process if this is a root work order in a group
-        if (!$this->work_order_group_id || !$this->is_dependency_root) {
+        if (! $this->work_order_group_id || ! $this->is_dependency_root) {
             return;
         }
 
@@ -1409,8 +1405,9 @@ class WorkOrder extends Model
             \Illuminate\Support\Facades\Log::info('Skipping auto-generation - manual batches exist for work order', [
                 'work_order_id' => $this->id,
                 'work_order_unique_id' => $this->unique_id,
-                'manual_batches_count' => $this->batches()->count()
+                'manual_batches_count' => $this->batches()->count(),
             ]);
+
             return;
         }
 
@@ -1418,7 +1415,7 @@ class WorkOrder extends Model
         $workOrderGroup = $this->workOrderGroup;
         $batchSize = $workOrderGroup->getBatchSizeForWorkOrder($this->id);
 
-        if (!$batchSize) {
+        if (! $batchSize) {
             // No batch configuration set, use default batch size of 25
             $batchSize = 25;
         }
@@ -1453,7 +1450,7 @@ class WorkOrder extends Model
                 'work_order_unique_id' => $this->unique_id,
                 'batch_number' => $batch->batch_number,
                 'batch_quantity' => $batchQuantity,
-                'remaining_unbatched' => $unbatchedQuantity
+                'remaining_unbatched' => $unbatchedQuantity,
             ]);
         }
 

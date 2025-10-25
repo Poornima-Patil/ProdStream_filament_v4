@@ -1,5 +1,5 @@
 {{-- Machine Status - Analytics Mode --}}
-{{-- Shows historical machine status distribution (Running/Hold/Scheduled/Idle) --}}
+{{-- Shows historical machine status distribution (Running/Setup/Hold/Scheduled/Idle) --}}
 
 @php
     $primaryPeriod = $data['primary_period'] ?? null;
@@ -18,6 +18,7 @@
     $getStatusColor = function($status) {
         return match($status) {
             'running' => 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20',
+            'setup' => 'text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20',
             'hold' => 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20',
             'scheduled' => 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20',
             'idle' => 'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/20',
@@ -51,7 +52,7 @@
 </div>
 
 {{-- Summary Cards --}}
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
     {{-- Running Machines Card --}}
     <x-filament::card>
         <div class="space-y-2">
@@ -112,6 +113,39 @@
                     <span class="{{ $comparisonAnalysis['hold']['status'] === 'improved' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
                         {{ $comparisonAnalysis['hold']['difference'] > 0 ? '+' : '' }}{{ number_format($comparisonAnalysis['hold']['difference'], 1) }}
                         ({{ $comparisonAnalysis['hold']['percentage_change'] > 0 ? '+' : '' }}{{ number_format($comparisonAnalysis['hold']['percentage_change'], 1) }}%)
+                    </span>
+                </div>
+            @endif
+        </div>
+    </x-filament::card>
+
+    {{-- Setup Machines Card --}}
+    <x-filament::card>
+        <div class="space-y-2">
+            <div class="flex items-center justify-between">
+                <h4 class="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    Avg Setup
+                </h4>
+                <x-heroicon-o-wrench-screwdriver class="w-5 h-5 text-violet-500" />
+            </div>
+            <div class="flex items-baseline gap-2">
+                <div class="text-3xl font-bold text-violet-600 dark:text-violet-400">
+                    {{ number_format($summary['avg_setup'] ?? 0, 1) }}
+                </div>
+                <span class="text-sm text-gray-500 dark:text-gray-400">
+                    / {{ $summary['total_machines'] }}
+                </span>
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ number_format($summary['avg_setup_pct'] ?? 0, 1) }}% of machines
+            </p>
+
+            @if($comparisonAnalysis && isset($comparisonAnalysis['setup']))
+                <div class="flex items-center gap-1 text-xs pt-2 border-t border-gray-200 dark:border-gray-700">
+                    {!! $getTrendIcon($comparisonAnalysis['setup']['trend']) !!}
+                    <span class="{{ $comparisonAnalysis['setup']['status'] === 'improved' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">
+                        {{ $comparisonAnalysis['setup']['difference'] > 0 ? '+' : '' }}{{ number_format($comparisonAnalysis['setup']['difference'], 1) }}
+                        ({{ $comparisonAnalysis['setup']['percentage_change'] > 0 ? '+' : '' }}{{ number_format($comparisonAnalysis['setup']['percentage_change'], 1) }}%)
                     </span>
                 </div>
             @endif
@@ -207,6 +241,9 @@
                             Running
                         </th>
                         <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                            Setup
+                        </th>
+                        <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                             Hold
                         </th>
                         <th scope="col" class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -224,10 +261,16 @@
                     @forelse($paginatedBreakdown['data'] as $day)
                         @php
                             $total = $day['total_machines'];
-                            $runningPct = $total > 0 ? ($day['running'] / $total) * 100 : 0;
-                            $holdPct = $total > 0 ? ($day['hold'] / $total) * 100 : 0;
-                            $scheduledPct = $total > 0 ? ($day['scheduled'] / $total) * 100 : 0;
-                            $idlePct = $total > 0 ? ($day['idle'] / $total) * 100 : 0;
+            $running = $day['running'] ?? 0;
+            $setup = $day['setup'] ?? 0;
+            $hold = $day['hold'] ?? 0;
+            $scheduled = $day['scheduled'] ?? 0;
+            $idle = $day['idle'] ?? 0;
+            $runningPct = $total > 0 ? ($running / $total) * 100 : 0;
+            $setupPct = $total > 0 ? ($setup / $total) * 100 : 0;
+            $holdPct = $total > 0 ? ($hold / $total) * 100 : 0;
+            $scheduledPct = $total > 0 ? ($scheduled / $total) * 100 : 0;
+            $idlePct = $total > 0 ? ($idle / $total) * 100 : 0;
                         @endphp
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-800">
                             {{-- Date --}}
@@ -238,17 +281,27 @@
                             {{-- Running --}}
                             <td class="px-4 py-3 whitespace-nowrap text-center">
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium {{ $getStatusColor('running') }}">
-                                    {{ $day['running'] }}
+                                    {{ $running }}
                                 </span>
                                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                     {{ number_format($runningPct, 0) }}%
                                 </div>
                             </td>
 
+                            {{-- Setup --}}
+                            <td class="px-4 py-3 whitespace-nowrap text-center">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium {{ $getStatusColor('setup') }}">
+                                    {{ $setup }}
+                                </span>
+                                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    {{ number_format($setupPct, 0) }}%
+                                </div>
+                            </td>
+
                             {{-- Hold --}}
                             <td class="px-4 py-3 whitespace-nowrap text-center">
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium {{ $getStatusColor('hold') }}">
-                                    {{ $day['hold'] }}
+                                    {{ $hold }}
                                 </span>
                                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                     {{ number_format($holdPct, 0) }}%
@@ -258,7 +311,7 @@
                             {{-- Scheduled --}}
                             <td class="px-4 py-3 whitespace-nowrap text-center">
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium {{ $getStatusColor('scheduled') }}">
-                                    {{ $day['scheduled'] }}
+                                    {{ $scheduled }}
                                 </span>
                                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                     {{ number_format($scheduledPct, 0) }}%
@@ -268,7 +321,7 @@
                             {{-- Idle --}}
                             <td class="px-4 py-3 whitespace-nowrap text-center">
                                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium {{ $getStatusColor('idle') }}">
-                                    {{ $day['idle'] }}
+                                    {{ $idle }}
                                 </span>
                                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                     {{ number_format($idlePct, 0) }}%
@@ -280,6 +333,9 @@
                                 <div class="flex w-full h-6 rounded-full overflow-hidden border border-gray-300 dark:border-gray-600">
                                     @if($runningPct > 0)
                                         <div class="bg-green-500 border-r border-white dark:border-gray-700" style="width: {{ $runningPct }}%" title="Running: {{ number_format($runningPct, 1) }}%"></div>
+                                    @endif
+                                    @if($setupPct > 0)
+                                        <div class="bg-violet-500 border-r border-white dark:border-gray-700" style="width: {{ $setupPct }}%" title="Setup: {{ number_format($setupPct, 1) }}%"></div>
                                     @endif
                                     @if($holdPct > 0)
                                         <div class="bg-yellow-500 border-r border-white dark:border-gray-700" style="width: {{ $holdPct }}%" title="Hold: {{ number_format($holdPct, 1) }}%"></div>
@@ -295,7 +351,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                            <td colspan="7" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                                 No data available for the selected period
                             </td>
                         </tr>
@@ -425,6 +481,12 @@
                     </div>
                 </div>
                 <div class="flex items-start gap-2">
+                    <div class="w-4 h-4 bg-violet-500 rounded mt-0.5"></div>
+                    <div>
+                        <span class="font-semibold">Setup:</span> Machines preparing for production (status = 'Setup')
+                    </div>
+                </div>
+                <div class="flex items-start gap-2">
                     <div class="w-4 h-4 bg-yellow-500 rounded mt-0.5"></div>
                     <div>
                         <span class="font-semibold">Hold:</span> Machines with work orders on hold (status = 'Hold')
@@ -462,11 +524,17 @@
                 $compSummary = $comparisonPeriod['summary'] ?? [];
             @endphp
 
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div class="text-center p-3 bg-gray-50 dark:bg-gray-800 rounded">
                     <div class="text-sm text-gray-600 dark:text-gray-400">Running</div>
                     <div class="text-2xl font-bold text-green-600 dark:text-green-400">
-                        {{ number_format($compSummary['avg_running'] ?? 0, 1) }}
+                    {{ number_format($compSummary['avg_running'] ?? 0, 1) }}
+                    </div>
+                </div>
+                <div class="text-center p-3 bg-gray-50 dark:bg-gray-800 rounded">
+                    <div class="text-sm text-gray-600 dark:text-gray-400">Setup</div>
+                    <div class="text-2xl font-bold text-violet-600 dark:text-violet-400">
+                        {{ number_format($compSummary['avg_setup'] ?? 0, 1) }}
                     </div>
                 </div>
                 <div class="text-center p-3 bg-gray-50 dark:bg-gray-800 rounded">

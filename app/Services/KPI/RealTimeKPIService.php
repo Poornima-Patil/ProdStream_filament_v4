@@ -4,6 +4,7 @@ namespace App\Services\KPI;
 
 use App\Models\Factory;
 use App\Models\Machine;
+use Carbon\Carbon;
 
 class RealTimeKPIService extends BaseKPIService
 {
@@ -29,8 +30,11 @@ class RealTimeKPIService extends BaseKPIService
                         $today = now()->startOfDay();
                         $endOfToday = now()->endOfDay();
 
-                        $query->whereIn('status', ['Start', 'Assigned', 'Hold'])
-                            ->whereBetween('start_time', [$today, $endOfToday])
+                        $query->where(function ($statusQuery) use ($today, $endOfToday) {
+                            $statusQuery->where('status', 'Assigned')
+                                ->whereBetween('start_time', [$today, $endOfToday]);
+                        })
+                            ->orWhereIn('status', ['Start', 'Setup', 'Hold'])
                             ->with([
                                 'operator.user:id,first_name,last_name',
                                 'bom.purchaseOrder.partNumber:id,partnumber',
@@ -49,6 +53,7 @@ class RealTimeKPIService extends BaseKPIService
             $statusGroups = [
                 'running' => ['count' => 0, 'machines' => []],
                 'hold' => ['count' => 0, 'machines' => []],
+                'setup' => ['count' => 0, 'machines' => []],
                 'scheduled' => ['count' => 0, 'machines' => []],
                 'idle' => ['count' => 0, 'machines' => []],
             ];
@@ -101,6 +106,40 @@ class RealTimeKPIService extends BaseKPIService
                         'wo_numbers' => $holdWOs->pluck('unique_id')->take(3)->toArray(),
                     ];
                     $statusGroups['hold']['count']++;
+                } elseif ($workOrders->contains('status', 'Setup')) {
+                    // Has work orders in setup phase = Setup
+                    $setupWOs = $workOrders->where('status', 'Setup');
+                    $primarySetupWO = $setupWOs->first();
+
+                    $operatorName = $primarySetupWO?->operator?->user
+                        ? "{$primarySetupWO->operator->user->first_name} {$primarySetupWO->operator->user->last_name}"
+                        : 'Unassigned';
+
+                    $partNumber = $primarySetupWO?->bom?->purchaseOrder?->partNumber?->partnumber ?? 'N/A';
+
+                    $scheduledStart = $primarySetupWO?->start_time
+                        ? $primarySetupWO->start_time->format('M d, H:i')
+                        : 'Not scheduled';
+
+                    $statusGroups['setup']['machines'][] = [
+                        'id' => $machine->id,
+                        'name' => $machine->name,
+                        'asset_id' => $machine->assetId,
+                        'status' => 'setup',
+                        'setup_wo_count' => $setupWOs->count(),
+                        'primary_wo_id' => $primarySetupWO?->id,
+                        'primary_wo_number' => $primarySetupWO?->unique_id ?? 'N/A',
+                        'unique_id' => $primarySetupWO?->unique_id ?? 'N/A',
+                        'operator' => $operatorName,
+                        'part_number' => $partNumber,
+                        'scheduled_start' => $scheduledStart,
+                        'start_time' => $primarySetupWO?->start_time?->toDateTimeString(),
+                        'setup_since' => $primarySetupWO?->updated_at?->toDateTimeString(),
+                        'setup_duration' => $primarySetupWO?->updated_at
+                            ? now()->diffForHumans($primarySetupWO->updated_at, true)
+                            : 'Unknown',
+                    ];
+                    $statusGroups['setup']['count']++;
                 } elseif ($workOrders->contains('status', 'Start')) {
                     // Has at least one running work order = Running
                     $runningWO = $workOrders->firstWhere('status', 'Start');
@@ -176,6 +215,23 @@ class RealTimeKPIService extends BaseKPIService
                 });
             }
 
+            // Setup machines: earliest start time first
+            if (! empty($statusGroups['setup']['machines'])) {
+                usort($statusGroups['setup']['machines'], function ($a, $b) {
+                    $timeA = $a['start_time'] ?? null;
+                    $timeB = $b['start_time'] ?? null;
+
+                    if ($timeA === null) {
+                        return 1;
+                    }
+                    if ($timeB === null) {
+                        return -1;
+                    }
+
+                    return $timeA <=> $timeB;
+                });
+            }
+
             // Scheduled machines: earliest start time first
             if (! empty($statusGroups['scheduled']['machines'])) {
                 usort($statusGroups['scheduled']['machines'], function ($a, $b) {
@@ -212,7 +268,7 @@ class RealTimeKPIService extends BaseKPIService
             return $callback();
         }
 
-        return $this->getCachedKPI('current_machine_status', $callback, 300);
+        return $this->getCachedKPI('current_machine_status_v2', $callback, 300);
     }
 
     /**
@@ -237,6 +293,17 @@ class RealTimeKPIService extends BaseKPIService
             $assignedWOs = \App\Models\WorkOrder::where('factory_id', $this->factory->id)
                 ->where('status', 'Assigned')
                 ->whereBetween('start_time', [$today, $endOfToday])
+                ->with([
+                    'machine:id,name,assetId',
+                    'operator.user:id,first_name,last_name',
+                    'bom.purchaseOrder.partNumber:id,partnumber',
+                ])
+                ->orderBy('start_time', 'asc')
+                ->get();
+
+            // Setup: ALL currently in setup WOs (no date filter)
+            $setupWOs = \App\Models\WorkOrder::where('factory_id', $this->factory->id)
+                ->where('status', 'Setup')
                 ->with([
                     'machine:id,name,assetId',
                     'operator.user:id,first_name,last_name',
@@ -312,6 +379,7 @@ class RealTimeKPIService extends BaseKPIService
             // Combine all work orders for processing
             $workOrders = collect()
                 ->merge($assignedWOs)
+                ->merge($setupWOs)
                 ->merge($startWOs)
                 ->merge($holdWOs)
                 ->merge($completedWOs)
@@ -320,6 +388,7 @@ class RealTimeKPIService extends BaseKPIService
             $statusDistribution = [
                 'hold' => ['count' => 0, 'work_orders' => []],
                 'start' => ['count' => 0, 'work_orders' => []],
+                'setup' => ['count' => 0, 'work_orders' => []],
                 'assigned' => ['count' => 0, 'work_orders' => []],
                 'completed' => ['count' => 0, 'work_orders' => []],
                 'closed' => ['count' => 0, 'work_orders' => []],
@@ -365,6 +434,14 @@ class RealTimeKPIService extends BaseKPIService
                     $woData['scheduled_start'] = $wo->start_time
                         ? $wo->start_time->format('M d, H:i')
                         : 'Not scheduled';
+                } elseif ($status === 'setup') {
+                    $woData['setup_since'] = $wo->updated_at?->toDateTimeString();
+                    $woData['setup_duration'] = $wo->updated_at
+                        ? now()->diffForHumans($wo->updated_at, true)
+                        : 'Unknown';
+                    $woData['scheduled_start'] = $wo->start_time
+                        ? $wo->start_time->format('M d, H:i')
+                        : 'Not scheduled';
                 } elseif ($status === 'completed') {
                     $woData['completed_at'] = $wo->end_time?->toDateTimeString() ?? $wo->updated_at?->toDateTimeString();
                     $woData['completion_rate'] = $wo->qty > 0
@@ -403,6 +480,13 @@ class RealTimeKPIService extends BaseKPIService
                 });
             }
 
+            // Setup: earliest start time first
+            if (! empty($statusDistribution['setup']['work_orders'])) {
+                usort($statusDistribution['setup']['work_orders'], function ($a, $b) {
+                    return ($a['start_time'] ?? '') <=> ($b['start_time'] ?? '');
+                });
+            }
+
             // Completed: most recent first
             if (! empty($statusDistribution['completed']['work_orders'])) {
                 usort($statusDistribution['completed']['work_orders'], function ($a, $b) {
@@ -429,7 +513,149 @@ class RealTimeKPIService extends BaseKPIService
             return $callback();
         }
 
-        return $this->getCachedKPI('current_work_order_status', $callback, 300);
+        return $this->getCachedKPI('current_work_order_status_v2', $callback, 300);
+    }
+
+    /**
+     * Get defect rate dashboard data for today's running work orders with scrap activity
+     */
+    public function getCurrentDefectRate(bool $skipCache = false): array
+    {
+        $callback = function () {
+            $todayStart = now()->startOfDay();
+            $todayEnd = now()->endOfDay();
+            $todayDate = now()->toDateString();
+
+            $aggregatedLogs = \App\Models\WorkOrderLog::query()
+                ->selectRaw('work_order_id, SUM(ok_qtys) as ok_qty_today, SUM(scrapped_qtys) as scrap_qty_today, MAX(changed_at) as last_log_at')
+                ->whereBetween('changed_at', [$todayStart, $todayEnd])
+                ->whereRaw('(ok_qtys + scrapped_qtys) > 0')
+                ->whereHas('workOrder', function ($query) use ($todayDate) {
+                    $query->where('factory_id', $this->factory->id)
+                        ->where('status', 'Start')
+                        ->whereDate('start_time', $todayDate);
+                })
+                ->groupBy('work_order_id')
+                ->havingRaw('SUM(scrapped_qtys) > 0')
+                ->get();
+
+            if ($aggregatedLogs->isEmpty()) {
+                return [
+                    'summary' => [
+                        'defective_work_orders' => 0,
+                        'total_scrap_today' => 0,
+                        'total_produced_today' => 0,
+                        'avg_defect_rate' => 0,
+                        'worst_defect_rate' => 0,
+                    ],
+                    'work_orders' => [],
+                    'updated_at' => now()->toDateTimeString(),
+                ];
+            }
+
+            $workOrderIds = $aggregatedLogs->pluck('work_order_id')->unique()->values();
+
+            $workOrders = \App\Models\WorkOrder::query()
+                ->whereIn('id', $workOrderIds)
+                ->with([
+                    'machine:id,name,assetId',
+                    'operator.user:id,first_name,last_name',
+                    'bom.purchaseOrder.partNumber:id,partnumber',
+                ])
+                ->get()
+                ->keyBy('id');
+
+            $workOrdersData = [];
+            $totalScrapToday = 0;
+            $totalProducedToday = 0;
+
+            foreach ($aggregatedLogs as $logAggregate) {
+                $workOrder = $workOrders->get($logAggregate->work_order_id);
+
+                if (! $workOrder) {
+                    continue;
+                }
+
+                $scrapToday = (int) ($logAggregate->scrap_qty_today ?? 0);
+                $okToday = (int) ($logAggregate->ok_qty_today ?? 0);
+                $producedToday = $scrapToday + $okToday;
+
+                if ($producedToday <= 0) {
+                    continue;
+                }
+
+                $totalScrapToday += $scrapToday;
+                $totalProducedToday += $producedToday;
+
+                $defectRateToday = $producedToday > 0
+                    ? round(($scrapToday / $producedToday) * 100, 2)
+                    : 0;
+
+                $cumulativeProduced = (int) (($workOrder->ok_qtys ?? 0) + ($workOrder->scrapped_qtys ?? 0));
+                $cumulativeDefectRate = $cumulativeProduced > 0
+                    ? round((($workOrder->scrapped_qtys ?? 0) / $cumulativeProduced) * 100, 2)
+                    : 0;
+
+                $operatorName = $workOrder->operator?->user
+                    ? "{$workOrder->operator->user->first_name} {$workOrder->operator->user->last_name}"
+                    : 'Unassigned';
+
+                $partNumber = $workOrder->bom?->purchaseOrder?->partNumber?->partnumber ?? 'N/A';
+
+                $lastScrapAt = $logAggregate->last_log_at
+                    ? Carbon::parse($logAggregate->last_log_at)
+                    : null;
+
+                $workOrdersData[] = [
+                    'id' => $workOrder->id,
+                    'wo_number' => $workOrder->unique_id ?? 'N/A',
+                    'machine_name' => $workOrder->machine?->name ?? 'Unknown',
+                    'machine_asset_id' => $workOrder->machine?->assetId ?? null,
+                    'operator' => $operatorName,
+                    'part_number' => $partNumber,
+                    'scrap_today' => $scrapToday,
+                    'ok_today' => $okToday,
+                    'produced_today' => $producedToday,
+                    'defect_rate_today' => $defectRateToday,
+                    'total_scrap' => (int) ($workOrder->scrapped_qtys ?? 0),
+                    'total_ok' => (int) ($workOrder->ok_qtys ?? 0),
+                    'cumulative_defect_rate' => $cumulativeDefectRate,
+                    'started_at' => $workOrder->start_time?->toDateTimeString(),
+                    'runtime_minutes' => $workOrder->start_time ? $workOrder->start_time->diffInMinutes(now()) : null,
+                    'last_scrap_at' => $lastScrapAt?->toDateTimeString(),
+                    'last_scrap_human' => $lastScrapAt ? $lastScrapAt->diffForHumans() : null,
+                ];
+            }
+
+            // Sort by worst defect rate first
+            usort($workOrdersData, fn ($a, $b) => $b['defect_rate_today'] <=> $a['defect_rate_today']);
+
+            $worstDefectRate = ! empty($workOrdersData)
+                ? max(array_column($workOrdersData, 'defect_rate_today'))
+                : 0;
+
+            $avgDefectRate = $totalProducedToday > 0
+                ? round(($totalScrapToday / $totalProducedToday) * 100, 2)
+                : 0;
+
+            return [
+                'summary' => [
+                    'defective_work_orders' => count($workOrdersData),
+                    'total_scrap_today' => $totalScrapToday,
+                    'total_produced_today' => $totalProducedToday,
+                    'avg_defect_rate' => $avgDefectRate,
+                    'worst_defect_rate' => $worstDefectRate,
+                ],
+                'work_orders' => $workOrdersData,
+                'updated_at' => now()->toDateTimeString(),
+            ];
+        };
+
+        if ($skipCache) {
+            return $callback();
+        }
+
+        return $this->getCachedKPI('current_defect_rate_dashboard_v1', $callback, 300);
     }
 
     /**
@@ -789,7 +1015,7 @@ class RealTimeKPIService extends BaseKPIService
                 $workOrders = \App\Models\WorkOrder::where('factory_id', $this->factory->id)
                     ->where('machine_id', $machine->id)
                     ->whereDate('start_time', $today)
-                    ->whereIn('status', ['Start', 'Completed', 'Hold'])
+                    ->whereIn('status', ['Start', 'Completed', 'Setup', 'Hold'])
                     ->get();
 
                 if ($workOrders->isEmpty()) {

@@ -82,7 +82,7 @@ class MachineStatusChart extends ChartWidget
             ->get()
             ->keyBy('status');
 
-        $statuses = ['Assigned', 'Start', 'Hold', 'Completed', 'Closed'];
+        $statuses = ['Assigned', 'Setup', 'Start', 'Hold', 'Completed', 'Closed'];
         $counts = [];
         $statusColors = config('work_order_status');
 
@@ -92,6 +92,7 @@ class MachineStatusChart extends ChartWidget
 
         $colors = [
             $statusColors['assigned'],
+            $statusColors['setup'],
             $statusColors['start'],
             $statusColors['hold'],
             $statusColors['completed'],
