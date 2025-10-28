@@ -2,27 +2,24 @@
 
 namespace App\Filament\Admin\Resources\WorkOrderGroupResource\RelationManagers;
 
-use Filament\Actions\AssociateAction;
+use App\Models\WorkOrder;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\DissociateAction;
-use Filament\Actions\DissociateBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Actions\Action;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Schemas\Components\Section;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Table;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
-use App\Models\WorkOrder;
+use Filament\Tables\Table;
 
 class DependenciesRelationManager extends RelationManager
 {
@@ -42,6 +39,7 @@ class DependenciesRelationManager extends RelationManager
                             ->mapWithKeys(function ($workOrder) {
                                 $partNumber = $workOrder->bom?->purchaseOrder?->partNumber?->partnumber ?? 'Unknown';
                                 $label = "{$workOrder->unique_id} - {$partNumber} (Qty: {$workOrder->qty}) [Seq: {$workOrder->sequence_order}]";
+
                                 return [$workOrder->id => $label];
                             });
                     })
@@ -59,6 +57,7 @@ class DependenciesRelationManager extends RelationManager
                             ->mapWithKeys(function ($workOrder) {
                                 $partNumber = $workOrder->bom?->purchaseOrder?->partNumber?->partnumber ?? 'Unknown';
                                 $label = "{$workOrder->unique_id} - {$partNumber} (Qty: {$workOrder->qty}) [Seq: {$workOrder->sequence_order}]";
+
                                 return [$workOrder->id => $label];
                             });
                     })
@@ -95,6 +94,7 @@ class DependenciesRelationManager extends RelationManager
                                     ->mapWithKeys(function ($workOrder) {
                                         $partNumber = $workOrder->bom?->purchaseOrder?->partNumber?->partnumber ?? 'Unknown';
                                         $label = "{$workOrder->unique_id} - {$partNumber} [Seq: {$workOrder->sequence_order}]";
+
                                         return [$workOrder->id => $label];
                                     });
                             })
@@ -170,7 +170,7 @@ class DependenciesRelationManager extends RelationManager
                     ->alignCenter(),
                 TextColumn::make('satisfaction_progress')
                     ->label('Progress')
-                    ->formatStateUsing(fn ($record) => $record->satisfaction_progress . '%')
+                    ->formatStateUsing(fn ($record) => $record->satisfaction_progress.'%')
                     ->alignCenter(),
                 IconColumn::make('is_satisfied')
                     ->boolean()
@@ -200,6 +200,7 @@ class DependenciesRelationManager extends RelationManager
                             ->get()
                             ->mapWithKeys(function ($workOrder) {
                                 $partNumber = $workOrder->bom?->purchaseOrder?->partNumber?->partnumber ?? 'Unknown';
+
                                 return [$workOrder->id => "{$workOrder->unique_id} - {$partNumber}"];
                             });
                     }),
@@ -229,7 +230,7 @@ class DependenciesRelationManager extends RelationManager
                                     $updateData['is_dependency_root'] = $data['is_dependency_root'];
                                 }
 
-                                if (!empty($updateData)) {
+                                if (! empty($updateData)) {
                                     $workOrderToUpdate->update($updateData);
                                 }
                             }
@@ -248,7 +249,7 @@ class DependenciesRelationManager extends RelationManager
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
                     ->action(fn ($record) => $record->checkSatisfaction())
-                    ->visible(fn ($record) => !$record->is_satisfied),
+                    ->visible(fn ($record) => ! $record->is_satisfied),
                 DeleteAction::make(),
             ])
             ->toolbarActions([

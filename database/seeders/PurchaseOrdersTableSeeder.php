@@ -2,10 +2,9 @@
 
 namespace Database\Seeders;
 
+use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
-use Illuminate\Support\Collection;
 
 class PurchaseOrdersTableSeeder extends Seeder
 {
@@ -16,7 +15,7 @@ class PurchaseOrdersTableSeeder extends Seeder
         $partNumbers = DB::table('part_numbers')->where('factory_id', $factoryId)->get();
 
         if ($partNumbers->count() < count($customers) * 2) {
-            throw new \Exception("At least " . (count($customers) * 2) . " part numbers are required (2 per customer × " . count($customers) . " customers).");
+            throw new \Exception('At least '.(count($customers) * 2).' part numbers are required (2 per customer × '.count($customers).' customers).');
         }
 
         $unitOptions = ['Kgs', 'Numbers'];
@@ -91,7 +90,7 @@ class PurchaseOrdersTableSeeder extends Seeder
             }
 
             $serial = str_pad($poIndex++, 4, '0', STR_PAD_LEFT);
-            $uniqueId = 'S' . $serial . '_' . $monthYear . '_' . $customer->customer_id . '_' . $part->partnumber . '_' . $part->revision;
+            $uniqueId = 'S'.$serial.'_'.$monthYear.'_'.$customer->customer_id.'_'.$part->partnumber.'_'.$part->revision;
 
             $deliveryTargetDate = Carbon::parse($customer->created_at)
                 ->addSeconds($qty * $cycleTime)

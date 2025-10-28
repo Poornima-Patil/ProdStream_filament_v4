@@ -24,6 +24,7 @@ class Factory3WorkOrderSeeder extends Seeder
 
         if (empty($machines) || empty($operators) || empty($boms)) {
             $this->command->error('Factory 1 needs machines, operators, and BOMs first!');
+
             return;
         }
 
@@ -51,15 +52,15 @@ class Factory3WorkOrderSeeder extends Seeder
             $endTime = $startTime->copy()->addHours($duration);
 
             $qty = rand(10, 500);
-            $okQtys = $status === 'Completed' ? rand((int)($qty * 0.7), $qty) : rand(0, (int)($qty * 0.5));
-            $scrappedQtys = rand(0, (int)($qty * 0.1));
+            $okQtys = $status === 'Completed' ? rand((int) ($qty * 0.7), $qty) : rand(0, (int) ($qty * 0.5));
+            $scrappedQtys = rand(0, (int) ($qty * 0.1));
 
             $workOrders[] = [
                 'bom_id' => $boms[array_rand($boms)],
                 'factory_id' => $factoryId,
                 'machine_id' => $machines[array_rand($machines)],
                 'operator_id' => $operators[array_rand($operators)],
-                'unique_id' => 'WO-F1-' . str_pad($i + 1, 6, '0', STR_PAD_LEFT),
+                'unique_id' => 'WO-F1-'.str_pad($i + 1, 6, '0', STR_PAD_LEFT),
                 'qty' => $qty,
                 'ok_qtys' => $okQtys,
                 'scrapped_qtys' => $scrappedQtys,
@@ -74,12 +75,12 @@ class Factory3WorkOrderSeeder extends Seeder
             if (count($workOrders) >= $batchSize) {
                 WorkOrder::insert($workOrders);
                 $workOrders = [];
-                $this->command->info("Inserted " . (($i + 1)) . " work orders...");
+                $this->command->info('Inserted '.(($i + 1)).' work orders...');
             }
         }
 
         // Insert remaining
-        if (!empty($workOrders)) {
+        if (! empty($workOrders)) {
             WorkOrder::insert($workOrders);
         }
 
@@ -92,7 +93,7 @@ class Factory3WorkOrderSeeder extends Seeder
             ->pluck('count', 'status');
 
         $this->command->newLine();
-        $this->command->info("Status Distribution:");
+        $this->command->info('Status Distribution:');
         foreach ($distribution as $status => $count) {
             $this->command->info("  {$status}: {$count}");
         }

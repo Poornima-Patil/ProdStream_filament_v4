@@ -2,10 +2,10 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\DB;
-use Livewire\Livewire;
 use App\Filament\Admin\Widgets\AdvancedWorkOrderGantt;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,7 +22,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //Livewire::component('app.filament.admin.widgets.advanced-work-order-gantt', AdvancedWorkOrderGantt::class);
+        // Livewire::component('app.filament.admin.widgets.advanced-work-order-gantt', AdvancedWorkOrderGantt::class);
 
         // Force PHP timezone
         date_default_timezone_set(config('app.timezone', 'Asia/Kolkata'));
@@ -33,4 +33,3 @@ class AppServiceProvider extends ServiceProvider
         }
     }
 }
-

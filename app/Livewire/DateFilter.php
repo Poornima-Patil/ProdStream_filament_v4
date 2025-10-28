@@ -2,12 +2,13 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
 use Carbon\Carbon;
+use Livewire\Component;
 
 class DateFilter extends Component
 {
     public $fromDate;
+
     public $toDate;
 
     public function mount()
@@ -21,6 +22,7 @@ class DateFilter extends Component
         if ($this->fromDate && $this->toDate) {
             if (Carbon::parse($this->fromDate)->gt(Carbon::parse($this->toDate))) {
                 $this->addError('fromDate', 'From date cannot be later than To date.');
+
                 return;
             }
             $this->resetErrorBag();

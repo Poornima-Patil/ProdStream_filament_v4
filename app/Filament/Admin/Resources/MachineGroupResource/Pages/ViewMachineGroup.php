@@ -84,7 +84,7 @@ class ViewMachineGroup extends ViewRecord
                             // Show notification
                             \Filament\Notifications\Notification::make()
                                 ->title('Date range updated')
-                                ->body('Data filtered from ' . $this->dateFrom . ' to ' . $this->dateTo)
+                                ->body('Data filtered from '.$this->dateFrom.' to '.$this->dateTo)
                                 ->success()
                                 ->send();
                         }),
@@ -268,7 +268,7 @@ class ViewMachineGroup extends ViewRecord
                                     </div>
 
                                     <!-- Bottom Row: Chart Full Width - Placeholder for Widget -->
-                                    <div id="machine-group-chart-container-' . $record->id . '"></div>
+                                    <div id="machine-group-chart-container-'.$record->id.'"></div>
                                 </div>
                             ');
                         })->html(),
@@ -278,7 +278,7 @@ class ViewMachineGroup extends ViewRecord
                         'record' => $this->record,
                         'dateFrom' => $this->dateFrom,
                         'dateTo' => $this->dateTo,
-                    ])->key('machine-group-status-chart-' . $this->record->id),
+                    ])->key('machine-group-status-chart-'.$this->record->id),
                 ]),
 
             Section::make('Machine Group Details')
@@ -288,7 +288,7 @@ class ViewMachineGroup extends ViewRecord
                     TextEntry::make('Machine Group Information')
                         ->label('')
                         ->getStateUsing(function ($record) {
-                            if (!$record) {
+                            if (! $record) {
                                 return '<div class="text-gray-500 dark:text-gray-400">No Machine Group Found</div>';
                             }
 

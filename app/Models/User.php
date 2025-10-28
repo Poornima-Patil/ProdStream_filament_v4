@@ -104,11 +104,11 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
         return "{$this->first_name} {$this->last_name}";
     }
 
-    public function hasRole($roles, string $guard = null): bool
+    public function hasRole($roles, ?string $guard = null): bool
     {
         $factoryId = $this->factory_id ?? Filament::getTenant()?->id;
 
-        if (!$factoryId) {
+        if (! $factoryId) {
             return parent::hasRole($roles, $guard);
         }
 
@@ -126,6 +126,7 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
                     return true;
                 }
             }
+
             return false;
         }
 
@@ -136,7 +137,7 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
     {
         $factoryId = $this->factory_id ?? Filament::getTenant()?->id;
 
-        if (!$factoryId) {
+        if (! $factoryId) {
             return parent::hasPermissionTo($permission, $guardName);
         }
 
@@ -160,8 +161,8 @@ class User extends Authenticatable implements FilamentUser, HasName, HasTenants
             ->where('guard_name', $guard)
             ->whereHas('permissions', function ($query) use ($permissionName, $guard, $factoryId) {
                 $query->where('name', $permissionName)
-                      ->where('guard_name', $guard)
-                      ->where('factory_id', $factoryId);
+                    ->where('guard_name', $guard)
+                    ->where('factory_id', $factoryId);
             })
             ->exists();
     }

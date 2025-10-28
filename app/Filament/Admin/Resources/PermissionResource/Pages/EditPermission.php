@@ -2,11 +2,10 @@
 
 namespace App\Filament\Admin\Resources\PermissionResource\Pages;
 
+use App\Filament\Admin\Resources\PermissionResource;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
-use App\Filament\Admin\Resources\PermissionResource;
-use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 
 class EditPermission extends EditRecord

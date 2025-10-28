@@ -20,6 +20,7 @@ class WorkOrder extends Model
         'machine_id',
         'operator_id',
         'start_time',
+        'delay_time',
         'end_time',
         'status',
         'ok_qtys',
@@ -1385,6 +1386,72 @@ class WorkOrder extends Model
         }
 
         return ($this->ok_qtys ?? 0) >= $this->qty;
+    }
+
+    /**
+     * Calculate the maximum allowed time to start the work order
+     * Returns the planned start time + delay time
+     */
+    public function getMaxAllowedStartTime(): Carbon
+    {
+        $plannedStartTime = Carbon::parse($this->start_time);
+        $delayTime = $this->delay_time ?? '00:00:00';
+
+        // Ensure delay_time has seconds component (add :00 if HH:MM format)
+        if (substr_count($delayTime, ':') === 1) {
+            $delayTime .= ':00';
+        }
+
+        $timeParts = explode(':', $delayTime);
+        $hours = (int) ($timeParts[0] ?? 0);
+        $minutes = (int) ($timeParts[1] ?? 0);
+        $seconds = (int) ($timeParts[2] ?? 0);
+
+        return $plannedStartTime->copy()
+            ->addHours($hours)
+            ->addMinutes($minutes)
+            ->addSeconds($seconds);
+    }
+
+    /**
+     * Check if operator can start the work order at the current time
+     * Returns validation result with reason if cannot start
+     */
+    public function canOperatorStartNow(): array
+    {
+        $plannedStartTime = Carbon::parse($this->start_time);
+        $currentTime = now();
+        $maxAllowedTime = $this->getMaxAllowedStartTime();
+
+        // Check for early start
+        if ($currentTime->lt($plannedStartTime)) {
+            return [
+                'can_start' => false,
+                'reason' => 'early_start',
+                'message' => 'You cannot start this work order before the planned start time ('.$plannedStartTime->format('d-m-Y H:i').'). Please use the "Request Start Time Approval" button at the top to alert your manager.',
+                'planned_start' => $plannedStartTime,
+                'max_allowed' => $maxAllowedTime,
+            ];
+        }
+
+        // Check for late start
+        if ($currentTime->gt($maxAllowedTime)) {
+            return [
+                'can_start' => false,
+                'reason' => 'late_start',
+                'message' => 'You have exceeded the allowed time limit ('.$maxAllowedTime->format('d-m-Y H:i').'). Please use the "Request Start Time Approval" button at the top to alert your manager.',
+                'planned_start' => $plannedStartTime,
+                'max_allowed' => $maxAllowedTime,
+            ];
+        }
+
+        return [
+            'can_start' => true,
+            'reason' => null,
+            'message' => null,
+            'planned_start' => $plannedStartTime,
+            'max_allowed' => $maxAllowedTime,
+        ];
     }
 
     /**

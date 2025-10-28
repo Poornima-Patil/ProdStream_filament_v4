@@ -2,10 +2,10 @@
 
 namespace Database\Seeders;
 
+use App\Models\Bom;
+use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
-use App\Models\Bom;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
@@ -51,6 +51,7 @@ class BomsTableSeeder extends Seeder
                 ) {
                     $this->attachFiles($existingBom);
                 }
+
                 continue; // Skip creating new BOM
             }
 
@@ -58,7 +59,7 @@ class BomsTableSeeder extends Seeder
             $monthYear = $bomCreatedAt->format('mY');
 
             // Reset serial number for new month
-            if (!isset($serialCounters[$monthYear])) {
+            if (! isset($serialCounters[$monthYear])) {
                 $lastUniqueId = Bom::where('unique_id', 'like', "O%{$monthYear}%")
                     ->orderByDesc('unique_id')
                     ->value('unique_id');
@@ -86,21 +87,21 @@ class BomsTableSeeder extends Seeder
                 ->first();
 
             // Skip if data is missing
-            if (!$customer || !$part) {
+            if (! $customer || ! $part) {
                 continue;
             }
 
             // Construct unique_id
             $uniqueId =
-                'O' .
-                $serial .
-                '_' .
-                $monthYear .
-                '_' .
-                $customer->customer_id .
-                '_' .
-                $part->partnumber .
-                '_' .
+                'O'.
+                $serial.
+                '_'.
+                $monthYear.
+                '_'.
+                $customer->customer_id.
+                '_'.
+                $part->partnumber.
+                '_'.
                 $part->revision;
 
             // Assign machine group and operator proficiency in round-robin
@@ -176,7 +177,7 @@ class BomsTableSeeder extends Seeder
     ): void {
         $fileContents = Http::get($fileUrl)->body();
         $fileName = basename(parse_url($fileUrl, PHP_URL_PATH));
-        $tempPath = 'temp/' . uniqid() . '_' . $fileName;
+        $tempPath = 'temp/'.uniqid().'_'.$fileName;
 
         Storage::disk('public')->put($tempPath, $fileContents);
 

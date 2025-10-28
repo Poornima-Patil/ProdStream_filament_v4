@@ -83,6 +83,7 @@ class WorkOrderDependency extends Model
     {
         if ($this->dependency_type === 'quantity_based') {
             $totalProduced = $this->getAvailableQuantity();
+
             return min(100, round(($totalProduced / $this->required_quantity) * 100, 2));
         }
 

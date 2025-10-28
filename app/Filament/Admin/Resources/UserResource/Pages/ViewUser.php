@@ -2,12 +2,12 @@
 
 namespace App\Filament\Admin\Resources\UserResource\Pages;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Illuminate\Support\HtmlString;
 use App\Filament\Admin\Resources\UserResource;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Illuminate\Support\HtmlString;
 
 class ViewUser extends ViewRecord
 {
@@ -26,10 +26,10 @@ class ViewUser extends ViewRecord
                 ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('View User')
-                    ->hiddenLabel()
+                        ->hiddenLabel()
                         ->label('')
                         ->getStateUsing(function ($record) {
-                            if (!$record) {
+                            if (! $record) {
                                 return '<div class="text-gray-500 dark:text-gray-400">No Users Found</div>';
                             }
 
@@ -37,7 +37,7 @@ class ViewUser extends ViewRecord
                             $lastName = $record->last_name;
                             $email = $record->email;
                             $Emp_id = $record->emp_id;
-                            $Roles = implode(", ", $record->getRoleNames()->toArray());
+                            $Roles = implode(', ', $record->getRoleNames()->toArray());
                             $Department = $record->department && $record->department->name ? $record->department->name : '';
 
                             return new HtmlString('

@@ -2,22 +2,23 @@
 
 namespace App\Filament\Admin\Resources\CustomerInformationResource\Pages;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Illuminate\Support\HtmlString;
 use App\Filament\Admin\Resources\CustomerInformationResource;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Resources\Pages\ViewRecord;
-use Filament\Schemas\Components\Livewire;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Livewire;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Illuminate\Support\HtmlString;
 
 class ViewCustomerInformation extends ViewRecord
 {
     protected static string $resource = CustomerInformationResource::class;
 
     public ?string $dateFrom = null;
+
     public ?string $dateTo = null;
 
     public function mount($record): void
@@ -25,7 +26,7 @@ class ViewCustomerInformation extends ViewRecord
         parent::mount($record);
 
         // Set default date range to last 30 days if not provided
-        if (!$this->dateFrom || !$this->dateTo) {
+        if (! $this->dateFrom || ! $this->dateTo) {
             $this->dateTo = Carbon::now()->format('Y-m-d');
             $this->dateFrom = Carbon::now()->subDays(30)->format('Y-m-d');
         }
@@ -74,7 +75,7 @@ class ViewCustomerInformation extends ViewRecord
                             // Show notification
                             \Filament\Notifications\Notification::make()
                                 ->title('Date range updated')
-                                ->body('Data filtered from ' . $this->dateFrom . ' to ' . $this->dateTo)
+                                ->body('Data filtered from '.$this->dateFrom.' to '.$this->dateTo)
                                 ->success()
                                 ->send();
                         }),
@@ -84,8 +85,8 @@ class ViewCustomerInformation extends ViewRecord
                         'customer' => $this->record,
                         'fromDate' => $this->dateFrom,
                         'toDate' => $this->dateTo,
-                        'factoryId' => \Filament\Facades\Filament::getTenant()?->id
-                    ])->key('customer-analytics-' . $this->record->id),
+                        'factoryId' => \Filament\Facades\Filament::getTenant()?->id,
+                    ])->key('customer-analytics-'.$this->record->id),
                 ]),
 
             Section::make('Customer Information')
@@ -95,7 +96,7 @@ class ViewCustomerInformation extends ViewRecord
                     TextEntry::make('Customer Details')
                         ->label('')
                         ->getStateUsing(function ($record) {
-                            if (!$record) {
+                            if (! $record) {
                                 return '<div class="text-gray-500 dark:text-gray-400">No Customers Found</div>';
                             }
 

@@ -2,9 +2,8 @@
 
 namespace App\Filament\Admin\Resources\MachineGroupResource\Pages;
 
-use Filament\Actions\CreateAction;
 use App\Filament\Admin\Resources\MachineGroupResource;
-use Filament\Actions;
+use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListMachineGroups extends ListRecords

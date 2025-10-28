@@ -2,8 +2,8 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
 use Illuminate\Support\Facades\DB;
+use Livewire\Component;
 
 class MachineGroupSummary extends Component
 {
@@ -13,7 +13,6 @@ class MachineGroupSummary extends Component
     {
         $this->machineGroup = $machineGroup;
     }
-
 
     public function getWorkOrderSummaryData()
     {
@@ -40,14 +39,14 @@ class MachineGroupSummary extends Component
             $percentage = $totalOrders > 0 ? round(($count / $totalOrders) * 100, 1) : 0;
             $statusData[$status] = [
                 'count' => $count,
-                'percentage' => $percentage
+                'percentage' => $percentage,
             ];
         }
 
         return [
             'statusData' => $statusData,
             'totalOrders' => $totalOrders,
-            'statusColors' => $statusColors
+            'statusColors' => $statusColors,
         ];
     }
 
@@ -81,7 +80,7 @@ class MachineGroupSummary extends Component
             'totalOk' => $totalOk,
             'totalScrapped' => $totalScrapped,
             'totalProduced' => $totalProduced,
-            'qualityRate' => $qualityRate
+            'qualityRate' => $qualityRate,
         ];
     }
 
@@ -135,7 +134,7 @@ class MachineGroupSummary extends Component
 
         return view('livewire.machine-group-summary', [
             'workOrderData' => $workOrderData,
-            'qualityData' => $qualityData
+            'qualityData' => $qualityData,
         ]);
     }
 }

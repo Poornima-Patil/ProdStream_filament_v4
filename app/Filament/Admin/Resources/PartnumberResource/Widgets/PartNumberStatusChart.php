@@ -19,7 +19,8 @@ class PartNumberStatusChart extends ChartWidget
         if ($this->dateFrom && $this->dateTo) {
             $fromDate = Carbon::parse($this->dateFrom)->format('M j, Y');
             $toDate = Carbon::parse($this->dateTo)->format('M j, Y');
-            return $baseHeading . ' (' . $fromDate . ' - ' . $toDate . ')';
+
+            return $baseHeading.' ('.$fromDate.' - '.$toDate.')';
         }
 
         return $baseHeading;
@@ -39,7 +40,7 @@ class PartNumberStatusChart extends ChartWidget
     {
         // Date range should be passed from parent component
         // If not provided, default to last 30 days
-        if (!$this->dateFrom || !$this->dateTo) {
+        if (! $this->dateFrom || ! $this->dateTo) {
             $this->dateTo = Carbon::now()->format('Y-m-d');
             $this->dateFrom = Carbon::now()->subDays(30)->format('Y-m-d');
         }
@@ -64,13 +65,14 @@ class PartNumberStatusChart extends ChartWidget
 
     protected function getData(): array
     {
-        \Log::info('PartNumberStatusChart getData called with record ID: ' . ($this->record?->id ?? 'null'));
+        \Log::info('PartNumberStatusChart getData called with record ID: '.($this->record?->id ?? 'null'));
 
-        if (!$this->record?->id) {
+        if (! $this->record?->id) {
             \Log::warning('PartNumberStatusChart: No record available, returning empty data');
+
             return [
                 'labels' => [],
-                'datasets' => []
+                'datasets' => [],
             ];
         }
 

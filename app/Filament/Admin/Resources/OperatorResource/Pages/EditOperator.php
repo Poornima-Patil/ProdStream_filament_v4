@@ -2,11 +2,10 @@
 
 namespace App\Filament\Admin\Resources\OperatorResource\Pages;
 
+use App\Filament\Admin\Resources\OperatorResource;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
-use App\Filament\Admin\Resources\OperatorResource;
-use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 
 class EditOperator extends EditRecord

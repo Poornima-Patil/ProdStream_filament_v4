@@ -2,16 +2,15 @@
 
 namespace Tests\Feature;
 
-use App\Models\WorkOrder;
-use App\Models\WorkOrderGroup;
+use App\Models\Bom;
+use App\Models\Factory;
+use App\Models\Machine;
+use App\Models\Operator;
+use App\Models\User;
 use App\Models\WorkOrderBatch;
 use App\Models\WorkOrderBatchKey;
 use App\Models\WorkOrderDependency;
-use App\Models\User;
-use App\Models\Operator;
-use App\Models\Factory;
-use App\Models\Machine;
-use App\Models\Bom;
+use App\Models\WorkOrderGroup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -20,10 +19,15 @@ class WorkOrderBatchSystemTest extends TestCase
     use RefreshDatabase;
 
     protected $factory;
+
     protected $workOrderGroup;
+
     protected $rootWorkOrder;
+
     protected $dependentWorkOrder;
+
     protected $operator;
+
     protected $user;
 
     protected function setUp(): void
@@ -37,7 +41,7 @@ class WorkOrderBatchSystemTest extends TestCase
             'city' => 'Test City',
             'state' => 'Test State',
             'country' => 'Test Country',
-            'zip_code' => '12345'
+            'zip_code' => '12345',
         ]);
 
         // Create user
@@ -47,13 +51,13 @@ class WorkOrderBatchSystemTest extends TestCase
         $this->operator = \App\Models\Operator::create([
             'factory_id' => $this->factory->id,
             'user_id' => $this->user->id,
-            'operator_proficiency_id' => 1
+            'operator_proficiency_id' => 1,
         ]);
 
         // Create work order group
         $this->workOrderGroup = WorkOrderGroup::factory()->create([
             'factory_id' => $this->factory->id,
-            'status' => 'active'
+            'status' => 'active',
         ]);
 
         // Create machine and BOM for work orders
@@ -61,14 +65,14 @@ class WorkOrderBatchSystemTest extends TestCase
             'name' => 'Test Machine',
             'assetId' => 'MACH001',
             'factory_id' => $this->factory->id,
-            'machine_group_id' => 1
+            'machine_group_id' => 1,
         ]);
 
         $bom = \App\Models\Bom::create([
             'unique_id' => 'BOM001',
             'machine_group_id' => 1,
             'operator_proficiency_id' => 1,
-            'purchase_order_id' => 1
+            'purchase_order_id' => 1,
         ]);
 
         // Create root work order directly
@@ -83,7 +87,7 @@ class WorkOrderBatchSystemTest extends TestCase
             'status' => 'Assigned',
             'factory_id' => $this->factory->id,
             'work_order_group_id' => $this->workOrderGroup->id,
-            'is_dependency_root' => true
+            'is_dependency_root' => true,
         ]);
 
         // Create dependent work order directly
@@ -98,7 +102,7 @@ class WorkOrderBatchSystemTest extends TestCase
             'status' => 'Waiting',
             'factory_id' => $this->factory->id,
             'work_order_group_id' => $this->workOrderGroup->id,
-            'is_dependency_root' => false
+            'is_dependency_root' => false,
         ]);
 
         // Create dependency
@@ -108,7 +112,7 @@ class WorkOrderBatchSystemTest extends TestCase
             'successor_work_order_id' => $this->dependentWorkOrder->id,
             'dependency_type' => 'quantity_based',
             'required_quantity' => 25,
-            'is_satisfied' => false
+            'is_satisfied' => false,
         ]);
     }
 
@@ -199,8 +203,8 @@ class WorkOrderBatchSystemTest extends TestCase
                 'work_order_id' => $this->rootWorkOrder->id,
                 'dependency_type' => 'quantity_based',
                 'quantity_needed' => 1,
-                'work_order_name' => $this->rootWorkOrder->unique_id
-            ]
+                'work_order_name' => $this->rootWorkOrder->unique_id,
+            ],
         ]);
 
         expect($dependentBatch)->toBeInstanceOf(WorkOrderBatch::class);

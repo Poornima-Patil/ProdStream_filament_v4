@@ -2,11 +2,9 @@
 
 namespace App\Filament\Admin\Pages;
 
-use Filament\Pages\Page;
-use Filament\Forms\Components\Radio;
-use Filament\Forms\Components\Section;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
+use Filament\Pages\Page;
 use Illuminate\Support\Facades\Cache;
 
 class Settings extends Page
@@ -14,8 +12,11 @@ class Settings extends Page
     protected string $view = 'filament.admin.pages.settings';
 
     protected static ?string $navigationLabel = 'Settings';
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-cog-6-tooth';
-    protected static string | \UnitEnum | null $navigationGroup = 'Admin Operations';
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cog-6-tooth';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Admin Operations';
+
     protected static ?int $navigationSort = 99;
 
     public ?string $kpiDateType = null;
@@ -34,7 +35,7 @@ class Settings extends Page
                 ->icon('heroicon-o-arrow-path')
                 ->color('gray')
                 ->action('resetToDefaults')
-                ->requiresConfirmation()
+                ->requiresConfirmation(),
         ];
     }
 

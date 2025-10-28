@@ -2,15 +2,15 @@
 
 namespace Database\Seeders;
 
+use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class PartNumbersTableSeeder extends Seeder
 {
     public function run(): void
     {
-        $factoryId = env('SEED_FACTORY_ID', 1); 
+        $factoryId = env('SEED_FACTORY_ID', 1);
         $revisions = ['0', 'A', 'B', 'C'];
         $now = Carbon::now();
 
@@ -20,7 +20,7 @@ class PartNumbersTableSeeder extends Seeder
             'Cooling Fan Blade', 'Exhaust Manifold', 'Transmission Cover', 'Bearing Block',
             'Hydraulic Cylinder', 'Timing Chain', 'Pressure Regulator', 'Compressor Head',
             'Fuel Injector', 'Ignition Coil Bracket', 'Air Filter Housing', 'Clutch Disk',
-            'Axle Tube', 'Tension Pulley', 'Actuator Arm', 'Gearbox Mount', 'Sealing Gasket'
+            'Axle Tube', 'Tension Pulley', 'Actuator Arm', 'Gearbox Mount', 'Sealing Gasket',
         ];
 
         foreach ($componentTypes as $index => $component) {
@@ -28,13 +28,13 @@ class PartNumbersTableSeeder extends Seeder
 
             foreach ($revisions as $revision) {
                 DB::table('part_numbers')->insert([
-                    'partnumber'   => $partNumber,
-                    'revision'     => $revision,
-                    'description'  => "{$component} - Rev {$revision}",
-                    'factory_id'   => $factoryId,
-                    'cycle_time'   => random_int(30, 300), // e.g., 30s to 5 mins
-                    'created_at'   => $now,
-                    'updated_at'   => $now,
+                    'partnumber' => $partNumber,
+                    'revision' => $revision,
+                    'description' => "{$component} - Rev {$revision}",
+                    'factory_id' => $factoryId,
+                    'cycle_time' => random_int(30, 300), // e.g., 30s to 5 mins
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ]);
             }
         }

@@ -3,14 +3,17 @@
 namespace App\Livewire\Calendar\Machines;
 
 use App\Models\Machine;
-use Livewire\Component;
 use Carbon\Carbon;
+use Livewire\Component;
 
 class MachineScheduleCalendar extends Component
 {
     public Machine $machine;
+
     public string $viewType = 'week';
+
     public string $currentDate;
+
     public array $events = [];
 
     public function mount(Machine $machine, string $viewType = 'week')
@@ -107,7 +110,8 @@ class MachineScheduleCalendar extends Component
             case 'week':
                 $start = $date->copy()->startOfWeek(Carbon::MONDAY);
                 $end = $date->copy()->startOfWeek(Carbon::MONDAY)->addDays(5); // Monday to Saturday
-                return $start->format('M j') . ' - ' . $end->format('M j, Y');
+
+                return $start->format('M j').' - '.$end->format('M j, Y');
             case 'month':
                 return $date->format('F Y');
             default:

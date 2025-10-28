@@ -3,17 +3,20 @@
 namespace App\Livewire;
 
 use App\Models\WorkOrder;
-use App\Models\WorkOrderBatch;
 use App\Models\WorkOrderBatchKey;
-use Livewire\Component;
 use Illuminate\Support\Collection;
+use Livewire\Component;
 
 class BatchStartModal extends Component
 {
     public WorkOrder $workOrder;
+
     public int $plannedQuantity = 25;
+
     public array $selectedKeys = [];
+
     public array $requiredKeys = [];
+
     public bool $showModal = false;
 
     protected $rules = [
@@ -29,8 +32,9 @@ class BatchStartModal extends Component
 
     public function calculateRequiredKeys()
     {
-        if (!$this->workOrder->usesBatchSystem()) {
+        if (! $this->workOrder->usesBatchSystem()) {
             $this->requiredKeys = [];
+
             return;
         }
 
@@ -49,7 +53,7 @@ class BatchStartModal extends Component
 
     public function getAvailableKeysProperty(): Collection
     {
-        if (!$this->workOrder->usesBatchSystem()) {
+        if (! $this->workOrder->usesBatchSystem()) {
             return collect();
         }
 
@@ -91,6 +95,7 @@ class BatchStartModal extends Component
         foreach ($this->requiredKeys as $requirement) {
             $selectedForWorkOrder = collect($this->selectedKeys)->filter(function ($keyId) use ($requirement) {
                 $key = WorkOrderBatchKey::find($keyId);
+
                 return $key && $key->work_order_id == $requirement['work_order_id'];
             })->count();
 
@@ -108,10 +113,11 @@ class BatchStartModal extends Component
 
         // Validate key selection
         $keyErrors = $this->validateKeySelection();
-        if (!empty($keyErrors)) {
+        if (! empty($keyErrors)) {
             foreach ($keyErrors as $error) {
                 $this->addError('selectedKeys', $error);
             }
+
             return;
         }
 
@@ -127,11 +133,11 @@ class BatchStartModal extends Component
                     // Update work order status to 'Start'
                     $this->workOrder->update([
                         'status' => 'Start',
-                        'material_batch' => $batch->batchKey?->key_code ?? "BATCH-{$batch->batch_number}-" . now()->format('Ymd'),
+                        'material_batch' => $batch->batchKey?->key_code ?? "BATCH-{$batch->batch_number}-".now()->format('Ymd'),
                     ]);
 
                     // Log key consumption in Work Order Group logs if keys were consumed
-                    if (!empty($this->selectedKeys)) {
+                    if (! empty($this->selectedKeys)) {
                         \App\Models\WorkOrderGroupLog::logKeyConsumption(
                             $this->workOrder,
                             $this->selectedKeys,
@@ -141,14 +147,14 @@ class BatchStartModal extends Component
 
                     // Create work order log
                     $existingLog = $this->workOrder->workOrderLogs()->where('status', 'Start')->first();
-                    if (!$existingLog) {
+                    if (! $existingLog) {
                         $this->workOrder->createWorkOrderLog('Start');
                     }
 
                     $this->dispatch('batch-started', [
                         'message' => "Work Order {$this->workOrder->unique_id} started successfully with batch {$batch->batch_number}",
                         'batch_id' => $batch->id,
-                        'status_updated' => true
+                        'status_updated' => true,
                     ]);
 
                     $this->closeModal();
@@ -162,7 +168,7 @@ class BatchStartModal extends Component
                 $this->addError('plannedQuantity', 'Failed to create batch.');
             }
         } catch (\Exception $e) {
-            $this->addError('selectedKeys', 'Error starting batch: ' . $e->getMessage());
+            $this->addError('selectedKeys', 'Error starting batch: '.$e->getMessage());
         }
     }
 

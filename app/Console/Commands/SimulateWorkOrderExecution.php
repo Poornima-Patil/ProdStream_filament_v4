@@ -3,13 +3,12 @@
 namespace App\Console\Commands;
 
 use App\Models\Factory;
-use Exception;
 use App\Models\User;
-use Illuminate\Console\Command;
 use App\Models\WorkOrder;
-use App\Models\WorkOrderQuantity;
 use App\Models\WorkOrderLog;
 use Carbon\Carbon;
+use Exception;
+use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -38,15 +37,17 @@ class SimulateWorkOrderExecution extends Command
         $factoryId = $this->argument('factory_id');
 
         // Validate factory_id is numeric
-        if (!is_numeric($factoryId)) {
+        if (! is_numeric($factoryId)) {
             $this->error('Factory ID must be a valid number.');
+
             return 1;
         }
 
         // Check if factory exists
         $factory = Factory::find($factoryId);
-        if (!$factory) {
+        if (! $factory) {
             $this->error("Factory with ID {$factoryId} not found.");
+
             return 1;
         }
 
@@ -54,12 +55,13 @@ class SimulateWorkOrderExecution extends Command
             $targetDate = Carbon::createFromFormat('Y-m-d', $dateInput, config('app.timezone'))->endOfDay();
         } catch (Exception $e) {
             $this->error('Invalid date format. Please use YYYY-MM-DD format.');
+
             return 1;
         }
 
         $this->info("Simulating work order execution for Factory: {$factory->name} (ID: {$factoryId})");
         $this->info("Processing work orders ending by: {$targetDate->format('Y-m-d H:i:s')}");
-        $this->info("Using timezone: " . config('app.timezone'));
+        $this->info('Using timezone: '.config('app.timezone'));
 
         // Get all work orders that should be completed by the target date for the specific factory
         $workOrders = WorkOrder::where('end_time', '<=', $targetDate)
@@ -73,6 +75,7 @@ class SimulateWorkOrderExecution extends Command
 
         if ($workOrders->isEmpty()) {
             $this->info('No work orders found to simulate.');
+
             return 0;
         }
 
@@ -88,7 +91,7 @@ class SimulateWorkOrderExecution extends Command
         foreach ($workOrders as $workOrder) {
             try {
                 // Log the start of processing for this work order
-                Log::info("Starting simulation for Work Order", [
+                Log::info('Starting simulation for Work Order', [
                     'work_order_id' => $workOrder->id,
                     'work_order_unique_id' => $workOrder->unique_id,
                     'factory_id' => $workOrder->factory_id,
@@ -106,7 +109,7 @@ class SimulateWorkOrderExecution extends Command
                 $statusCounts[$workOrder->status]++;
 
                 // Log successful completion
-                Log::info("Successfully simulated Work Order", [
+                Log::info('Successfully simulated Work Order', [
                     'work_order_id' => $workOrder->id,
                     'work_order_unique_id' => $workOrder->unique_id,
                     'factory_id' => $workOrder->factory_id,
@@ -114,13 +117,13 @@ class SimulateWorkOrderExecution extends Command
                 ]);
             } catch (Exception $e) {
                 $this->newLine();
-                $this->error("Error processing Work Order {$workOrder->unique_id} (Factory {$workOrder->factory_id}): " . $e->getMessage());
-                Log::error("Work Order Simulation Error", [
+                $this->error("Error processing Work Order {$workOrder->unique_id} (Factory {$workOrder->factory_id}): ".$e->getMessage());
+                Log::error('Work Order Simulation Error', [
                     'work_order_id' => $workOrder->id,
                     'work_order_unique_id' => $workOrder->unique_id,
                     'factory_id' => $workOrder->factory_id,
                     'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
+                    'trace' => $e->getTraceAsString(),
                 ]);
                 $errorCount++;
             }
@@ -131,9 +134,9 @@ class SimulateWorkOrderExecution extends Command
         $progressBar->finish();
         $this->newLine(2);
 
-        $this->info("Simulation completed!");
+        $this->info('Simulation completed!');
         $this->info("Successfully processed: {$successCount}");
-        $this->info("Final Status Distribution:");
+        $this->info('Final Status Distribution:');
         $this->info("  - Start: {$statusCounts['Start']}");
         $this->info("  - Hold: {$statusCounts['Hold']}");
         $this->info("  - Completed: {$statusCounts['Completed']}");
@@ -142,7 +145,7 @@ class SimulateWorkOrderExecution extends Command
         }
 
         // Log summary for audit purposes
-        Log::info("Work Order Simulation Summary", [
+        Log::info('Work Order Simulation Summary', [
             'factory_id' => $factoryId,
             'factory_name' => $factory->name,
             'target_date' => $targetDate->format('Y-m-d'),
@@ -185,7 +188,7 @@ class SimulateWorkOrderExecution extends Command
                     'status' => 'Start',
                     'material_batch' => $batchNumber,
                     'ok_qtys' => 0,
-                    'scrapped_qtys' => 0
+                    'scrapped_qtys' => 0,
                 ]);
                 $startLog = $this->createManualWorkOrderLog($workOrder, 'Start', $startTime, $operatorUserId, 0, 0);
 
@@ -206,14 +209,14 @@ class SimulateWorkOrderExecution extends Command
                 $workOrder->update([
                     'status' => 'Hold',
                     'ok_qtys' => $quantities['hold_ok'],
-                    'scrapped_qtys' => $quantities['hold_ko']
+                    'scrapped_qtys' => $quantities['hold_ko'],
                 ]);
                 $holdLog = $this->createManualWorkOrderLog($workOrder, 'Hold', $holdTime, $operatorUserId, $quantities['hold_ok'], $quantities['hold_ko']);
 
                 // Create quantity entry for hold
                 $this->createQuantityEntry($workOrder, $holdLog, [
                     'ok' => $quantities['hold_ok'],
-                    'ko' => $quantities['hold_ko']
+                    'ko' => $quantities['hold_ko'],
                 ]);
 
                 if ($finalStatus === 'Hold') {
@@ -226,7 +229,7 @@ class SimulateWorkOrderExecution extends Command
                 $workOrder->update([
                     'status' => 'Start',
                     'ok_qtys' => $quantities['hold_ok'], // Keep hold quantities
-                    'scrapped_qtys' => $quantities['hold_ko']
+                    'scrapped_qtys' => $quantities['hold_ko'],
                 ]);
                 $resumeLog = $this->createManualWorkOrderLog($workOrder, 'Start', $resumeTime, $operatorUserId, $quantities['hold_ok'], $quantities['hold_ko']);
 
@@ -234,18 +237,19 @@ class SimulateWorkOrderExecution extends Command
                 $workOrder->update([
                     'status' => 'Completed',
                     'ok_qtys' => $quantities['total_ok'],
-                    'scrapped_qtys' => $quantities['total_ko']
+                    'scrapped_qtys' => $quantities['total_ko'],
                 ]);
                 $completeLog = $this->createManualWorkOrderLog($workOrder, 'Completed', $endTime, $operatorUserId, $quantities['total_ok'], $quantities['total_ko']);
 
                 // Create remaining quantity entry for completion
                 $this->createQuantityEntry($workOrder, $completeLog, [
                     'ok' => $quantities['remaining_ok'],
-                    'ko' => $quantities['remaining_ko']
+                    'ko' => $quantities['remaining_ko'],
                 ]);
             });
         });
     }
+
     /**
      * Get operator user ID with proper fallback
      */
@@ -268,6 +272,7 @@ class SimulateWorkOrderExecution extends Command
 
         // Final fallback to super admin
         $superAdmin = User::role('Super Admin')->first();
+
         return $superAdmin?->id ?? 1;
     }
 
@@ -333,7 +338,7 @@ class SimulateWorkOrderExecution extends Command
 
         // Ensure timestamp is in the correct timezone
         $timestampInAppTimezone = $timestamp->setTimezone(config('app.timezone'));
-        
+
         // Create log entry directly in database to avoid any model events
         $logId = DB::table('work_order_logs')->insertGetId([
             'work_order_id' => $workOrder->id,
@@ -366,7 +371,7 @@ class SimulateWorkOrderExecution extends Command
 
         // Ensure timestamp consistency with app timezone
         $logTimestamp = Carbon::parse($log->changed_at)->setTimezone(config('app.timezone'));
-        
+
         // Use direct database insertion to maintain timestamp consistency
         DB::table('work_order_quantities')->insert([
             'work_order_id' => $workOrder->id,
@@ -379,7 +384,7 @@ class SimulateWorkOrderExecution extends Command
         ]);
 
         // Log the quantity creation for audit purposes
-        Log::info("Quantity entry created for Work Order simulation", [
+        Log::info('Quantity entry created for Work Order simulation', [
             'work_order_id' => $workOrder->id,
             'work_order_unique_id' => $workOrder->unique_id,
             'factory_id' => $workOrder->factory_id,

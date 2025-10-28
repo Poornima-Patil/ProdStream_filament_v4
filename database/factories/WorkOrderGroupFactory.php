@@ -17,7 +17,7 @@ class WorkOrderGroupFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => $this->faker->words(3, true) . ' Group',
+            'name' => $this->faker->words(3, true).' Group',
             'description' => $this->faker->sentence(),
             'status' => $this->faker->randomElement(['draft', 'active', 'completed', 'cancelled']),
             'planner_id' => \App\Models\User::factory(),

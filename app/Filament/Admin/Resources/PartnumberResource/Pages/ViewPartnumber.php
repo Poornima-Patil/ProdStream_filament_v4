@@ -12,7 +12,6 @@ use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Illuminate\Support\HtmlString;
 
 class ViewPartnumber extends ViewRecord
 {
@@ -93,7 +92,7 @@ class ViewPartnumber extends ViewRecord
                             // Show notification
                             \Filament\Notifications\Notification::make()
                                 ->title('Date range updated')
-                                ->body('Data filtered from ' . $this->dateFrom . ' to ' . $this->dateTo)
+                                ->body('Data filtered from '.$this->dateFrom.' to '.$this->dateTo)
                                 ->success()
                                 ->send();
                         }),
@@ -123,7 +122,7 @@ class ViewPartnumber extends ViewRecord
                             if ($this->dateFrom && $this->dateTo) {
                                 if ($kpiDateType === 'start_time') {
                                     // Only include work orders that have a Start log entry
-                                    $summaryQuery->whereExists(function ($query) use ($summaryQuery) {
+                                    $summaryQuery->whereExists(function ($query) {
                                         $query->select(\Illuminate\Support\Facades\DB::raw(1))
                                             ->from('work_order_logs')
                                             ->whereColumn('work_order_logs.work_order_id', 'work_orders.id')
@@ -358,7 +357,7 @@ class ViewPartnumber extends ViewRecord
                                     </div>
 
                                     <!-- Bottom Row: Chart Full Width - Placeholder for Widget -->
-                                    <div id="part-number-chart-container-' . $record->id . '"></div>
+                                    <div id="part-number-chart-container-'.$record->id.'"></div>
                                 </div>
                             ');
                         })->html(),
@@ -368,7 +367,7 @@ class ViewPartnumber extends ViewRecord
                         'record' => $this->record,
                         'dateFrom' => $this->dateFrom,
                         'dateTo' => $this->dateTo,
-                    ])->key('part-number-status-chart-' . $this->record->id),
+                    ])->key('part-number-status-chart-'.$this->record->id),
                 ]),
 
             Section::make('View Part Number')
@@ -378,7 +377,7 @@ class ViewPartnumber extends ViewRecord
                     TextEntry::make('View PartNumber')
                         ->label('')
                         ->getStateUsing(function ($record) {
-                            if (!$record) {
+                            if (! $record) {
                                 return '<div class="text-gray-500 dark:text-gray-400">No Part Number Found</div>';
                             }
 

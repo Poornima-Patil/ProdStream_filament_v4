@@ -2,25 +2,22 @@
 
 namespace App\Filament\Admin\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\TextInput;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\TrashedFilter;
-use Filament\Actions\ActionGroup;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
-use Filament\Tables\Enums\RecordActionsPosition;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Admin\Resources\ScrappedReasonResource\Pages\ListScrappedReasons;
 use App\Filament\Admin\Resources\ScrappedReasonResource\Pages\CreateScrappedReason;
 use App\Filament\Admin\Resources\ScrappedReasonResource\Pages\EditScrappedReason;
+use App\Filament\Admin\Resources\ScrappedReasonResource\Pages\ListScrappedReasons;
 use App\Filament\Admin\Resources\ScrappedReasonResource\Pages\ViewScrappedReason;
-use App\Filament\Admin\Resources\ScrappedReasonResource\Pages;
 use App\Models\ScrappedReason;
-use Filament\Forms;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 
 class ScrappedReasonResource extends Resource
@@ -29,9 +26,9 @@ class ScrappedReasonResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-trash';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-trash';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Admin Operations';
+    protected static string|\UnitEnum|null $navigationGroup = 'Admin Operations';
 
     public static function form(Schema $schema): Schema
     {
@@ -60,14 +57,14 @@ class ScrappedReasonResource extends Resource
                 ActionGroup::make([
                     EditAction::make()->label('Edit')->size('sm'),
                     ViewAction::make()->label('View')->size('sm'),
-                ])->size('sm')->tooltip('Action')->dropdownPlacement('right')
+                ])->size('sm')->tooltip('Action')->dropdownPlacement('right'),
             ], position: RecordActionsPosition::BeforeColumns)
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
             ]);
-        }
+    }
 
     public static function getRelations(): array
     {

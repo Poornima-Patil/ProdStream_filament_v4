@@ -2,10 +2,10 @@
 
 namespace App\Filament\Admin\Pages;
 
-use Carbon\Carbon;
 use App\Models\Machine;
 use App\Models\Operator;
 use App\Models\WorkOrder;
+use Carbon\Carbon;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -15,9 +15,9 @@ class MesWorkOrderDashboard extends Page
 {
     protected string $view = 'filament.admin.pages.mes-work-order-dashboard';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Work Order Reports';
+    protected static string|\UnitEnum|null $navigationGroup = 'Work Order Reports';
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-chart-bar';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-chart-bar';
 
     protected static ?string $navigationLabel = 'MES Work Order Dashboard';
 

@@ -84,7 +84,7 @@ class TestIndexPerformance extends Command
         $queries1 = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $results[] = ['Active Work Orders', $activeCount, $time1 . 'ms', $queries1];
+        $results[] = ['Active Work Orders', $activeCount, $time1.'ms', $queries1];
 
         // Test 2: Today's work orders (uses work_orders_created_status_idx)
         DB::enableQueryLog();
@@ -96,7 +96,7 @@ class TestIndexPerformance extends Command
         $queries2 = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $results[] = ['Today\'s Work Orders', $todayCount, $time2 . 'ms', $queries2];
+        $results[] = ['Today\'s Work Orders', $todayCount, $time2.'ms', $queries2];
 
         // Test 3: Completed this month (uses work_orders_kpi_reporting_idx)
         DB::enableQueryLog();
@@ -109,7 +109,7 @@ class TestIndexPerformance extends Command
         $queries3 = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $results[] = ['Completed This Month', $completedCount, $time3 . 'ms', $queries3];
+        $results[] = ['Completed This Month', $completedCount, $time3.'ms', $queries3];
 
         // Test 4: Machine schedule query (uses work_orders_machine_schedule_idx)
         $machineId = WorkOrder::where('factory_id', $factoryId)->value('machine_id');
@@ -125,7 +125,7 @@ class TestIndexPerformance extends Command
             $queries4 = count(DB::getQueryLog());
             DB::disableQueryLog();
 
-            $results[] = ['Machine Schedule Query', $machineCount, $time4 . 'ms', $queries4];
+            $results[] = ['Machine Schedule Query', $machineCount, $time4.'ms', $queries4];
         }
 
         $this->table(
@@ -157,7 +157,7 @@ class TestIndexPerformance extends Command
         $queries1 = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $results[] = ['Production Efficiency', $efficiency . '%', $time1 . 'ms', $queries1];
+        $results[] = ['Production Efficiency', $efficiency.'%', $time1.'ms', $queries1];
 
         // Test 2: Status Distribution
         DB::enableQueryLog();
@@ -173,7 +173,7 @@ class TestIndexPerformance extends Command
         $queries2 = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $results[] = ['Status Distribution', $statusCounts->count() . ' statuses', $time2 . 'ms', $queries2];
+        $results[] = ['Status Distribution', $statusCounts->count().' statuses', $time2.'ms', $queries2];
 
         // Test 3: Machine Utilization
         DB::enableQueryLog();
@@ -185,7 +185,7 @@ class TestIndexPerformance extends Command
                 'machines.id',
                 'machines.name',
                 DB::raw('COUNT(*) as total_orders'),
-                DB::raw('SUM(CASE WHEN work_orders.status IN ("Start", "Completed") THEN 1 ELSE 0 END) as active_orders')
+                DB::raw('SUM(CASE WHEN work_orders.status IN ("Start", "Completed") THEN 1 ELSE 0 END) as active_orders'),
             ])
             ->groupBy('machines.id', 'machines.name')
             ->get();
@@ -194,7 +194,7 @@ class TestIndexPerformance extends Command
         $queries3 = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $results[] = ['Machine Utilization', $machineStats->count() . ' machines', $time3 . 'ms', $queries3];
+        $results[] = ['Machine Utilization', $machineStats->count().' machines', $time3.'ms', $queries3];
 
         $this->table(
             ['KPI Metric', 'Result', 'Time', 'Queries'],
@@ -254,10 +254,10 @@ class TestIndexPerformance extends Command
         );
 
         $this->newLine();
-        $this->info("📊 Dashboard Performance:");
+        $this->info('📊 Dashboard Performance:');
         $this->info("   Total Load Time: {$overallTime}ms");
         $this->info("   Total Queries: {$totalQueries}");
-        $this->info("   Average per Query: " . round($overallTime / $totalQueries, 2) . "ms");
+        $this->info('   Average per Query: '.round($overallTime / $totalQueries, 2).'ms');
     }
 
     private function testRepeatedQueries(int $factoryId): void
@@ -288,17 +288,17 @@ class TestIndexPerformance extends Command
             ['Metric', 'Value'],
             [
                 ['Iterations', $iterations],
-                ['Total Time', round($totalTime, 2) . 'ms'],
-                ['Average Time', round($avgTime, 2) . 'ms'],
-                ['Min Time', round($minTime, 2) . 'ms'],
-                ['Max Time', round($maxTime, 2) . 'ms'],
+                ['Total Time', round($totalTime, 2).'ms'],
+                ['Average Time', round($avgTime, 2).'ms'],
+                ['Min Time', round($minTime, 2).'ms'],
+                ['Max Time', round($maxTime, 2).'ms'],
             ]
         );
 
         $this->newLine();
-        $this->info("💡 Analysis:");
-        $this->info("   Without cache: {$iterations} queries × " . round($avgTime, 2) . "ms = " . round($totalTime, 2) . "ms");
-        $this->info("   With cache (5-min TTL): ~1 query + 19 cache hits ≈ " . round($avgTime + (19 * 0.5), 2) . "ms");
-        $this->info("   Potential improvement with cache: " . round((($totalTime - ($avgTime + 9.5)) / $totalTime) * 100, 1) . "%");
+        $this->info('💡 Analysis:');
+        $this->info("   Without cache: {$iterations} queries × ".round($avgTime, 2).'ms = '.round($totalTime, 2).'ms');
+        $this->info('   With cache (5-min TTL): ~1 query + 19 cache hits ≈ '.round($avgTime + (19 * 0.5), 2).'ms');
+        $this->info('   Potential improvement with cache: '.round((($totalTime - ($avgTime + 9.5)) / $totalTime) * 100, 1).'%');
     }
 }

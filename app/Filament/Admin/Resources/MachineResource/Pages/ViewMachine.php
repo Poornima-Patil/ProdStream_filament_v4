@@ -10,7 +10,6 @@ use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Schemas\Components\Grid;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Components\Section;
@@ -88,7 +87,7 @@ class ViewMachine extends ViewRecord
                                 // Show notification
                                 \Filament\Notifications\Notification::make()
                                     ->title('Date range updated')
-                                    ->body('Data filtered from ' . $this->dateFrom . ' to ' . $this->dateTo)
+                                    ->body('Data filtered from '.$this->dateFrom.' to '.$this->dateTo)
                                     ->success()
                                     ->send();
                             }),
@@ -269,7 +268,7 @@ class ViewMachine extends ViewRecord
                                         </div>
 
                                         <!-- Bottom Row: Chart Full Width - Placeholder for Widget -->
-                                        <div id="machine-chart-container-' . $record->id . '"></div>
+                                        <div id="machine-chart-container-'.$record->id.'"></div>
                                     </div>
                                 ');
                             })->html(),
@@ -279,7 +278,7 @@ class ViewMachine extends ViewRecord
                             'record' => $this->record,
                             'dateFrom' => $this->dateFrom,
                             'dateTo' => $this->dateTo,
-                        ])->key('machine-status-chart-' . $this->record->id),
+                        ])->key('machine-status-chart-'.$this->record->id),
                     ]),
 
                 Section::make('Machine Information')

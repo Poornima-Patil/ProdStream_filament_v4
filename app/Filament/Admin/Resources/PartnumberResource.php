@@ -2,25 +2,22 @@
 
 namespace App\Filament\Admin\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\TextInput;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\TrashedFilter;
-use Filament\Actions\ActionGroup;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
-use Filament\Tables\Enums\RecordActionsPosition;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Admin\Resources\PartnumberResource\Pages\ListPartnumbers;
 use App\Filament\Admin\Resources\PartnumberResource\Pages\CreatePartnumber;
 use App\Filament\Admin\Resources\PartnumberResource\Pages\EditPartnumber;
+use App\Filament\Admin\Resources\PartnumberResource\Pages\ListPartnumbers;
 use App\Filament\Admin\Resources\PartnumberResource\Pages\ViewPartnumber;
-use App\Filament\Admin\Resources\PartnumberResource\Pages;
 use App\Models\PartNumber;
-use Filament\Forms;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -30,9 +27,9 @@ class PartnumberResource extends Resource
 {
     protected static ?string $model = PartNumber::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-tag';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-tag';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Process Operations';
+    protected static string|\UnitEnum|null $navigationGroup = 'Process Operations';
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
@@ -47,7 +44,7 @@ class PartnumberResource extends Resource
                     Rule::unique('part_numbers', 'partnumber')
                         ->where(function ($query) {
                             $query->where('revision', request()->input('revision'))
-                                  ->where('factory_id', auth()->user()->factory_id);
+                                ->where('factory_id', auth()->user()->factory_id);
                         })
                         ->ignore(request()->route('record')), // Exclude current record during editing
                 ])->reactive(),
@@ -61,7 +58,7 @@ class PartnumberResource extends Resource
                     Rule::unique('part_numbers', 'revision')
                         ->where(function ($query) {
                             $query->where('partnumber', request()->input('partnumber'))
-                                  ->where('factory_id', auth()->user()->factory_id);
+                                ->where('factory_id', auth()->user()->factory_id);
                         })
                         ->ignore(request()->route('record')), // Exclude current record during editing
                 ])->reactive(),
@@ -104,7 +101,7 @@ class PartnumberResource extends Resource
                 ActionGroup::make([
                     EditAction::make()->label('Edit')->size('sm'),
                     ViewAction::make()->label('View')->size('sm'),
-                ])->size('sm')->tooltip('Action')->dropdownPlacement('right')
+                ])->size('sm')->tooltip('Action')->dropdownPlacement('right'),
             ], position: RecordActionsPosition::BeforeColumns)
             ->toolbarActions([
                 BulkActionGroup::make([

@@ -2,12 +2,12 @@
 
 namespace App\Filament\Admin\Resources\HoldReasonResource\Pages;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Illuminate\Support\HtmlString;
 use App\Filament\Admin\Resources\HoldReasonResource;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Illuminate\Support\HtmlString;
 
 class ViewHoldReasons extends ViewRecord
 {
@@ -26,10 +26,10 @@ class ViewHoldReasons extends ViewRecord
                 ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('View Hold Reason')
-                    ->hiddenLabel()
+                        ->hiddenLabel()
                         ->label('')
                         ->getStateUsing(function ($record) {
-                            if (!$record) {
+                            if (! $record) {
                                 return '<div class="text-gray-500 dark:text-gray-400">No Hold Reasons Found</div>';
                             }
 

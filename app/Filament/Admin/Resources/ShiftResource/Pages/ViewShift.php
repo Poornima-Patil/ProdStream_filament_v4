@@ -2,17 +2,17 @@
 
 namespace App\Filament\Admin\Resources\ShiftResource\Pages;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Illuminate\Support\HtmlString;
 use App\Filament\Admin\Resources\ShiftResource;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Resources\Pages\ViewRecord;
+use App\Filament\Admin\Resources\ShiftResource\Widgets\ShiftStatusChart;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Livewire;
-use App\Filament\Admin\Resources\ShiftResource\Widgets\ShiftStatusChart;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Illuminate\Support\HtmlString;
 
 class ViewShift extends ViewRecord
 {
@@ -76,7 +76,7 @@ class ViewShift extends ViewRecord
                             // Show notification
                             \Filament\Notifications\Notification::make()
                                 ->title('Date range updated')
-                                ->body('Data filtered from ' . $this->dateFrom . ' to ' . $this->dateTo)
+                                ->body('Data filtered from '.$this->dateFrom.' to '.$this->dateTo)
                                 ->success()
                                 ->send();
                         }),
@@ -260,7 +260,7 @@ class ViewShift extends ViewRecord
                                     </div>
 
                                     <!-- Bottom Row: Chart Full Width - Placeholder for Widget -->
-                                    <div id="shift-chart-container-' . $record->id . '"></div>
+                                    <div id="shift-chart-container-'.$record->id.'"></div>
                                 </div>
                             ');
                         })->html(),
@@ -270,7 +270,7 @@ class ViewShift extends ViewRecord
                         'record' => $this->record,
                         'dateFrom' => $this->dateFrom,
                         'dateTo' => $this->dateTo,
-                    ])->key('shift-status-chart-' . $this->record->id),
+                    ])->key('shift-status-chart-'.$this->record->id),
                 ]),
 
             Section::make('Shift Details')
@@ -280,7 +280,7 @@ class ViewShift extends ViewRecord
                     TextEntry::make('View Shift')
                         ->label('')
                         ->getStateUsing(function ($record) {
-                            if (!$record) {
+                            if (! $record) {
                                 return '<div class="text-gray-500 dark:text-gray-400">No Shifts Found</div>';
                             }
 

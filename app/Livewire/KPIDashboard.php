@@ -2,29 +2,34 @@
 
 namespace App\Livewire;
 
-use Exception;
-use Carbon\Carbon;
 use App\Services\KPIService;
-use Livewire\Component;
-use Livewire\Attributes\Reactive;
-use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
+use Exception;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Livewire\Component;
 
 class KPIDashboard extends Component
 {
     public $fromDate;
+
     public $toDate;
+
     public $kpis = [];
+
     public $lastUpdated;
+
     public $currentFactory;
 
     // Modal properties for Livewire v3
     public bool $showKPIDetail = false;
+
     public string $selectedKPI = '';
+
     public string $selectedKPITitle = '';
 
     protected $listeners = [
-        'refreshKPIs' => 'loadKPIs'
+        'refreshKPIs' => 'loadKPIs',
     ];
 
     public function mount()
@@ -37,7 +42,6 @@ class KPIDashboard extends Component
         $this->toDate = $today->format('Y-m-d');
         $this->fromDate = $today->copy()->subDays(30)->format('Y-m-d');
 
-
         // Load initial KPI data
         $this->loadKPIs();
         $this->lastUpdated = now()->format('H:i:s');
@@ -46,7 +50,7 @@ class KPIDashboard extends Component
     public function loadKPIs()
     {
         try {
-            $kpiService = new KPIService();
+            $kpiService = new KPIService;
 
             // Always use current user's factory ID with custom date range
             $this->kpis = $kpiService->getExecutiveKPIsWithDateRange(
@@ -63,18 +67,18 @@ class KPIDashboard extends Component
                 'kpis_count' => count($this->kpis),
                 'kpis_keys' => array_keys($this->kpis),
                 'work_order_data' => $this->kpis['work_order_completion_rate'] ?? 'NOT_SET',
-                'production_data' => $this->kpis['production_throughput'] ?? 'NOT_SET'
+                'production_data' => $this->kpis['production_throughput'] ?? 'NOT_SET',
             ]);
 
             $this->lastUpdated = now()->format('H:i:s');
         } catch (Exception $e) {
-            Log::error('Error loading KPIs: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString()
+            Log::error('Error loading KPIs: '.$e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
             ]);
 
             $this->dispatch('notify', [
                 'type' => 'error',
-                'message' => 'Error loading KPIs: ' . $e->getMessage()
+                'message' => 'Error loading KPIs: '.$e->getMessage(),
             ]);
         }
     }
@@ -96,7 +100,7 @@ class KPIDashboard extends Component
         if ($this->fromDate && $this->toDate && $this->fromDate > $this->toDate) {
             $this->dispatch('notify', [
                 'type' => 'error',
-                'message' => 'From date cannot be later than To date'
+                'message' => 'From date cannot be later than To date',
             ]);
         }
     }
@@ -104,7 +108,7 @@ class KPIDashboard extends Component
     public function refreshDashboard()
     {
         // Clear cache for this factory
-        $kpiService = new KPIService();
+        $kpiService = new KPIService;
         $kpiService->clearKPICache($this->currentFactory->id);
 
         // Reload KPIs
@@ -112,7 +116,7 @@ class KPIDashboard extends Component
 
         $this->dispatch('notify', [
             'type' => 'success',
-            'message' => 'Dashboard refreshed successfully'
+            'message' => 'Dashboard refreshed successfully',
         ]);
     }
 
@@ -160,7 +164,7 @@ class KPIDashboard extends Component
         // Future implementation for export
         $this->dispatch('notify', [
             'type' => 'info',
-            'message' => 'Export functionality coming soon!'
+            'message' => 'Export functionality coming soon!',
         ]);
     }
 
@@ -212,7 +216,7 @@ class KPIDashboard extends Component
 
     public function getDateRangeLabel()
     {
-        if (!$this->fromDate || !$this->toDate) {
+        if (! $this->fromDate || ! $this->toDate) {
             return 'Date range not set';
         }
 
@@ -227,4 +231,3 @@ class KPIDashboard extends Component
         return view('livewire.kpi-dashboard');
     }
 }
-

@@ -2,9 +2,8 @@
 
 namespace App\Filament\Admin\Resources\RoleResource\Pages;
 
-use Filament\Actions\CreateAction;
 use App\Filament\Admin\Resources\RoleResource;
-use Filament\Actions;
+use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListRoles extends ListRecords

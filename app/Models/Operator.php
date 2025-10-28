@@ -228,7 +228,7 @@ class Operator extends Model
             if ($shiftEnd < $shiftStart) {
                 $shiftEnd->addDay();
             }
-            
+
             // For Gantt chart visualization, extend shift to end of the time block
             // Weekly view uses 2-hour blocks, so extend to end of that block
             if ($viewType === 'week') {
@@ -423,8 +423,8 @@ class Operator extends Model
      * Check for scheduling conflicts when planning a new Work Order for this operator
      * Considers both operator availability and shift constraints
      *
-     * @param Carbon $newStartTime
-     * @param Carbon $newEndTime
+     * @param  Carbon  $newStartTime
+     * @param  Carbon  $newEndTime
      * @param  int  $factoryId  - Factory ID for multi-tenancy
      * @param  int|null  $excludeWorkOrderId  - Exclude current WO when updating
      * @return array

@@ -2,11 +2,11 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Models\User;
-use App\Models\Shift;
-use App\Models\OperatorProficiency;
 use App\Models\Operator;
+use App\Models\OperatorProficiency;
+use App\Models\Shift;
+use App\Models\User;
+use Illuminate\Database\Seeder;
 
 class OperatorsTableSeeder extends Seeder
 {
@@ -16,13 +16,14 @@ class OperatorsTableSeeder extends Seeder
 
         // Get all users with 'Operator' role in this factory
         $operatorUsers = User::whereHas('roles', function ($query) {
-                $query->where('name', 'Operator');
-            })
+            $query->where('name', 'Operator');
+        })
             ->where('factory_id', $factoryId)
             ->get();
 
         if ($operatorUsers->isEmpty()) {
             $this->command->error('No operator users found in the users table.');
+
             return;
         }
 
@@ -32,6 +33,7 @@ class OperatorsTableSeeder extends Seeder
 
         if ($shifts->isEmpty() || $proficiencies->isEmpty()) {
             $this->command->error('Shifts or Proficiencies not found.');
+
             return;
         }
 

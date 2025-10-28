@@ -2,13 +2,12 @@
 
 namespace App\Filament\Pages\Tenancy;
 
-use Filament\Schemas\Schema;
 use App\Models\Factory;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Pages\Tenancy\RegisterTenant;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Auth;
-use Filament\Forms\Components\FileUpload;
-
 
 class RegisterFactory extends RegisterTenant
 {

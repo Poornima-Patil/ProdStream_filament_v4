@@ -2,38 +2,45 @@
 
 namespace App\Filament\Admin\Pages;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Components\Actions;
-use Filament\Actions\Action;
 use Exception;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
-use Filament\Pages\Page;
-use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Select;
+use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Radio;
-use Filament\Forms\Contracts\HasForms;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
+use Filament\Pages\Page;
+use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Session;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PivotTableDashboard extends Page implements HasForms
 {
     use InteractsWithForms;
 
     protected string $view = 'filament.admin.pages.pivot-table-dashboard';
-    protected static string | \UnitEnum | null $navigationGroup = 'Work Order Reports';
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-table-cells';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'Work Order Reports';
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-table-cells';
+
     protected static ?string $navigationLabel = 'Pivot Table';
 
     public array $data = [];
+
     public array $csvHeaders = [];
+
     public array $csvData = [];
+
     public array $pivotResult = [];
+
     public bool $showPivotConfig = false;
+
     public bool $showPivotTable = false;
 
     public function mount(): void
@@ -69,7 +76,7 @@ class PivotTableDashboard extends Page implements HasForms
                             ->schema([
                                 Select::make('rows')
                                     ->label('Rows')
-                                    ->options(fn() => empty($this->csvHeaders) ? [] : array_combine($this->csvHeaders, $this->csvHeaders))
+                                    ->options(fn () => empty($this->csvHeaders) ? [] : array_combine($this->csvHeaders, $this->csvHeaders))
                                     ->multiple()
                                     ->searchable()
                                     ->placeholder('Select fields for rows')
@@ -77,7 +84,7 @@ class PivotTableDashboard extends Page implements HasForms
 
                                 Select::make('columns')
                                     ->label('Columns')
-                                    ->options(fn() => empty($this->csvHeaders) ? [] : array_combine($this->csvHeaders, $this->csvHeaders))
+                                    ->options(fn () => empty($this->csvHeaders) ? [] : array_combine($this->csvHeaders, $this->csvHeaders))
                                     ->multiple()
                                     ->searchable()
                                     ->placeholder('Select fields for columns')
@@ -88,7 +95,7 @@ class PivotTableDashboard extends Page implements HasForms
                             ->schema([
                                 Select::make('values')
                                     ->label('Values')
-                                    ->options(fn() => empty($this->csvHeaders) ? [] : array_combine($this->csvHeaders, $this->csvHeaders))
+                                    ->options(fn () => empty($this->csvHeaders) ? [] : array_combine($this->csvHeaders, $this->csvHeaders))
                                     ->multiple()
                                     ->searchable()
                                     ->placeholder('Select fields to aggregate')
@@ -110,7 +117,7 @@ class PivotTableDashboard extends Page implements HasForms
 
                         CheckboxList::make('filters')
                             ->label('Available Filters')
-                            ->options(fn() => empty($this->csvHeaders) ? [] : array_combine($this->csvHeaders, $this->csvHeaders))
+                            ->options(fn () => empty($this->csvHeaders) ? [] : array_combine($this->csvHeaders, $this->csvHeaders))
                             ->columns(3)
                             ->helperText('Select fields to enable as filters'),
 
@@ -120,14 +127,14 @@ class PivotTableDashboard extends Page implements HasForms
                                 ->icon('heroicon-o-table-cells')
                                 ->color('primary')
                                 ->action('generatePivotTable')
-                                ->disabled(fn() => empty($this->csvData)),
+                                ->disabled(fn () => empty($this->csvData)),
 
                             Action::make('reset')
                                 ->label('Reset')
                                 ->icon('heroicon-o-arrow-path')
                                 ->color('gray')
                                 ->action('resetForm'),
-                        ])
+                        ]),
                     ])
                     ->visible($this->showPivotConfig)
                     ->collapsed(false),
@@ -150,8 +157,8 @@ class PivotTableDashboard extends Page implements HasForms
                                 ->icon('heroicon-o-arrow-down-tray')
                                 ->color('success')
                                 ->action('exportPivotTable')
-                                ->disabled(fn() => empty($this->pivotResult)),
-                        ])
+                                ->disabled(fn () => empty($this->pivotResult)),
+                        ]),
                     ])
                     ->visible($this->showPivotTable)
                     ->collapsed(false),
@@ -164,7 +171,7 @@ class PivotTableDashboard extends Page implements HasForms
         try {
             $fullPath = Storage::path($filePath);
 
-            if (!file_exists($fullPath)) {
+            if (! file_exists($fullPath)) {
                 throw new Exception('File not found');
             }
 
@@ -174,7 +181,7 @@ class PivotTableDashboard extends Page implements HasForms
             if (($handle = fopen($fullPath, 'r')) !== false) {
                 // Read headers
                 $headers = fgetcsv($handle);
-                if (!$headers) {
+                if (! $headers) {
                     throw new Exception('Invalid CSV format');
                 }
 
@@ -194,7 +201,7 @@ class PivotTableDashboard extends Page implements HasForms
             Notification::make()
                 ->title('CSV file processed successfully')
                 ->success()
-                ->body(count($csvData) . ' rows loaded with ' . count($headers) . ' columns')
+                ->body(count($csvData).' rows loaded with '.count($headers).' columns')
                 ->send();
         } catch (Exception $e) {
             Notification::make()
@@ -244,16 +251,16 @@ class PivotTableDashboard extends Page implements HasForms
             $rowKey = $this->createGroupKey($row, $rows);
             $colKey = $this->createGroupKey($row, $columns);
 
-            if (!isset($groupedData[$rowKey])) {
+            if (! isset($groupedData[$rowKey])) {
                 $groupedData[$rowKey] = [];
             }
 
-            if (!isset($groupedData[$rowKey][$colKey])) {
+            if (! isset($groupedData[$rowKey][$colKey])) {
                 $groupedData[$rowKey][$colKey] = [];
             }
 
             foreach ($values as $value) {
-                if (!isset($groupedData[$rowKey][$colKey][$value])) {
+                if (! isset($groupedData[$rowKey][$colKey][$value])) {
                     $groupedData[$rowKey][$colKey][$value] = [];
                 }
 
@@ -280,7 +287,7 @@ class PivotTableDashboard extends Page implements HasForms
             'rows' => $rows,
             'columns' => $columns,
             'values' => $values,
-            'aggregation' => $aggregation
+            'aggregation' => $aggregation,
         ];
     }
 
@@ -294,6 +301,7 @@ class PivotTableDashboard extends Page implements HasForms
         foreach ($fields as $field) {
             $keyParts[] = $row[$field] ?? '';
         }
+
         return implode(' | ', $keyParts);
     }
 
@@ -333,7 +341,7 @@ class PivotTableDashboard extends Page implements HasForms
         $format = $formState['export_format'] ?? 'csv';
 
         try {
-            $filename = 'pivot_table_' . now()->format('Y-m-d_H-i-s');
+            $filename = 'pivot_table_'.now()->format('Y-m-d_H-i-s');
 
             switch ($format) {
                 case 'csv':
@@ -356,7 +364,7 @@ class PivotTableDashboard extends Page implements HasForms
     {
         $csvPath = storage_path("app/temp/{$filename}.csv");
 
-        if (!file_exists(dirname($csvPath))) {
+        if (! file_exists(dirname($csvPath))) {
             mkdir(dirname($csvPath), 0755, true);
         }
 

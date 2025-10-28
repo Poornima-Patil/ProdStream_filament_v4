@@ -53,6 +53,7 @@ class WorkOrderBatchKey extends Model
     public static function generateKeyCode(WorkOrder $workOrder, int $batchNumber): string
     {
         $timestamp = now()->format('Ymd');
+
         return "KEY-{$workOrder->unique_id}-{$batchNumber}-{$timestamp}";
     }
 
@@ -78,7 +79,7 @@ class WorkOrderBatchKey extends Model
      */
     public function isAvailable(): bool
     {
-        return !$this->is_consumed;
+        return ! $this->is_consumed;
     }
 
     /**
@@ -87,7 +88,7 @@ class WorkOrderBatchKey extends Model
     public function scopeAvailableForWorkOrder($query, int $workOrderId)
     {
         return $query->where('work_order_id', $workOrderId)
-                    ->where('is_consumed', false);
+            ->where('is_consumed', false);
     }
 
     /**

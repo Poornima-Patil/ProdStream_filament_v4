@@ -2,35 +2,40 @@
 
 namespace App\Filament\Admin\Pages;
 
-use Filament\Schemas\Schema;
 use App\Models\WorkOrder;
-use Filament\Forms;
-use Filament\Pages\Page;
-use Illuminate\Support\Collection;
 use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
+use Filament\Pages\Page;
+use Filament\Schemas\Schema;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-
 
 class WorkOrderPivot extends Page implements HasForms
 {
     use InteractsWithForms;
 
     protected string $view = 'filament.admin.pages.work-order-pivot';
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-table-cells';
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-table-cells';
+
     protected static ?string $navigationLabel = 'Pivot Table';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Work Order Reports';
-    public ?string $startDate=null;
-    public ?string $endDate=null;
+    protected static string|\UnitEnum|null $navigationGroup = 'Work Order Reports';
+
+    public ?string $startDate = null;
+
+    public ?string $endDate = null;
+
     public Collection $data;
+
     public Collection $pivotData;
 
     protected $queryString = [
         'startDate' => ['except' => null],
         'endDate' => ['except' => null],
     ];
+
     public function mount(): void
     {
         $this->startDate = request()->query('startDate', $this->startDate ?? now()->subMonth()->toDateString());
@@ -45,6 +50,7 @@ class WorkOrderPivot extends Page implements HasForms
 
         $this->loadData();
     }
+
     public function form(Schema $schema): Schema
     {
         return $schema->components([
@@ -61,6 +67,7 @@ class WorkOrderPivot extends Page implements HasForms
                 ->format('Y-m-d'),       // Format stored in the backend
         ]);
     }
+
     public function applyFilters()
     {
         $formState = $this->form->getState();
@@ -68,6 +75,7 @@ class WorkOrderPivot extends Page implements HasForms
         $this->startDate = $formState['startDate'];
         $this->endDate = $formState['endDate'];
         $tenant = auth()->user()->factory_id;
+
         return redirect()->route('filament.admin.pages.work-order-pivot', [
             'tenant' => $tenant,
             'startDate' => $this->startDate,
@@ -83,7 +91,7 @@ class WorkOrderPivot extends Page implements HasForms
         $this->pivotData = WorkOrder::with([
             'bom.purchaseOrder.partNumber',
             'machine',
-            'operator.user'
+            'operator.user',
         ])
             ->where('factory_id', $factoryId) // ✅ filter by the user's factory
             ->whereBetween('created_at', [$this->startDate, $this->endDate])
@@ -105,6 +113,7 @@ class WorkOrderPivot extends Page implements HasForms
                 ];
             });
     }
+
     public function getViewData(): array
     {
         return [

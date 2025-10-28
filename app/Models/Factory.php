@@ -13,7 +13,7 @@ class Factory extends Model
 {
     use HasFactory,HasRoles,SoftDeletes;
 
-    protected $fillable = ['name', 'slug','template_path'];
+    protected $fillable = ['name', 'slug', 'template_path'];
 
     public function departments(): HasMany
     {
