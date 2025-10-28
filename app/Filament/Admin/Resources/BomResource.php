@@ -2,51 +2,43 @@
 
 namespace App\Filament\Admin\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\Select;
-use App\Models\PartNumber;
-use App\Models\PurchaseOrder;
-use App\Models\MachineGroup;
-use App\Models\OperatorProficiency;
-use Filament\Forms\Components\DatePicker;
-use Carbon\Carbon;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\TrashedFilter;
-use Filament\Actions\ActionGroup;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
-use Filament\Tables\Enums\RecordActionsPosition;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Admin\Resources\BomResource\Pages\ListBoms;
+use App\Enums\BomStatus;
 use App\Filament\Admin\Resources\BomResource\Pages\CreateBom;
 use App\Filament\Admin\Resources\BomResource\Pages\EditBom;
+use App\Filament\Admin\Resources\BomResource\Pages\ListBoms;
 use App\Filament\Admin\Resources\BomResource\Pages\ViewBom;
-use App\Filament\Admin\Resources\BomResource\Pages;
 use App\Models\Bom;
+use App\Models\MachineGroup;
+use App\Models\OperatorProficiency;
+use App\Models\PartNumber;
+use App\Models\PurchaseOrder;
 use App\Models\WorkOrder;
-use Filament\Forms;
+use Carbon\Carbon;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
-use Filament\Infolists\Components\IconEntry;
-use Filament\Infolists\Components\Section;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
-use App\Enums\BomStatus;
-
 
 class BomResource extends Resource
 {
     protected static ?string $model = Bom::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-document-text';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-document-text';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Process Operations';
+    protected static string|\UnitEnum|null $navigationGroup = 'Process Operations';
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
@@ -131,35 +123,35 @@ class BomResource extends Resource
                             ->pluck('proficiency', 'id');
                     })->required(),
 
-DatePicker::make('lead_time')
-    ->label('Target Completion Time')
-    ->helperText(function (callable $get) {
-        $purchaseOrderId = $get('purchase_order_id');
-        if (!$purchaseOrderId) {
-            return 'Select a Sales Order line to view PO Delivery Date.';
-        }
-        $po = PurchaseOrder::find($purchaseOrderId);
-        if ($po && $po->delivery_target_date) {
-            return 'PO Delivery Date: ' . Carbon::parse($po->delivery_target_date)->format('d M Y');
-        }
-    })
-     ->minDate(fn (string $operation): ?Carbon => $operation === 'create' ? now()->startOfDay() : null) // Only allow today or future dates during creation
-    ->required()
-    ->reactive(),
+                DatePicker::make('lead_time')
+                    ->label('Target Completion Time')
+                    ->helperText(function (callable $get) {
+                        $purchaseOrderId = $get('purchase_order_id');
+                        if (! $purchaseOrderId) {
+                            return 'Select a Sales Order line to view PO Delivery Date.';
+                        }
+                        $po = PurchaseOrder::find($purchaseOrderId);
+                        if ($po && $po->delivery_target_date) {
+                            return 'PO Delivery Date: '.Carbon::parse($po->delivery_target_date)->format('d M Y');
+                        }
+                    })
+                    ->minDate(fn (string $operation): ?Carbon => $operation === 'create' ? now()->startOfDay() : null) // Only allow today or future dates during creation
+                    ->required()
+                    ->reactive(),
 
-Select::make('status')
-    ->options(
-        collect(BomStatus::cases())
-            ->mapWithKeys(fn($case) => [$case->value => $case->label()])
-            ->toArray()
-    )
-    ->required()
-    ->reactive()
-    ->afterStateUpdated(function (callable $get, $record) {
-        if ($get('status') === BomStatus::Complete->value) {
-            self::close_WO($record);
-        }
-    }),
+                Select::make('status')
+                    ->options(
+                        collect(BomStatus::cases())
+                            ->mapWithKeys(fn ($case) => [$case->value => $case->label()])
+                            ->toArray()
+                    )
+                    ->required()
+                    ->reactive()
+                    ->afterStateUpdated(function (callable $get, $record) {
+                        if ($get('status') === BomStatus::Complete->value) {
+                            self::close_WO($record);
+                        }
+                    }),
             ]);
     }
 
@@ -208,39 +200,40 @@ Select::make('status')
                     ->toggleable(),
 
                 TextColumn::make('lead_time')
-    ->label('Target Completion Time')
-    ->formatStateUsing(function ($state) {
-        return $state ? Carbon::parse($state)->format('d M Y') : '-';
-    })  ->extraAttributes(function ($record) {
-        // Check if BOM and PurchaseOrder exist and have the relevant dates
-        if (
-            $record &&
-            $record->lead_time &&
-            $record->purchaseOrder &&
-            $record->purchaseOrder->delivery_target_date
-        ) {
-            $leadTime = Carbon::parse($record->lead_time);
-            $deliveryTarget = Carbon::parse($record->purchaseOrder->delivery_target_date)->endOfDay();
-            if ($leadTime->greaterThan($deliveryTarget)) {
-                return [
-                    'style' => 'background-color: #FCA5A5; cursor: pointer;',
-                ];
-            }
-        }
-        return [];
-    })
-    ->tooltip(function ($record) {
-        if (
-            $record &&
-            $record->purchaseOrder &&
-            $record->purchaseOrder->delivery_target_date
-        ) {
-            return 'Sales Order Line Target Completion Date: ' .
-                Carbon::parse($record->purchaseOrder->delivery_target_date)->format('d M Y');
-        }
-        return null;
-    }),
+                    ->label('Target Completion Time')
+                    ->formatStateUsing(function ($state) {
+                        return $state ? Carbon::parse($state)->format('d M Y') : '-';
+                    })->extraAttributes(function ($record) {
+                        // Check if BOM and PurchaseOrder exist and have the relevant dates
+                        if (
+                            $record &&
+                            $record->lead_time &&
+                            $record->purchaseOrder &&
+                            $record->purchaseOrder->delivery_target_date
+                        ) {
+                            $leadTime = Carbon::parse($record->lead_time);
+                            $deliveryTarget = Carbon::parse($record->purchaseOrder->delivery_target_date)->endOfDay();
+                            if ($leadTime->greaterThan($deliveryTarget)) {
+                                return [
+                                    'style' => 'background-color: #FCA5A5; cursor: pointer;',
+                                ];
+                            }
+                        }
 
+                        return [];
+                    })
+                    ->tooltip(function ($record) {
+                        if (
+                            $record &&
+                            $record->purchaseOrder &&
+                            $record->purchaseOrder->delivery_target_date
+                        ) {
+                            return 'Sales Order Line Target Completion Date: '.
+                                Carbon::parse($record->purchaseOrder->delivery_target_date)->format('d M Y');
+                        }
+
+                        return null;
+                    }),
 
                 TextColumn::make('status')
                     ->label('Status')
@@ -254,20 +247,20 @@ Select::make('status')
             ])
 
             ->filters([
-            TrashedFilter::make(),
-        ])
+                TrashedFilter::make(),
+            ])
 
             ->recordActions([
-            ActionGroup::make([
+                ActionGroup::make([
                     EditAction::make()->label('Edit')->size('sm'),
                     ViewAction::make()->label('View')->size('sm'),
-            ])->size('sm')->tooltip('Action')->dropdownPlacement('right')
-        ], position: RecordActionsPosition::BeforeColumns)
+                ])->size('sm')->tooltip('Action')->dropdownPlacement('right'),
+            ], position: RecordActionsPosition::BeforeColumns)
             ->toolbarActions([
-            BulkActionGroup::make([
+                BulkActionGroup::make([
                     DeleteBulkAction::make(),
-            ]),
-        ]);
+                ]),
+            ]);
     }
 
     public static function getRelations(): array

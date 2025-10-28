@@ -2,8 +2,8 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -13,12 +13,12 @@ return new class extends Migration
     public function up(): void
     {
         // First, let's check if there are any existing dependency records that would conflict
-        $duplicates = DB::select("
+        $duplicates = DB::select('
             SELECT predecessor_work_order_id, successor_work_order_id, COUNT(*) as count
             FROM work_order_dependencies
             GROUP BY predecessor_work_order_id, successor_work_order_id
             HAVING COUNT(*) > 1
-        ");
+        ');
 
         if (empty($duplicates)) {
             // No duplicates, safe to drop the unique constraint

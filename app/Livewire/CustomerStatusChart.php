@@ -2,16 +2,19 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
 use App\Services\CustomerKPIService;
 use Carbon\Carbon;
 use Livewire\Attributes\On;
+use Livewire\Component;
 
 class CustomerStatusChart extends Component
 {
     public $record;
+
     public $fromDate;
+
     public $toDate;
+
     public $factoryId;
 
     protected CustomerKPIService $customerKPIService;
@@ -31,10 +34,10 @@ class CustomerStatusChart extends Component
 
     public function getData()
     {
-        if (!$this->record?->id || !$this->factoryId) {
+        if (! $this->record?->id || ! $this->factoryId) {
             return [
                 'labels' => [],
-                'datasets' => []
+                'datasets' => [],
             ];
         }
 

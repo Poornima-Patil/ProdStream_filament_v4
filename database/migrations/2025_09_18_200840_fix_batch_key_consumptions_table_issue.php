@@ -27,16 +27,16 @@ return new class extends Migration
 
             Schema::table('batch_key_consumptions', function (Blueprint $table) use ($indexNames) {
                 // Add missing indexes if they don't exist
-                if (!in_array('bkc_consumer_wo_batch_idx', $indexNames)) {
+                if (! in_array('bkc_consumer_wo_batch_idx', $indexNames)) {
                     $table->index(['consumer_work_order_id', 'consumer_batch_number'], 'bkc_consumer_wo_batch_idx');
                 }
 
-                if (!in_array('bkc_consumed_key_idx', $indexNames)) {
+                if (! in_array('bkc_consumed_key_idx', $indexNames)) {
                     $table->index(['consumed_key_id'], 'bkc_consumed_key_idx');
                 }
 
                 // Add missing unique constraint if it doesn't exist
-                if (!in_array('batch_key_consumptions_consumed_key_id_consumer_batch_id_unique', $indexNames)) {
+                if (! in_array('batch_key_consumptions_consumed_key_id_consumer_batch_id_unique', $indexNames)) {
                     $table->unique(['consumed_key_id', 'consumer_batch_id']);
                 }
             });
@@ -53,15 +53,15 @@ return new class extends Migration
 
             Schema::table('batch_key_consumptions', function (Blueprint $table) use ($foreignKeyNames) {
                 // Add missing foreign keys if they don't exist
-                if (!in_array('batch_key_consumptions_consumer_work_order_id_foreign', $foreignKeyNames)) {
+                if (! in_array('batch_key_consumptions_consumer_work_order_id_foreign', $foreignKeyNames)) {
                     $table->foreign('consumer_work_order_id')->references('id')->on('work_orders')->onDelete('cascade');
                 }
 
-                if (!in_array('batch_key_consumptions_consumer_batch_id_foreign', $foreignKeyNames)) {
+                if (! in_array('batch_key_consumptions_consumer_batch_id_foreign', $foreignKeyNames)) {
                     $table->foreign('consumer_batch_id')->references('id')->on('work_order_batches')->onDelete('cascade');
                 }
 
-                if (!in_array('batch_key_consumptions_consumed_key_id_foreign', $foreignKeyNames)) {
+                if (! in_array('batch_key_consumptions_consumed_key_id_foreign', $foreignKeyNames)) {
                     $table->foreign('consumed_key_id')->references('id')->on('work_order_batch_keys')->onDelete('cascade');
                 }
             });

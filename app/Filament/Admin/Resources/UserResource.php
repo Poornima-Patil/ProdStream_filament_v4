@@ -2,29 +2,25 @@
 
 namespace App\Filament\Admin\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Select;
-use Filament\Facades\Filament;
-use Filament\Forms\Components\Hidden;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\TrashedFilter;
+use App\Filament\Admin\Resources\UserResource\Pages\CreateUser;
+use App\Filament\Admin\Resources\UserResource\Pages\EditUser;
+use App\Filament\Admin\Resources\UserResource\Pages\ListUsers;
+use App\Filament\Admin\Resources\UserResource\Pages\ViewUser;
 use Filament\Actions\ActionGroup;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
-use Filament\Tables\Enums\RecordActionsPosition;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
-use App\Filament\Admin\Resources\UserResource\Pages\ListUsers;
-use App\Filament\Admin\Resources\UserResource\Pages\EditUser;
-use App\Filament\Admin\Resources\UserResource\Pages\ViewUser;
-use App\Filament\Admin\Resources\UserResource\Pages;
-use App\Filament\Admin\Resources\UserResource\Pages\CreateUser;
-use App\Models\User;
-use Filament\Forms;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Pages\Page;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -33,11 +29,11 @@ use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
 {
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-user';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-user';
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Admin Operations';
+    protected static string|\UnitEnum|null $navigationGroup = 'Admin Operations';
 
     public static function form(Schema $schema): Schema
     {
@@ -56,9 +52,9 @@ class UserResource extends Resource
                 TextInput::make('password')
                     ->password()
                     ->required()
-                    ->dehydrateStateUsing(fn($state) => Hash::make($state))
-                    ->dehydrated(fn($state) => filled($state))
-                    ->required(fn(Page $livewire) => ($livewire instanceof CreateUser)),
+                    ->dehydrateStateUsing(fn ($state) => Hash::make($state))
+                    ->dehydrated(fn ($state) => filled($state))
+                    ->required(fn (Page $livewire) => ($livewire instanceof CreateUser)),
                 Select::make('roles')
                     ->label('Roles')
                     ->multiple()
@@ -68,7 +64,7 @@ class UserResource extends Resource
                     ->preload()
                     ->required(),
                 Hidden::make('factory_id')
-                    ->default(fn() => Filament::getTenant()?->id ?? Auth::user()->factory_id)
+                    ->default(fn () => Filament::getTenant()?->id ?? Auth::user()->factory_id)
                     ->dehydrated(fn ($state) => $state ?? Filament::getTenant()?->id ?? Auth::user()->factory_id),
                 Select::make('department_id')
                     ->relationship('department', 'name', function ($query) {
@@ -109,7 +105,7 @@ class UserResource extends Resource
                 ActionGroup::make([
                     EditAction::make()->label('Edit')->size('sm'),
                     ViewAction::make()->label('View')->size('sm'),
-                ])->size('sm')->tooltip('Action')->dropdownPlacement('right')
+                ])->size('sm')->tooltip('Action')->dropdownPlacement('right'),
             ], position: RecordActionsPosition::BeforeColumns)
             ->toolbarActions([
                 BulkActionGroup::make([

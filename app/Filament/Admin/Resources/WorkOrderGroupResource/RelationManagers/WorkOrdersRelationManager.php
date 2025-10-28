@@ -2,40 +2,34 @@
 
 namespace App\Filament\Admin\Resources\WorkOrderGroupResource\RelationManagers;
 
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\CreateAction;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\DissociateAction;
-use Filament\Actions\DissociateBulkAction;
-use Filament\Actions\EditAction;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Repeater;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Grid;
-use Filament\Notifications\Notification;
-use Illuminate\Support\HtmlString;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
-use Closure;
-use Exception;
-use App\Models\PartNumber;
 use App\Models\Bom;
 use App\Models\Machine;
 use App\Models\Operator;
+use App\Models\PartNumber;
 use App\Models\WorkOrder;
+use Carbon\Carbon;
+use Exception;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\CreateAction;
+use Filament\Actions\DissociateAction;
+use Filament\Actions\DissociateBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\BadgeColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
-use Filament\Tables\Table;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Table;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\HtmlString;
 
 class WorkOrdersRelationManager extends RelationManager
 {
@@ -52,6 +46,7 @@ class WorkOrdersRelationManager extends RelationManager
                     ->label('Partnumber')
                     ->options(function () {
                         $factoryId = $this->getOwnerRecord()->factory_id;
+
                         return PartNumber::where('factory_id', $factoryId)
                             ->get()
                             ->mapWithKeys(function ($partNumber) {
@@ -64,19 +59,21 @@ class WorkOrdersRelationManager extends RelationManager
                     ->reactive()
                     ->required()
                     ->preload()
-                    ->disabled(!$isAdminOrManager),
+                    ->disabled(! $isAdminOrManager),
 
                 Select::make('bom_id')
                     ->label('BOM')
                     ->options(function (callable $get) {
                         $partNumberId = $get('part_number_id');
-                        if (!$partNumberId) {
+                        if (! $partNumberId) {
                             return [];
                         }
+
                         return Bom::whereHas('purchaseOrder', function ($query) use ($partNumberId) {
                             $query->where('part_number_id', $partNumberId);
                         })->get()->mapWithKeys(function ($bom) {
                             $partNumberDescription = $bom->purchaseOrder->partNumber->description ?? '';
+
                             return [
                                 $bom->id => "BOM ID: {$bom->unique_id} - Part Description: {$partNumberDescription}",
                             ];
@@ -85,7 +82,7 @@ class WorkOrdersRelationManager extends RelationManager
                     ->required()
                     ->reactive()
                     ->searchable()
-                    ->disabled(!$isAdminOrManager),
+                    ->disabled(! $isAdminOrManager),
 
                 Select::make('machine_id')
                     ->label('Machine')
@@ -93,7 +90,7 @@ class WorkOrdersRelationManager extends RelationManager
                         $bomId = $get('bom_id');
                         $factoryId = $this->getOwnerRecord()->factory_id;
 
-                        if (!$bomId) {
+                        if (! $bomId) {
                             return [];
                         }
 
@@ -108,13 +105,14 @@ class WorkOrdersRelationManager extends RelationManager
                             $inGroup = $machine->machine_group_id == $machineGroupId;
                             $color = $inGroup ? '🟢' : '🔴';
                             $label = "{$color} Asset ID: {$machine->assetId} - Name: {$machine->name}";
+
                             return [(int) $machine->id => $label];
                         })->toArray();
                     })
                     ->reactive()
                     ->required()
                     ->searchable()
-                    ->disabled(!$isAdminOrManager)
+                    ->disabled(! $isAdminOrManager)
                     ->helperText(function (callable $get) {
                         $machineId = $get('machine_id');
                         $bomId = $get('bom_id');
@@ -122,9 +120,10 @@ class WorkOrdersRelationManager extends RelationManager
                             $bom = Bom::find($bomId);
                             $machine = Machine::find($machineId);
                             if ($bom && $machine && $machine->machine_group_id != $bom->machine_group_id) {
-                                return "⚠️ This Machine is not as per BOM Specifications.";
+                                return '⚠️ This Machine is not as per BOM Specifications.';
                             }
                         }
+
                         return null;
                     })
                     ->afterStateUpdated(function (callable $get, callable $set, $state) {
@@ -145,15 +144,16 @@ class WorkOrdersRelationManager extends RelationManager
                 TextInput::make('qty')
                     ->label('Quantity')
                     ->required()
-                    ->disabled(!$isAdminOrManager)
+                    ->disabled(! $isAdminOrManager)
                     ->live(onBlur: true)
                     ->numeric()
                     ->afterStateUpdated(function (callable $get, callable $set) {
                         $partNumberId = $get('part_number_id');
                         $qty = (int) $get('qty');
 
-                        if (!$partNumberId || !$qty) {
+                        if (! $partNumberId || ! $qty) {
                             $set('time_to_complete', '00:00:00');
+
                             return;
                         }
 
@@ -167,13 +167,15 @@ class WorkOrdersRelationManager extends RelationManager
                                     ->danger()
                                     ->send();
                                 $set('qty', 0);
+
                                 return;
                             }
                         }
 
                         $cycleTimeInSeconds = PartNumber::where('id', $partNumberId)->value('cycle_time');
-                        if (!$cycleTimeInSeconds) {
+                        if (! $cycleTimeInSeconds) {
                             $set('time_to_complete', '00:00:00');
+
                             return;
                         }
 
@@ -186,10 +188,10 @@ class WorkOrdersRelationManager extends RelationManager
 
                 Select::make('operator_id')
                     ->label('Operator')
-                    ->disabled(!$isAdminOrManager)
+                    ->disabled(! $isAdminOrManager)
                     ->options(function (callable $get) {
                         $bomId = $get('bom_id');
-                        if (!$bomId) {
+                        if (! $bomId) {
                             return [];
                         }
 
@@ -206,6 +208,7 @@ class WorkOrdersRelationManager extends RelationManager
                                 $isMatch = $operator->operator_proficiency_id == $operatorProficiencyId;
                                 $color = $isMatch ? '🟢' : '🔴';
                                 $label = "{$color} {$operator->user->first_name} {$operator->user->last_name}{$shiftInfo}";
+
                                 return [$operator->id => $label];
                             });
                     })
@@ -222,6 +225,7 @@ class WorkOrdersRelationManager extends RelationManager
                                 return "⚠️ The Operator's Proficiency does not match with the BOM specifications.";
                             }
                         }
+
                         return null;
                     })
                     ->afterStateUpdated(function (callable $get, callable $set, $state) {
@@ -248,7 +252,7 @@ class WorkOrdersRelationManager extends RelationManager
 
                 DateTimePicker::make('start_time')
                     ->required()
-                    ->disabled(!$isAdminOrManager)
+                    ->disabled(! $isAdminOrManager)
                     ->label('Planned Start Time')
                     ->minDate(fn (string $operation): ?\Carbon\Carbon => $operation === 'create' ? now()->startOfDay() : null)
                     ->seconds(false)
@@ -260,7 +264,7 @@ class WorkOrdersRelationManager extends RelationManager
                 DateTimePicker::make('end_time')
                     ->label('Planned End Time')
                     ->minDate(fn (string $operation): ?\Carbon\Carbon => $operation === 'create' ? now()->startOfDay() : null)
-                    ->disabled(!$isAdminOrManager)
+                    ->disabled(! $isAdminOrManager)
                     ->seconds(false)
                     ->native(false)
                     ->displayFormat('d M Y, H:i')
@@ -269,13 +273,14 @@ class WorkOrdersRelationManager extends RelationManager
                     ->required()
                     ->helperText(function (callable $get) {
                         $bomId = $get('bom_id');
-                        if (!$bomId) {
+                        if (! $bomId) {
                             return null;
                         }
                         $bom = Bom::find($bomId);
                         if ($bom && $bom->lead_time) {
                             return 'BOM Target Completion Time: '.Carbon::parse($bom->lead_time)->format('d M Y');
                         }
+
                         return null;
                     })
                     ->reactive(),
@@ -292,7 +297,7 @@ class WorkOrdersRelationManager extends RelationManager
                                 $status = $get('status');
                                 $factoryId = $this->getOwnerRecord()->factory_id;
 
-                                if (!$machineId || !$factoryId) {
+                                if (! $machineId || ! $factoryId) {
                                     return new HtmlString('<div class="text-gray-500 italic">Select a machine to see status</div>');
                                 }
 
@@ -301,7 +306,7 @@ class WorkOrdersRelationManager extends RelationManager
                                         ->where('factory_id', $factoryId)
                                         ->first();
 
-                                    if (!$machine) {
+                                    if (! $machine) {
                                         return new HtmlString('<div class="text-red-600">⚠️ Machine not found or belongs to different factory</div>');
                                     }
 
@@ -310,7 +315,7 @@ class WorkOrdersRelationManager extends RelationManager
                                     // Check if machine is currently occupied
                                     if (WorkOrder::isMachineCurrentlyOccupied($machineId, $factoryId)) {
                                         $currentWO = WorkOrder::getCurrentRunningWorkOrder($machineId, $factoryId);
-                                        $woLink = "#"; // Can't generate edit link in relation manager context
+                                        $woLink = '#'; // Can't generate edit link in relation manager context
                                         $estimatedCompletion = Carbon::parse($currentWO->end_time)->format('M d, H:i');
 
                                         return new HtmlString(
@@ -338,7 +343,7 @@ class WorkOrdersRelationManager extends RelationManager
                                             'id' => $get('id'),
                                         ]);
 
-                                        if (!$validation['is_valid']) {
+                                        if (! $validation['is_valid']) {
                                             $conflictCount = count($validation['conflicts']);
 
                                             return new HtmlString(
@@ -390,7 +395,7 @@ class WorkOrdersRelationManager extends RelationManager
                                 $status = $get('status');
                                 $factoryId = $this->getOwnerRecord()->factory_id;
 
-                                if (!$operatorId || !$factoryId) {
+                                if (! $operatorId || ! $factoryId) {
                                     return new HtmlString('<div class="text-gray-500 italic">Select an operator to see status</div>');
                                 }
 
@@ -401,7 +406,7 @@ class WorkOrdersRelationManager extends RelationManager
                                         ->with(['user', 'shift'])
                                         ->first();
 
-                                    if (!$operator) {
+                                    if (! $operator) {
                                         return new HtmlString('<div class="text-red-600">⚠️ Operator not found or belongs to different factory</div>');
                                     }
 
@@ -414,8 +419,8 @@ class WorkOrdersRelationManager extends RelationManager
                                     if ($operator->isCurrentlyOccupied($factoryId)) {
                                         $currentWO = $operator->getCurrentRunningWorkOrder($factoryId);
                                         // Don't show as occupied if it's the current work order being edited
-                                        if (!$get('id') || $currentWO->id !== $get('id')) {
-                                            $woLink = "#"; // Can't generate edit link in relation manager context
+                                        if (! $get('id') || $currentWO->id !== $get('id')) {
+                                            $woLink = '#'; // Can't generate edit link in relation manager context
                                             $estimatedCompletion = Carbon::parse($currentWO->end_time)->format('M d, H:i');
 
                                             return new HtmlString(
@@ -447,7 +452,7 @@ class WorkOrdersRelationManager extends RelationManager
                                         ]);
 
                                         // Check for shift conflicts (warnings, not blocking)
-                                        if (!empty($validation['shift_conflicts'])) {
+                                        if (! empty($validation['shift_conflicts'])) {
                                             $shiftConflict = $validation['shift_conflicts'][0];
 
                                             return new HtmlString(
@@ -466,7 +471,7 @@ class WorkOrdersRelationManager extends RelationManager
                                         }
 
                                         // Check for operator availability conflicts (blocking)
-                                        if (!empty($validation['operator_conflicts'])) {
+                                        if (! empty($validation['operator_conflicts'])) {
                                             $operatorConflictCount = count(array_filter($validation['operator_conflicts'],
                                                 fn ($c) => $c['type'] === 'work_order_conflict'));
 
@@ -585,7 +590,7 @@ class WorkOrdersRelationManager extends RelationManager
                     ->toggleable(),
                 TextColumn::make('operator.user.first_name')
                     ->label('Operator')
-                    ->formatStateUsing(fn ($record) => $record->operator?->user ? $record->operator->user->first_name . ' ' . $record->operator->user->last_name : 'N/A')
+                    ->formatStateUsing(fn ($record) => $record->operator?->user ? $record->operator->user->first_name.' '.$record->operator->user->last_name : 'N/A')
                     ->toggleable(),
             ])
             ->filters([
@@ -641,7 +646,7 @@ class WorkOrdersRelationManager extends RelationManager
                         }
 
                         // Set default values if not provided
-                        if (!isset($data['sequence_order'])) {
+                        if (! isset($data['sequence_order'])) {
                             $data['sequence_order'] = $this->getOwnerRecord()->workOrders()->max('sequence_order') + 1;
                         }
 

@@ -3,9 +3,9 @@
 namespace App\Livewire;
 
 use Exception;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\WithFileUploads;
-use Livewire\Attributes\Computed;
 
 class PivotTableBuilder extends Component
 {
@@ -14,22 +14,30 @@ class PivotTableBuilder extends Component
     protected $layout = 'components.layouts.app';
 
     public $csvFile;
+
     public $csvData = [];
+
     public $csvHeaders = [];
 
     // Pivot configuration
     public $selectedRows = [];
+
     public $selectedColumns = [];
+
     public $selectedValues = [];
+
     public $selectedFilters = [];
+
     public $aggregationFunction = 'sum';
 
     // Filter values
     public $filterValues = [];
+
     public $activeFilters = [];
 
     // UI state
     public $showConfiguration = false;
+
     public $showResults = false;
 
     public $pivotResult = [];
@@ -51,7 +59,7 @@ class PivotTableBuilder extends Component
             $this->showConfiguration = true;
             session()->flash('success', 'CSV file uploaded successfully!');
         } catch (Exception $e) {
-            session()->flash('error', 'Error processing CSV: ' . $e->getMessage());
+            session()->flash('error', 'Error processing CSV: '.$e->getMessage());
         }
     }
 
@@ -63,7 +71,7 @@ class PivotTableBuilder extends Component
 
         if (($handle = fopen($path, 'r')) !== false) {
             $headers = fgetcsv($handle);
-            if (!$headers) {
+            if (! $headers) {
                 throw new Exception('Invalid CSV format');
             }
 
@@ -109,7 +117,7 @@ class PivotTableBuilder extends Component
 
             session()->flash('success', 'Pivot table generated successfully!');
         } catch (Exception $e) {
-            session()->flash('error', 'Error generating pivot table: ' . $e->getMessage());
+            session()->flash('error', 'Error generating pivot table: '.$e->getMessage());
         }
     }
 
@@ -121,10 +129,11 @@ class PivotTableBuilder extends Component
 
         return collect($data)->filter(function ($row) {
             foreach ($this->activeFilters as $field => $values) {
-                if (!empty($values) && !in_array($row[$field], $values)) {
+                if (! empty($values) && ! in_array($row[$field], $values)) {
                     return false;
                 }
             }
+
             return true;
         })->toArray();
     }
@@ -137,16 +146,16 @@ class PivotTableBuilder extends Component
             $rowKey = $this->createGroupKey($row, $this->selectedRows);
             $colKey = $this->createGroupKey($row, $this->selectedColumns);
 
-            if (!isset($grouped[$rowKey])) {
+            if (! isset($grouped[$rowKey])) {
                 $grouped[$rowKey] = [];
             }
 
-            if (!isset($grouped[$rowKey][$colKey])) {
+            if (! isset($grouped[$rowKey][$colKey])) {
                 $grouped[$rowKey][$colKey] = [];
             }
 
             foreach ($this->selectedValues as $valueField) {
-                if (!isset($grouped[$rowKey][$colKey][$valueField])) {
+                if (! isset($grouped[$rowKey][$colKey][$valueField])) {
                     $grouped[$rowKey][$colKey][$valueField] = [];
                 }
 
@@ -176,8 +185,8 @@ class PivotTableBuilder extends Component
                 'columns' => $this->selectedColumns,
                 'values' => $this->selectedValues,
                 'aggregation' => $this->aggregationFunction,
-                'total_records' => count($data)
-            ]
+                'total_records' => count($data),
+            ],
         ];
     }
 
@@ -191,6 +200,7 @@ class PivotTableBuilder extends Component
         foreach ($fields as $field) {
             $keyParts[] = $row[$field] ?? 'N/A';
         }
+
         return implode(' | ', $keyParts);
     }
 
@@ -242,7 +252,7 @@ class PivotTableBuilder extends Component
         return [
             'total_rows' => $totalRows,
             'total_columns' => $totalColumns,
-            'grand_total' => $grandTotal
+            'grand_total' => $grandTotal,
         ];
     }
 
@@ -250,10 +260,11 @@ class PivotTableBuilder extends Component
     {
         if (empty($this->pivotResult)) {
             session()->flash('error', 'No pivot data to export');
+
             return;
         }
 
-        $filename = 'pivot_export_' . now()->format('Y-m-d_H-i-s') . '.csv';
+        $filename = 'pivot_export_'.now()->format('Y-m-d_H-i-s').'.csv';
         $headers = [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
@@ -303,7 +314,7 @@ class PivotTableBuilder extends Component
             'selectedValues',
             'selectedFilters',
             'activeFilters',
-            'pivotResult'
+            'pivotResult',
         ]);
         $this->showConfiguration = false;
         $this->showResults = false;
@@ -323,7 +334,7 @@ class PivotTableBuilder extends Component
             $sampleValues = collect($this->csvData)
                 ->take(10)
                 ->pluck($header)
-                ->filter(fn($val) => is_numeric($val));
+                ->filter(fn ($val) => is_numeric($val));
 
             if ($sampleValues->count() > 5) {
                 $numericFields[] = $header;

@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
-use Exception;
 use App\Models\WorkOrder;
 use Carbon\Carbon;
+use Exception;
 use Illuminate\Support\Facades\Cache;
 
 class KPIService
@@ -44,13 +44,13 @@ class KPIService
             // Calculate percentage for each status
             $statusPercentages = [];
             $statuses = ['Assigned', 'Start', 'Hold', 'Completed', 'Closed'];
-            
+
             foreach ($statuses as $statusKey) {
                 $count = $statusDistribution->get($statusKey)?->count ?? 0;
                 $percentage = $totalOrders > 0 ? round(($count / $totalOrders) * 100, 1) : 0;
                 $statusPercentages[$statusKey] = [
                     'count' => $count,
-                    'percentage' => $percentage
+                    'percentage' => $percentage,
                 ];
             }
 
@@ -61,7 +61,7 @@ class KPIService
                     'completed_orders' => $completedOrders,
                     'trend' => 0,
                     'status' => 'neutral',
-                    'status_distribution' => $statusPercentages
+                    'status_distribution' => $statusPercentages,
                 ];
             }
 
@@ -74,7 +74,7 @@ class KPIService
                 'completed_orders' => $completedOrders,
                 'trend' => 0, // Trend calculation disabled for custom date ranges
                 'status' => $status,
-                'status_distribution' => $statusPercentages
+                'status_distribution' => $statusPercentages,
             ];
         });
     }
@@ -107,7 +107,7 @@ class KPIService
                     'total_orders' => 0,
                     'completed_orders' => 0,
                     'trend' => 0,
-                    'status' => 'neutral'
+                    'status' => 'neutral',
                 ];
             }
 
@@ -120,7 +120,7 @@ class KPIService
                 'total_orders' => $totalOrders,
                 'completed_orders' => $completedOrders,
                 'trend' => $trend,
-                'status' => $status
+                'status' => $status,
             ];
         });
     }
@@ -161,7 +161,7 @@ class KPIService
                     $partNumber = 'Unknown Part';
                     if ($item->bom && $item->bom->purchaseOrder && $item->bom->purchaseOrder->partNumber) {
                         $pn = $item->bom->purchaseOrder->partNumber;
-                        $partNumber = $pn->partnumber . '_' . $pn->revision;
+                        $partNumber = $pn->partnumber.'_'.$pn->revision;
                     } elseif ($item->bom) {
                         $partNumber = $item->bom->unique_id;
                     }
@@ -170,7 +170,7 @@ class KPIService
                         'part' => $partNumber,
                         'units' => (int) $item->total_units,
                         'percentage' => $totalUnitsProduced > 0 ? round(($item->total_units / $totalUnitsProduced) * 100, 1) : 0,
-                        'orders' => $item->order_count
+                        'orders' => $item->order_count,
                     ];
                 })
                 ->toArray();
@@ -188,12 +188,13 @@ class KPIService
                 ->get()
                 ->map(function ($item) {
                     $efficiency = round($item->avg_efficiency ?? 0, 1);
+
                     return [
-                        'machine' => $item->machine ? $item->machine->name : 'Machine-' . $item->machine_id,
+                        'machine' => $item->machine ? $item->machine->name : 'Machine-'.$item->machine_id,
                         'units' => (int) $item->total_units,
                         'efficiency' => $efficiency,
                         'orders' => $item->order_count,
-                        'status' => $this->getMachineStatus($efficiency)
+                        'status' => $this->getMachineStatus($efficiency),
                     ];
                 })
                 ->toArray();
@@ -207,7 +208,7 @@ class KPIService
                     'trend' => 0,
                     'status' => 'neutral',
                     'production_by_part' => [],
-                    'production_by_machine' => []
+                    'production_by_machine' => [],
                 ];
             }
 
@@ -222,7 +223,7 @@ class KPIService
                 'trend' => 0, // Trend calculation disabled for custom date ranges
                 'status' => $status,
                 'production_by_part' => $productionByPart,
-                'production_by_machine' => $productionByMachine
+                'production_by_machine' => $productionByMachine,
             ];
         });
     }
@@ -260,7 +261,7 @@ class KPIService
                     $partNumber = 'Unknown Part';
                     if ($item->bom && $item->bom->purchaseOrder && $item->bom->purchaseOrder->partNumber) {
                         $pn = $item->bom->purchaseOrder->partNumber;
-                        $partNumber = $pn->partnumber . '_' . $pn->revision;
+                        $partNumber = $pn->partnumber.'_'.$pn->revision;
                     } elseif ($item->bom) {
                         $partNumber = $item->bom->unique_id;
                     }
@@ -269,7 +270,7 @@ class KPIService
                         'part' => $partNumber,
                         'units' => (int) $item->total_units,
                         'percentage' => $totalUnitsProduced > 0 ? round(($item->total_units / $totalUnitsProduced) * 100, 1) : 0,
-                        'orders' => $item->order_count
+                        'orders' => $item->order_count,
                     ];
                 })
                 ->toArray();
@@ -286,12 +287,13 @@ class KPIService
                 ->get()
                 ->map(function ($item) {
                     $efficiency = round($item->avg_efficiency ?? 0, 1);
+
                     return [
-                        'machine' => $item->machine ? $item->machine->name : 'Machine-' . $item->machine_id,
+                        'machine' => $item->machine ? $item->machine->name : 'Machine-'.$item->machine_id,
                         'units' => (int) $item->total_units,
                         'efficiency' => $efficiency,
                         'orders' => $item->order_count,
-                        'status' => $this->getMachineStatus($efficiency)
+                        'status' => $this->getMachineStatus($efficiency),
                     ];
                 })
                 ->toArray();
@@ -305,7 +307,7 @@ class KPIService
                     'trend' => 0,
                     'status' => 'neutral',
                     'production_by_part' => [],
-                    'production_by_machine' => []
+                    'production_by_machine' => [],
                 ];
             }
 
@@ -321,7 +323,7 @@ class KPIService
                 'trend' => $trend,
                 'status' => $status,
                 'production_by_part' => $productionByPart,
-                'production_by_machine' => $productionByMachine
+                'production_by_machine' => $productionByMachine,
             ];
         });
     }
@@ -356,8 +358,8 @@ class KPIService
                     'by_status' => [
                         'completed' => ['rate' => 0, 'total_qty' => 0, 'scrapped_qty' => 0, 'count' => 0],
                         'hold' => ['rate' => 0, 'total_qty' => 0, 'scrapped_qty' => 0, 'count' => 0],
-                        'closed' => ['rate' => 0, 'total_qty' => 0, 'scrapped_qty' => 0, 'count' => 0]
-                    ]
+                        'closed' => ['rate' => 0, 'total_qty' => 0, 'scrapped_qty' => 0, 'count' => 0],
+                    ],
                 ];
             }
 
@@ -380,7 +382,7 @@ class KPIService
                     'rate' => $statusScrapRate,
                     'total_qty' => $statusTotalQty,
                     'scrapped_qty' => $statusScrappedQty,
-                    'count' => $statusCount
+                    'count' => $statusCount,
                 ];
             }
 
@@ -392,7 +394,7 @@ class KPIService
                     'good_qty' => 0,
                     'trend' => 0,
                     'status' => 'neutral',
-                    'by_status' => $byStatus
+                    'by_status' => $byStatus,
                 ];
             }
 
@@ -406,7 +408,7 @@ class KPIService
                 'good_qty' => $goodQty,
                 'trend' => 0, // Trend calculation disabled for custom date ranges
                 'status' => $status,
-                'by_status' => $byStatus
+                'by_status' => $byStatus,
             ];
         });
     }
@@ -440,8 +442,8 @@ class KPIService
                     'by_status' => [
                         'completed' => ['rate' => 0, 'total_qty' => 0, 'scrapped_qty' => 0, 'count' => 0],
                         'hold' => ['rate' => 0, 'total_qty' => 0, 'scrapped_qty' => 0, 'count' => 0],
-                        'closed' => ['rate' => 0, 'total_qty' => 0, 'scrapped_qty' => 0, 'count' => 0]
-                    ]
+                        'closed' => ['rate' => 0, 'total_qty' => 0, 'scrapped_qty' => 0, 'count' => 0],
+                    ],
                 ];
             }
 
@@ -464,7 +466,7 @@ class KPIService
                     'rate' => $statusScrapRate,
                     'total_qty' => $statusTotalQty,
                     'scrapped_qty' => $statusScrappedQty,
-                    'count' => $statusCount
+                    'count' => $statusCount,
                 ];
             }
 
@@ -476,7 +478,7 @@ class KPIService
                     'good_qty' => 0,
                     'trend' => 0,
                     'status' => 'neutral',
-                    'by_status' => $byStatus
+                    'by_status' => $byStatus,
                 ];
             }
 
@@ -491,7 +493,7 @@ class KPIService
                 'good_qty' => $goodQty,
                 'trend' => $trend,
                 'status' => $status,
-                'by_status' => $byStatus
+                'by_status' => $byStatus,
             ];
         });
     }
@@ -560,7 +562,7 @@ class KPIService
                     'orders_count' => 0,
                     'average_throughput' => 0,
                     'trend' => 0,
-                    'status' => 'neutral'
+                    'status' => 'neutral',
                 ];
             }
 
@@ -634,7 +636,7 @@ class KPIService
                     'orders_count' => 0,
                     'average_throughput' => 0,
                     'trend' => 0,
-                    'status' => 'neutral'
+                    'status' => 'neutral',
                 ];
             }
 
@@ -651,7 +653,7 @@ class KPIService
                 'average_throughput' => $averageThroughput,
                 'individual_throughputs_count' => count($individualThroughputs),
                 'trend' => 0, // Trend calculation disabled for custom date ranges
-                'status' => $status
+                'status' => $status,
             ];
         });
     }
@@ -685,7 +687,7 @@ class KPIService
                     'orders_count' => 0,
                     'average_throughput' => 0,
                     'trend' => 0,
-                    'status' => 'neutral'
+                    'status' => 'neutral',
                 ];
             }
 
@@ -713,8 +715,7 @@ class KPIService
                     if ($log->status === 'Start') {
                         // Mark the start of a production period
                         $lastStartTime = Carbon::parse($log->created_at);
-                    }
-                    elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
+                    } elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
                         // End of a production period - calculate duration
                         $endTime = Carbon::parse($log->created_at);
                         $periodHours = $lastStartTime->diffInHours($endTime, true);
@@ -751,7 +752,7 @@ class KPIService
                     'orders_count' => 0,
                     'average_throughput' => 0,
                     'trend' => 0,
-                    'status' => 'neutral'
+                    'status' => 'neutral',
                 ];
             }
 
@@ -768,7 +769,7 @@ class KPIService
                 'average_throughput' => $averageThroughput,
                 'individual_throughputs_count' => count($individualThroughputs),
                 'trend' => 0,
-                'status' => $status
+                'status' => $status,
             ];
         });
     }
@@ -800,7 +801,7 @@ class KPIService
                     'total_hours' => 0,
                     'orders_count' => 0,
                     'trend' => 0,
-                    'status' => 'neutral'
+                    'status' => 'neutral',
                 ];
             }
 
@@ -857,7 +858,7 @@ class KPIService
                     'total_hours' => 0,
                     'orders_count' => $ordersProcessed,
                     'trend' => 0,
-                    'status' => 'neutral'
+                    'status' => 'neutral',
                 ];
             }
 
@@ -872,7 +873,7 @@ class KPIService
                 'total_hours' => round($totalHours, 1),
                 'orders_count' => $ordersProcessed,
                 'trend' => $trend,
-                'status' => $status
+                'status' => $status,
             ];
         });
     }
@@ -904,7 +905,7 @@ class KPIService
                     'total_net_hours' => 0,
                     'orders_count' => 0,
                     'trend' => 0,
-                    'status' => 'neutral'
+                    'status' => 'neutral',
                 ];
             }
 
@@ -931,8 +932,7 @@ class KPIService
                     if ($log->status === 'Start') {
                         // Mark the start of a production period
                         $lastStartTime = Carbon::parse($log->created_at);
-                    }
-                    elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
+                    } elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
                         // End of a production period - calculate duration
                         $endTime = Carbon::parse($log->created_at);
                         $periodHours = $lastStartTime->diffInHours($endTime, true);
@@ -964,7 +964,7 @@ class KPIService
                     'total_net_hours' => 0,
                     'orders_count' => $ordersProcessed,
                     'trend' => 0,
-                    'status' => 'neutral'
+                    'status' => 'neutral',
                 ];
             }
 
@@ -979,7 +979,7 @@ class KPIService
                 'total_net_hours' => round($totalNetHours, 1),
                 'orders_count' => $ordersProcessed,
                 'trend' => $trend,
-                'status' => $status
+                'status' => $status,
             ];
         });
     }
@@ -1013,7 +1013,7 @@ class KPIService
                     'orders_count' => 0,
                     'average_throughput' => 0,
                     'trend' => 0,
-                    'status' => 'neutral'
+                    'status' => 'neutral',
                 ];
             }
 
@@ -1087,7 +1087,7 @@ class KPIService
                     'orders_count' => 0,
                     'average_throughput' => 0,
                     'trend' => 0,
-                    'status' => 'neutral'
+                    'status' => 'neutral',
                 ];
             }
 
@@ -1104,7 +1104,7 @@ class KPIService
                 'average_throughput' => $averageGrossThroughput,
                 'individual_throughputs_count' => count($individualThroughputs),
                 'trend' => 0,
-                'status' => $status
+                'status' => $status,
             ];
         });
     }
@@ -1136,7 +1136,7 @@ class KPIService
                     'total_hours' => 0,
                     'orders_count' => 0,
                     'trend' => 0,
-                    'status' => 'neutral'
+                    'status' => 'neutral',
                 ];
             }
 
@@ -1196,7 +1196,7 @@ class KPIService
                     'total_hours' => 0,
                     'orders_count' => $ordersProcessed,
                     'trend' => 0,
-                    'status' => 'neutral'
+                    'status' => 'neutral',
                 ];
             }
 
@@ -1211,7 +1211,7 @@ class KPIService
                 'total_hours' => round($totalHours, 1),
                 'orders_count' => $ordersProcessed,
                 'trend' => $trend,
-                'status' => $status
+                'status' => $status,
             ];
         });
     }
@@ -1245,7 +1245,7 @@ class KPIService
                     'orders_count' => 0,
                     'average_throughput' => 0,
                     'trend' => 0,
-                    'status' => 'neutral'
+                    'status' => 'neutral',
                 ];
             }
 
@@ -1273,8 +1273,7 @@ class KPIService
                     if ($log->status === 'Start') {
                         // Mark the start of a production period
                         $lastStartTime = Carbon::parse($log->created_at);
-                    }
-                    elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
+                    } elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
                         // End of a production period - calculate duration
                         $endTime = Carbon::parse($log->created_at);
                         $periodHours = $lastStartTime->diffInHours($endTime, true);
@@ -1311,7 +1310,7 @@ class KPIService
                     'orders_count' => 0,
                     'average_throughput' => 0,
                     'trend' => 0,
-                    'status' => 'neutral'
+                    'status' => 'neutral',
                 ];
             }
 
@@ -1328,7 +1327,7 @@ class KPIService
                 'average_throughput' => $averageThroughput,
                 'individual_throughputs_count' => count($individualThroughputs),
                 'trend' => 0,
-                'status' => $status
+                'status' => $status,
             ];
         });
     }
@@ -1360,7 +1359,7 @@ class KPIService
                     'total_net_hours' => 0,
                     'orders_count' => 0,
                     'trend' => 0,
-                    'status' => 'neutral'
+                    'status' => 'neutral',
                 ];
             }
 
@@ -1387,8 +1386,7 @@ class KPIService
                     if ($log->status === 'Start') {
                         // Mark the start of a production period
                         $lastStartTime = Carbon::parse($log->created_at);
-                    }
-                    elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
+                    } elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
                         // End of a production period - calculate duration
                         $endTime = Carbon::parse($log->created_at);
                         $periodHours = $lastStartTime->diffInHours($endTime, true);
@@ -1420,7 +1418,7 @@ class KPIService
                     'total_net_hours' => 0,
                     'orders_count' => $ordersProcessed,
                     'trend' => 0,
-                    'status' => 'neutral'
+                    'status' => 'neutral',
                 ];
             }
 
@@ -1435,7 +1433,7 @@ class KPIService
                 'total_net_hours' => round($totalNetHours, 1),
                 'orders_count' => $ordersProcessed,
                 'trend' => $trend,
-                'status' => $status
+                'status' => $status,
             ];
         });
     }
@@ -1451,7 +1449,7 @@ class KPIService
             'unit' => $unit,
             'trend' => 0,
             'status' => 'neutral',
-            'coming_soon' => true
+            'coming_soon' => true,
         ];
     }
 
@@ -1576,6 +1574,7 @@ class KPIService
                     }
 
                     $previousValue = ($completedOrders / $totalOrders) * 100;
+
                     return round($currentValue - $previousValue, 1);
                 } elseif ($kpiType === 'production_throughput') {
                     $dateRange = $this->getDateRange($previousPeriod);
@@ -1591,6 +1590,7 @@ class KPIService
                     }
 
                     $previousValue = $totalUnitsProduced / $days;
+
                     return round($currentValue - $previousValue, 1);
                 } elseif ($kpiType === 'production_throughput_time') {
                     $dateRange = $this->getDateRange($previousPeriod);
@@ -1653,6 +1653,7 @@ class KPIService
                     }
 
                     $previousValue = $totalUnits / $totalHours;
+
                     return round($currentValue - $previousValue, 1);
                 } elseif ($kpiType === 'scrap_rate') {
                     $dateRange = $this->getDateRange($previousPeriod);
@@ -1674,6 +1675,7 @@ class KPIService
                     }
 
                     $previousValue = ($scrappedQty / $totalQty) * 100;
+
                     return round($currentValue - $previousValue, 1);
                 }
 
@@ -1773,7 +1775,7 @@ class KPIService
             "kpi_completion_rate_factory_{$factoryId}_*",
             "kpi_production_throughput_factory_{$factoryId}_*",
             "kpi_scrap_rate_factory_{$factoryId}_*",
-            "kpi_*_trend_factory_{$factoryId}_*"
+            "kpi_*_trend_factory_{$factoryId}_*",
         ];
 
         foreach ($patterns as $pattern) {

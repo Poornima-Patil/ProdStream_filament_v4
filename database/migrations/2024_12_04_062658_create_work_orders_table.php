@@ -18,6 +18,7 @@ return new class extends Migration
             $table->foreignId('machine_id')->constrained();
             $table->foreignId('operator_id')->nullable();
             $table->dateTime('start_time')->nullable();
+            $table->time('delay_time')->nullable();
             $table->dateTime('end_time')->nullable();
             $table->string('status')->nullable();
             $table->integer('ok_qtys')->default(0);

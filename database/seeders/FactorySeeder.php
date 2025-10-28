@@ -2,14 +2,13 @@
 
 namespace Database\Seeders;
 
-use App\Models\Factory;
-use App\Models\Role;
-use App\Models\Permission;
-use App\Models\User;
 use App\Models\Department;
+use App\Models\Factory;
+use App\Models\Permission;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 class FactorySeeder extends Seeder
 {
@@ -22,18 +21,18 @@ class FactorySeeder extends Seeder
             [
                 'name' => 'Alpha',
                 'slug' => 'alpha',
-                'template_path' => '/templates/alpha'
+                'template_path' => '/templates/alpha',
             ],
             [
                 'name' => 'Beta',
                 'slug' => 'beta',
-                'template_path' => '/templates/beta'
+                'template_path' => '/templates/beta',
             ],
             [
                 'name' => 'Gamma',
                 'slug' => 'gamma',
-                'template_path' => '/templates/gamma'
-            ]
+                'template_path' => '/templates/gamma',
+            ],
         ];
 
         foreach ($factories as $factoryData) {
@@ -60,7 +59,7 @@ class FactorySeeder extends Seeder
             $this->command->info("✅ Factory '{$factory->name}' setup completed");
         }
 
-        $this->command->info("🎉 All factories created successfully!");
+        $this->command->info('🎉 All factories created successfully!');
     }
 
     /**
@@ -171,7 +170,7 @@ class FactorySeeder extends Seeder
                 'guard_name' => 'web',
                 'factory_id' => $factory->id,
             ], [
-                'group' => $groupName
+                'group' => $groupName,
             ]);
         }
 
@@ -186,7 +185,7 @@ class FactorySeeder extends Seeder
         $roles = [
             [
                 'name' => 'Factory Admin',
-                'permissions' => 'ALL' // Special marker for all permissions
+                'permissions' => 'ALL', // Special marker for all permissions
             ],
             [
                 'name' => 'Manager',
@@ -205,7 +204,7 @@ class FactorySeeder extends Seeder
                     'View MachineGroup', 'Create MachineGroup', 'Edit MachineGroup',
                     'View Customer Information', 'Create Customer Information', 'Edit Customer Information',
                     'View WorkOrderGroup', 'Create WorkOrderGroup', 'Edit WorkOrderGroup',
-                ]
+                ],
             ],
             [
                 'name' => 'Operator',
@@ -221,8 +220,8 @@ class FactorySeeder extends Seeder
                     'View HoldReason',
                     'View MachineGroup',
                     'View Customer Information',
-                ]
-            ]
+                ],
+            ],
         ];
 
         foreach ($roles as $roleData) {
@@ -258,7 +257,7 @@ class FactorySeeder extends Seeder
             'factory_id' => $factory->id,
             'name' => 'Management',
         ], [
-            'description' => 'Management department for ' . $factory->name
+            'description' => 'Management department for '.$factory->name,
         ]);
     }
 
@@ -267,14 +266,14 @@ class FactorySeeder extends Seeder
      */
     private function createFactoryAdminUser(Factory $factory, Department $managementDept): void
     {
-        $adminEmail = 'admin@factory' . $factory->id . '.com';
+        $adminEmail = 'admin@factory'.$factory->id.'.com';
 
         $user = User::firstOrCreate([
             'email' => $adminEmail,
         ], [
             'first_name' => 'Factory',
             'last_name' => 'Admin',
-            'emp_id' => 'FADM' . str_pad($factory->id, 3, '0', STR_PAD_LEFT),
+            'emp_id' => 'FADM'.str_pad($factory->id, 3, '0', STR_PAD_LEFT),
             'password' => Hash::make('password'),
             'factory_id' => $factory->id,
             'department_id' => $managementDept->id,

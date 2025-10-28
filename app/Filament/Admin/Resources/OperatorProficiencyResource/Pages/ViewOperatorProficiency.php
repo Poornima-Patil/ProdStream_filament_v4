@@ -2,17 +2,17 @@
 
 namespace App\Filament\Admin\Resources\OperatorProficiencyResource\Pages;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Illuminate\Support\HtmlString;
 use App\Filament\Admin\Resources\OperatorProficiencyResource;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Resources\Pages\ViewRecord;
+use App\Filament\Admin\Resources\OperatorProficiencyResource\Widgets\OperatorProficiencyStatusChart;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Livewire;
-use App\Filament\Admin\Resources\OperatorProficiencyResource\Widgets\OperatorProficiencyStatusChart;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Illuminate\Support\HtmlString;
 
 class ViewOperatorProficiency extends ViewRecord
 {
@@ -76,7 +76,7 @@ class ViewOperatorProficiency extends ViewRecord
                             // Show notification
                             \Filament\Notifications\Notification::make()
                                 ->title('Date range updated')
-                                ->body('Data filtered from ' . $this->dateFrom . ' to ' . $this->dateTo)
+                                ->body('Data filtered from '.$this->dateFrom.' to '.$this->dateTo)
                                 ->success()
                                 ->send();
                         }),
@@ -260,7 +260,7 @@ class ViewOperatorProficiency extends ViewRecord
                                     </div>
 
                                     <!-- Bottom Row: Chart Full Width - Placeholder for Widget -->
-                                    <div id="operator-proficiency-chart-container-' . $record->id . '"></div>
+                                    <div id="operator-proficiency-chart-container-'.$record->id.'"></div>
                                 </div>
                             ');
                         })->html(),
@@ -270,7 +270,7 @@ class ViewOperatorProficiency extends ViewRecord
                         'record' => $this->record,
                         'dateFrom' => $this->dateFrom,
                         'dateTo' => $this->dateTo,
-                    ])->key('operator-proficiency-status-chart-' . $this->record->id),
+                    ])->key('operator-proficiency-status-chart-'.$this->record->id),
                 ]),
 
             Section::make('Operator Proficiency Details')
@@ -280,7 +280,7 @@ class ViewOperatorProficiency extends ViewRecord
                     TextEntry::make('View Operator Proficiency')
                         ->label('')
                         ->getStateUsing(function ($record) {
-                            if (!$record) {
+                            if (! $record) {
                                 return '<div class="text-gray-500 dark:text-gray-400">No Operator Proficiencies Found</div>';
                             }
 

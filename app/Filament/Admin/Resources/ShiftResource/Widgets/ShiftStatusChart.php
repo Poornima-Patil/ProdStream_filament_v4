@@ -19,7 +19,8 @@ class ShiftStatusChart extends ChartWidget
         if ($this->dateFrom && $this->dateTo) {
             $fromDate = Carbon::parse($this->dateFrom)->format('M j, Y');
             $toDate = Carbon::parse($this->dateTo)->format('M j, Y');
-            return $baseHeading . ' (' . $fromDate . ' - ' . $toDate . ')';
+
+            return $baseHeading.' ('.$fromDate.' - '.$toDate.')';
         }
 
         return $baseHeading;
@@ -39,7 +40,7 @@ class ShiftStatusChart extends ChartWidget
     {
         // Date range should be passed from parent component
         // If not provided, default to last 30 days
-        if (!$this->dateFrom || !$this->dateTo) {
+        if (! $this->dateFrom || ! $this->dateTo) {
             $this->dateTo = Carbon::now()->format('Y-m-d');
             $this->dateFrom = Carbon::now()->subDays(30)->format('Y-m-d');
         }

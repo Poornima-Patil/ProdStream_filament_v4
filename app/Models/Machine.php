@@ -123,7 +123,7 @@ class Machine extends Model
                 'unique_id' => $workOrder->unique_id,
                 'backgroundColor' => $workOrder->status === 'Start' ? '#ef4444' : '#f97316', // Red for running, Orange for planned
                 'borderColor' => $workOrder->status === 'Start' ? '#dc2626' : '#ea580c',
-                'textColor' => '#ffffff'
+                'textColor' => '#ffffff',
             ];
         }
 

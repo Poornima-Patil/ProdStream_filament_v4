@@ -123,4 +123,3 @@ class PermissionsTableSeeder extends Seeder
         }
     }
 }
-

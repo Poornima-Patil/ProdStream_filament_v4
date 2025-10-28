@@ -2,24 +2,21 @@
 
 namespace App\Filament\Admin\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Hidden;
-use Filament\Facades\Filament;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\TrashedFilter;
-use Filament\Actions\EditAction;
-use Filament\Actions\RestoreAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\RestoreBulkAction;
-use App\Filament\Admin\Resources\PermissionResource\Pages\ListPermissions;
 use App\Filament\Admin\Resources\PermissionResource\Pages\CreatePermission;
 use App\Filament\Admin\Resources\PermissionResource\Pages\EditPermission;
-use App\Filament\Admin\Resources\PermissionResource\Pages;
+use App\Filament\Admin\Resources\PermissionResource\Pages\ListPermissions;
 use App\Models\Permission;
-use Filament\Forms;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\EditAction;
+use Filament\Actions\RestoreAction;
+use Filament\Actions\RestoreBulkAction;
+use Filament\Facades\Filament;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
@@ -29,11 +26,11 @@ class PermissionResource extends Resource
 {
     protected static ?string $model = Permission::class;
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Admin Operations';
+    protected static string|\UnitEnum|null $navigationGroup = 'Admin Operations';
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-rectangle-stack';
 
     public static function form(Schema $schema): Schema
     {
@@ -46,7 +43,7 @@ class PermissionResource extends Resource
                     ->label('Permission Group')
                     ->required(),
                 Hidden::make('factory_id')
-                    ->default(fn() => Filament::getTenant()?->id ?? Auth::user()->factory_id)
+                    ->default(fn () => Filament::getTenant()?->id ?? Auth::user()->factory_id)
                     ->dehydrated(fn ($state) => $state ?? Filament::getTenant()?->id ?? Auth::user()->factory_id),
             ]);
     }

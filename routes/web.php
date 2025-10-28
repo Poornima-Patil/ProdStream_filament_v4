@@ -1,10 +1,10 @@
 <?php
 
+use App\Exports\WorkOrderExport;
 use App\Filament\Admin\Widgets\AdvancedWorkOrderGantt;
 use App\Models\OkQuantity;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
-use App\Exports\WorkOrderExport;
 use Maatwebsite\Excel\Facades\Excel;
 
 Route::get('/', function () {
@@ -72,14 +72,14 @@ Route::get('/work-order-quantity/{id}/download', function ($id) {
         \Illuminate\Support\Facades\Log::error("WorkOrderQuantity not found: {$id}");
         abort(404, 'Work Order Quantity not found');
     } catch (\Exception $e) {
-        \Illuminate\Support\Facades\Log::error('Error downloading report: ' . $e->getMessage());
+        \Illuminate\Support\Facades\Log::error('Error downloading report: '.$e->getMessage());
         abort(500, 'Error downloading report');
     }
 })->name('workorderquantity.download');
 
 // Add a direct file access route for testing
 Route::get('/storage/{path}', function ($path) {
-    $fullPath = storage_path('app/public/' . $path);
+    $fullPath = storage_path('app/public/'.$path);
     if (file_exists($fullPath)) {
         return response()->download($fullPath);
     }
@@ -106,7 +106,6 @@ Route::get('/export/work-orders', function (\Illuminate\Http\Request $request) {
 
     return Excel::download(new WorkOrderExport($start, $end), 'work-orders.xlsx');
 })->name('export.workorders');
-
 
 Route::get('/debug-workorders', function () {
     $export = new \App\Exports\WorkOrderSheet('2025-06-01', '2025-06-30');

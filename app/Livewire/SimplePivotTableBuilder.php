@@ -13,11 +13,14 @@ class SimplePivotTableBuilder extends Component
     protected $layout = 'components.layouts.app';
 
     public $csvFile;
+
     public $csvData = [];
+
     public $csvHeaders = [];
 
     // UI state
     public $showConfiguration = false;
+
     public $showResults = false;
 
     protected $rules = [
@@ -33,7 +36,7 @@ class SimplePivotTableBuilder extends Component
             $this->showConfiguration = true;
             session()->flash('success', 'CSV file uploaded successfully!');
         } catch (Exception $e) {
-            session()->flash('error', 'Error processing CSV: ' . $e->getMessage());
+            session()->flash('error', 'Error processing CSV: '.$e->getMessage());
         }
     }
 
@@ -45,7 +48,7 @@ class SimplePivotTableBuilder extends Component
 
         if (($handle = fopen($path, 'r')) !== false) {
             $headers = fgetcsv($handle);
-            if (!$headers) {
+            if (! $headers) {
                 throw new Exception('Invalid CSV format');
             }
 

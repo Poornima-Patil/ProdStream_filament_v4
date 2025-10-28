@@ -2,36 +2,34 @@
 
 namespace App\Filament\Admin\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\TimePicker;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\TrashedFilter;
-use Filament\Actions\ActionGroup;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
-use Filament\Tables\Enums\RecordActionsPosition;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Admin\Resources\ShiftResource\Pages\ListShifts;
 use App\Filament\Admin\Resources\ShiftResource\Pages\CreateShift;
 use App\Filament\Admin\Resources\ShiftResource\Pages\EditShift;
+use App\Filament\Admin\Resources\ShiftResource\Pages\ListShifts;
 use App\Filament\Admin\Resources\ShiftResource\Pages\ViewShift;
-use App\Filament\Admin\Resources\ShiftResource\Pages;
 use App\Models\Shift;
-use Filament\Forms;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\TimePicker;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+
 class ShiftResource extends Resource
 {
     protected static ?string $model = Shift::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-clock';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clock';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Admin Operations';
+    protected static string|\UnitEnum|null $navigationGroup = 'Admin Operations';
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
@@ -73,7 +71,7 @@ class ShiftResource extends Resource
                 ActionGroup::make([
                     EditAction::make()->label('Edit')->size('sm'),
                     ViewAction::make()->label('View')->size('sm'),
-                ])->size('sm')->tooltip('Action')->dropdownPlacement('right')
+                ])->size('sm')->tooltip('Action')->dropdownPlacement('right'),
             ], position: RecordActionsPosition::BeforeColumns)
             ->toolbarActions([
                 BulkActionGroup::make([

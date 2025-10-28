@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
+use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class ScrappedReasonsTableSeeder extends Seeder
 {
@@ -19,7 +19,7 @@ class ScrappedReasonsTableSeeder extends Seeder
 
         // Step 1: First 10 generic scrapped reasons
         for ($i = 1; $i <= $count; $i++) {
-            $codeNumber = str_pad((string)$i, 3, '0', STR_PAD_LEFT); // '001' to '010'
+            $codeNumber = str_pad((string) $i, 3, '0', STR_PAD_LEFT); // '001' to '010'
             $code = "SCR{$codeNumber}";
             $description = "Scrapped Reason #{$codeNumber}";
 
@@ -40,7 +40,7 @@ class ScrappedReasonsTableSeeder extends Seeder
         ];
 
         foreach ($additionalReasons as $index => $description) {
-            $codeNumber = str_pad((string)($count + $index + 1), 3, '0', STR_PAD_LEFT); // '011' to '013'
+            $codeNumber = str_pad((string) ($count + $index + 1), 3, '0', STR_PAD_LEFT); // '011' to '013'
             $code = "SCR{$codeNumber}";
 
             DB::table('scrapped_reasons')->insert([

@@ -79,7 +79,7 @@ class WorkOrderBatch extends Model
         }
 
         // For grouped work orders, validate required keys
-        if ($this->workOrder->work_order_group_id && !empty($this->keys_required)) {
+        if ($this->workOrder->work_order_group_id && ! empty($this->keys_required)) {
             if (empty($consumedKeys)) {
                 return false; // Keys required but none provided
             }
@@ -87,7 +87,7 @@ class WorkOrderBatch extends Model
             // Validate that all required keys are available and consume them
             foreach ($consumedKeys as $keyId) {
                 $key = WorkOrderBatchKey::find($keyId);
-                if (!$key || !$key->isAvailable()) {
+                if (! $key || ! $key->isAvailable()) {
                     return false; // Key not available
                 }
 
@@ -161,7 +161,7 @@ class WorkOrderBatch extends Model
         }
 
         // Individual work orders can always start
-        if (!$this->workOrder->work_order_group_id) {
+        if (! $this->workOrder->work_order_group_id) {
             return true;
         }
 

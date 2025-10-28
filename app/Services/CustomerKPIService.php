@@ -3,10 +3,8 @@
 namespace App\Services;
 
 use App\Models\WorkOrder;
-use App\Models\CustomerInformation;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 
 class CustomerKPIService
 {
@@ -22,9 +20,9 @@ class CustomerKPIService
             $endDate = Carbon::parse($toDate)->endOfDay();
 
             // Get work orders for this customer through the relationship chain
-            $statusDistribution = WorkOrder::whereHas('bom.purchaseOrder', function($query) use ($customerId) {
-                    $query->where('cust_id', $customerId);
-                })
+            $statusDistribution = WorkOrder::whereHas('bom.purchaseOrder', function ($query) use ($customerId) {
+                $query->where('cust_id', $customerId);
+            })
                 ->where('factory_id', $factoryId)
                 ->whereBetween('created_at', [$startDate, $endDate])
                 ->selectRaw('status, COUNT(*) as count')
@@ -49,9 +47,9 @@ class CustomerKPIService
             $endDate = Carbon::parse($toDate)->endOfDay();
 
             // Get quality metrics for completed/closed work orders for this customer
-            $qualityData = WorkOrder::whereHas('bom.purchaseOrder', function($query) use ($customerId) {
-                    $query->where('cust_id', $customerId);
-                })
+            $qualityData = WorkOrder::whereHas('bom.purchaseOrder', function ($query) use ($customerId) {
+                $query->where('cust_id', $customerId);
+            })
                 ->where('factory_id', $factoryId)
                 ->whereBetween('created_at', [$startDate, $endDate])
                 ->whereIn('status', ['Completed', 'Closed'])
@@ -78,17 +76,17 @@ class CustomerKPIService
             $endDate = Carbon::parse($toDate)->endOfDay();
 
             // Get total work orders for this customer
-            $totalOrders = WorkOrder::whereHas('bom.purchaseOrder', function($query) use ($customerId) {
-                    $query->where('cust_id', $customerId);
-                })
+            $totalOrders = WorkOrder::whereHas('bom.purchaseOrder', function ($query) use ($customerId) {
+                $query->where('cust_id', $customerId);
+            })
                 ->where('factory_id', $factoryId)
                 ->whereBetween('created_at', [$startDate, $endDate])
                 ->count();
 
             // Get completed work orders
-            $completedOrders = WorkOrder::whereHas('bom.purchaseOrder', function($query) use ($customerId) {
-                    $query->where('cust_id', $customerId);
-                })
+            $completedOrders = WorkOrder::whereHas('bom.purchaseOrder', function ($query) use ($customerId) {
+                $query->where('cust_id', $customerId);
+            })
                 ->where('factory_id', $factoryId)
                 ->whereBetween('created_at', [$startDate, $endDate])
                 ->whereIn('status', ['Completed', 'Closed'])
@@ -117,9 +115,9 @@ class CustomerKPIService
             $endDate = Carbon::parse($toDate)->endOfDay();
 
             // Get top parts produced for this customer
-            $topParts = WorkOrder::whereHas('bom.purchaseOrder', function($query) use ($customerId) {
-                    $query->where('cust_id', $customerId);
-                })
+            $topParts = WorkOrder::whereHas('bom.purchaseOrder', function ($query) use ($customerId) {
+                $query->where('cust_id', $customerId);
+            })
                 ->where('factory_id', $factoryId)
                 ->whereBetween('created_at', [$startDate, $endDate])
                 ->whereIn('status', ['Completed', 'Closed'])
@@ -134,7 +132,7 @@ class CustomerKPIService
                     $partNumber = 'Unknown Part';
                     if ($item->bom && $item->bom->purchaseOrder && $item->bom->purchaseOrder->partNumber) {
                         $pn = $item->bom->purchaseOrder->partNumber;
-                        $partNumber = $pn->partnumber . '_' . $pn->revision;
+                        $partNumber = $pn->partnumber.'_'.$pn->revision;
                     } elseif ($item->bom) {
                         $partNumber = $item->bom->unique_id;
                     }
@@ -142,7 +140,7 @@ class CustomerKPIService
                     return [
                         'part' => $partNumber,
                         'units' => (int) $item->total_units,
-                        'orders' => $item->order_count
+                        'orders' => $item->order_count,
                     ];
                 });
 
@@ -159,7 +157,7 @@ class CustomerKPIService
             "customer_kpi_status_distribution_{$customerId}_{$factoryId}_*",
             "customer_kpi_quality_data_{$customerId}_{$factoryId}_*",
             "customer_kpi_analytics_{$customerId}_{$factoryId}_*",
-            "customer_kpi_top_parts_{$customerId}_{$factoryId}_*"
+            "customer_kpi_top_parts_{$customerId}_{$factoryId}_*",
         ];
 
         foreach ($patterns as $pattern) {

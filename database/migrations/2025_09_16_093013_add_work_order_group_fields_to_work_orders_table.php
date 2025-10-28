@@ -34,7 +34,7 @@ return new class extends Migration
                 'sequence_order',
                 'is_dependency_root',
                 'dependency_satisfied_at',
-                'dependency_metadata'
+                'dependency_metadata',
             ]);
         });
     }

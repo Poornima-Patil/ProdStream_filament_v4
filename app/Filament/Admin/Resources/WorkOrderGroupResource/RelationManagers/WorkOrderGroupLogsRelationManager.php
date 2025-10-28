@@ -5,8 +5,8 @@ namespace App\Filament\Admin\Resources\WorkOrderGroupResource\RelationManagers;
 use Filament\Actions\ViewAction;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
@@ -35,14 +35,14 @@ class WorkOrderGroupLogsRelationManager extends RelationManager
 
                 IconColumn::make('event_type')
                     ->label('Type')
-                    ->icon(fn (string $state): string => match($state) {
+                    ->icon(fn (string $state): string => match ($state) {
                         'dependency_satisfied' => 'heroicon-o-arrow-right-circle',
                         'status_change' => 'heroicon-o-arrow-path',
                         'work_order_triggered' => 'heroicon-o-play',
                         'key_consumption' => 'heroicon-o-key',
                         default => 'heroicon-o-information-circle',
                     })
-                    ->color(fn (string $state): string => match($state) {
+                    ->color(fn (string $state): string => match ($state) {
                         'dependency_satisfied' => 'success',
                         'status_change' => 'warning',
                         'work_order_triggered' => 'primary',
@@ -71,8 +71,9 @@ class WorkOrderGroupLogsRelationManager extends RelationManager
                     ->label('Status Change')
                     ->formatStateUsing(function ($record) {
                         if ($record->previous_status && $record->new_status) {
-                            return $record->previous_status . ' → ' . $record->new_status;
+                            return $record->previous_status.' → '.$record->new_status;
                         }
+
                         return null;
                     })
                     ->badge()

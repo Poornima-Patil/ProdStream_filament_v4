@@ -2,38 +2,36 @@
 
 namespace App\Filament\Admin\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\TrashedFilter;
-use Filament\Actions\ActionGroup;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
-use Filament\Tables\Enums\RecordActionsPosition;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Admin\Resources\CustomerInformationResource\Pages\ListCustomerInformation;
 use App\Filament\Admin\Resources\CustomerInformationResource\Pages\CreateCustomerInformation;
 use App\Filament\Admin\Resources\CustomerInformationResource\Pages\EditCustomerInformation;
+use App\Filament\Admin\Resources\CustomerInformationResource\Pages\ListCustomerInformation;
 use App\Filament\Admin\Resources\CustomerInformationResource\Pages\ViewCustomerInformation;
-use App\Filament\Admin\Resources\CustomerInformationResource\Pages;
 use App\Models\CustomerInformation;
-use Filament\Forms;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+
 class CustomerInformationResource extends Resource
 {
     protected static ?string $model = CustomerInformation::class;
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-users';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-users';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Admin Operations';
+    protected static string|\UnitEnum|null $navigationGroup = 'Admin Operations';
 
     public static function form(Schema $schema): Schema
     {
@@ -63,14 +61,14 @@ class CustomerInformationResource extends Resource
                 ActionGroup::make([
                     EditAction::make()->label('Edit')->size('sm'),
                     ViewAction::make()->label('View')->size('sm'),
-                ])->size('sm')->tooltip('Action')->dropdownPlacement('right')
+                ])->size('sm')->tooltip('Action')->dropdownPlacement('right'),
             ], position: RecordActionsPosition::BeforeColumns)
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
             ]);
-        
+
     }
 
     public static function getRelations(): array

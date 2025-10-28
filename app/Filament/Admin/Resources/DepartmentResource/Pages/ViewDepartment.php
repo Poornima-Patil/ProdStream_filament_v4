@@ -2,12 +2,12 @@
 
 namespace App\Filament\Admin\Resources\DepartmentResource\Pages;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Illuminate\Support\HtmlString;
 use App\Filament\Admin\Resources\DepartmentResource;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Illuminate\Support\HtmlString;
 
 class ViewDepartment extends ViewRecord
 {
@@ -26,10 +26,10 @@ class ViewDepartment extends ViewRecord
                 ->collapsible()->columnSpanFull()
                 ->schema([
                     TextEntry::make('View Department')
-                     ->hiddenLabel()
+                        ->hiddenLabel()
                         ->label('')
                         ->getStateUsing(function ($record) {
-                            if (!$record) {
+                            if (! $record) {
                                 return '<div class="text-gray-500 dark:text-gray-400">No Departments Found</div>';
                             }
 

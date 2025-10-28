@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Log;
 
 class AdvancedWorkOrderGantt extends Page
 {
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-chart-bar';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-chart-bar';
 
     protected static ?string $navigationLabel = 'Gantt Chart';
 
@@ -20,7 +20,7 @@ class AdvancedWorkOrderGantt extends Page
 
     public $selectedDate;
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Work Order Reports';
+    protected static string|\UnitEnum|null $navigationGroup = 'Work Order Reports';
 
     public function mount()
     {

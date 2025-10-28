@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (!Schema::hasTable('batch_key_consumptions')) {
+        if (! Schema::hasTable('batch_key_consumptions')) {
             Schema::create('batch_key_consumptions', function (Blueprint $table) {
                 $table->id();
                 $table->foreignId('consumer_work_order_id')->constrained('work_orders')->onDelete('cascade');

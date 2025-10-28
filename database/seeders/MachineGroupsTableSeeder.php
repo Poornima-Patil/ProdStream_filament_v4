@@ -2,19 +2,16 @@
 
 namespace Database\Seeders;
 
+use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class MachineGroupsTableSeeder extends Seeder
 {
-   
-    /**
-     */
     public function run(): void
     {
         $now = Carbon::now();
-         $factoryId = env('SEED_FACTORY_ID',1); 
+        $factoryId = env('SEED_FACTORY_ID', 1);
 
         $groups = [
             [

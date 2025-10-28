@@ -50,7 +50,7 @@ class WorkOrderGroup extends Model
         static::updating(function ($workOrderGroup) {
             // Validate dependencies before allowing activation
             if ($workOrderGroup->isDirty('status') && $workOrderGroup->status === 'active') {
-                if (!$workOrderGroup->canActivate()) {
+                if (! $workOrderGroup->canActivate()) {
                     $errors = $workOrderGroup->getActivationValidationErrors();
 
                     // Reset status to previous value to prevent activation
@@ -74,10 +74,10 @@ class WorkOrderGroup extends Model
     public static function generateUniqueId(int $factoryId): string
     {
         $factory = Factory::find($factoryId);
-        $prefix = $factory ? 'F' . $factory->id : 'F1';
+        $prefix = $factory ? 'F'.$factory->id : 'F1';
 
         do {
-            $uniqueId = $prefix . '-WG' . str_pad(random_int(1, 9999), 4, '0', STR_PAD_LEFT);
+            $uniqueId = $prefix.'-WG'.str_pad(random_int(1, 9999), 4, '0', STR_PAD_LEFT);
         } while (static::where('unique_id', $uniqueId)->exists());
 
         return $uniqueId;
@@ -166,7 +166,7 @@ class WorkOrderGroup extends Model
                 ->where('successor_work_order_id', $dependentWO->id)
                 ->exists();
 
-            if (!$hasDependency) {
+            if (! $hasDependency) {
                 return false; // Found a non-root WO without dependencies
             }
         }
@@ -204,13 +204,13 @@ class WorkOrderGroup extends Model
                 ->where('successor_work_order_id', $dependentWO->id)
                 ->exists();
 
-            if (!$hasDependency) {
+            if (! $hasDependency) {
                 $missingDependencies[] = $dependentWO->unique_id;
             }
         }
 
-        if (!empty($missingDependencies)) {
-            $errors[] = 'The following work orders have no dependencies defined: ' . implode(', ', $missingDependencies);
+        if (! empty($missingDependencies)) {
+            $errors[] = 'The following work orders have no dependencies defined: '.implode(', ', $missingDependencies);
         }
 
         return $errors;
@@ -242,8 +242,6 @@ class WorkOrderGroup extends Model
     /**
      * Update status of waiting work orders based on their dependencies
      * This should be called when any work order in the group updates its quantities
-     *
-     * @return void
      */
     public function updateWaitingWorkOrderStatuses(): void
     {
@@ -257,15 +255,13 @@ class WorkOrderGroup extends Model
 
         \Illuminate\Support\Facades\Log::info('Updated waiting work order statuses for group', [
             'group_id' => $this->id,
-            'updated_count' => $waitingWorkOrders->count()
+            'updated_count' => $waitingWorkOrders->count(),
         ]);
     }
 
     /**
      * Initialize all work order statuses when the group is activated
      * Root work orders become 'Assigned', others become 'Waiting'
-     *
-     * @return void
      */
     public function initializeWorkOrderStatuses(): void
     {
@@ -276,20 +272,20 @@ class WorkOrderGroup extends Model
                 // Root work orders start as Assigned
                 $workOrder->update([
                     'status' => 'Assigned',
-                    'dependency_status' => 'ready'
+                    'dependency_status' => 'ready',
                 ]);
             } else {
                 // Non-root work orders start as Waiting until dependencies are satisfied
                 $workOrder->update([
                     'status' => 'Waiting',
-                    'dependency_status' => 'blocked'
+                    'dependency_status' => 'blocked',
                 ]);
             }
         }
 
         \Illuminate\Support\Facades\Log::info('Initialized work order statuses for group', [
             'group_id' => $this->id,
-            'work_orders_count' => $workOrders->count()
+            'work_orders_count' => $workOrders->count(),
         ]);
     }
 
@@ -298,7 +294,7 @@ class WorkOrderGroup extends Model
      */
     public function getBatchSizeForWorkOrder(int $workOrderId): ?int
     {
-        if (!$this->batch_configuration) {
+        if (! $this->batch_configuration) {
             return null;
         }
 
@@ -320,7 +316,7 @@ class WorkOrderGroup extends Model
      */
     public function getBatchConfigurations(): array
     {
-        if (!$this->batch_configuration) {
+        if (! $this->batch_configuration) {
             return [];
         }
 
@@ -347,14 +343,14 @@ class WorkOrderGroup extends Model
     {
         $batchSize = $this->getBatchSizeForWorkOrder($workOrder->id);
 
-        if (!$batchSize) {
+        if (! $batchSize) {
             return false; // No batch configuration set
         }
 
         // Get current in-progress batch
         $currentBatch = $workOrder->batches()->where('status', 'in_progress')->first();
 
-        if (!$currentBatch) {
+        if (! $currentBatch) {
             return false; // No active batch
         }
 
@@ -369,7 +365,7 @@ class WorkOrderGroup extends Model
      */
     public function autoCompleteBatchIfReady(WorkOrder $workOrder): bool
     {
-        if (!$this->hasWorkOrderCompletedBatch($workOrder)) {
+        if (! $this->hasWorkOrderCompletedBatch($workOrder)) {
             return false;
         }
 
@@ -377,6 +373,7 @@ class WorkOrderGroup extends Model
 
         if ($currentBatch) {
             $batchSize = $this->getBatchSizeForWorkOrder($workOrder->id);
+
             return $currentBatch->completeBatch($batchSize);
         }
 

@@ -13,7 +13,6 @@ use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Illuminate\Support\HtmlString;
 use Livewire\Attributes\On;
 
 class ViewOperator extends ViewRecord
@@ -87,7 +86,7 @@ class ViewOperator extends ViewRecord
                             // Show notification
                             \Filament\Notifications\Notification::make()
                                 ->title('Date range updated')
-                                ->body('Data filtered from ' . $this->dateFrom . ' to ' . $this->dateTo)
+                                ->body('Data filtered from '.$this->dateFrom.' to '.$this->dateTo)
                                 ->success()
                                 ->send();
                         }),
@@ -268,7 +267,7 @@ class ViewOperator extends ViewRecord
                                     </div>
 
                                     <!-- Bottom Row: Chart Full Width - Placeholder for Widget -->
-                                    <div id="operator-chart-container-' . $record->id . '"></div>
+                                    <div id="operator-chart-container-'.$record->id.'"></div>
                                 </div>
                             ');
                         })->html(),
@@ -278,7 +277,7 @@ class ViewOperator extends ViewRecord
                         'record' => $this->record,
                         'dateFrom' => $this->dateFrom,
                         'dateTo' => $this->dateTo,
-                    ])->key('operator-status-chart-' . $this->record->id),
+                    ])->key('operator-status-chart-'.$this->record->id),
                 ]),
 
             Section::make('Operator Information')

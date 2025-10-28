@@ -2,13 +2,12 @@
 
 namespace App\Filament\Admin\Resources\WorkOrderResource\Widgets;
 
-use Illuminate\Support\Facades\Auth;
 use App\Filament\Admin\Resources\WorkOrderResource\Pages\ListWorkOrders;
-use App\Models\WorkOrderLog;
 use Filament\Widgets\Concerns\InteractsWithPageTable;
 use Filament\Widgets\Widget;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class SimpleWorkOrderGantt extends Widget
@@ -20,6 +19,7 @@ class SimpleWorkOrderGantt extends Widget
     protected int|string|array $columnSpan = 'full';
 
     public $timeRange = 'week';
+
     public $selectedDate;
 
     public function mount()

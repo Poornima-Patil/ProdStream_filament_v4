@@ -2,9 +2,9 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Admin\Pages\Auth\Login;
 use App\Filament\Admin\Pages\KPIAnalyticsDashboard;
 use App\Filament\Admin\Pages\WorkOrderWidgets;
-use App\Filament\Admin\Pages\Auth\Login;
 use App\Filament\Pages\Tenancy\EditFactoryProfile;
 use App\Filament\Pages\Tenancy\RegisterFactory;
 use App\Filament\Widgets\KPIAnalyticsLinkWidget;

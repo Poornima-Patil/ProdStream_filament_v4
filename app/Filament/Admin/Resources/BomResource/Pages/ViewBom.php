@@ -2,14 +2,14 @@
 
 namespace App\Filament\Admin\Resources\BomResource\Pages;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Illuminate\Support\HtmlString;
-use Carbon\Carbon;
-use App\Filament\Admin\Resources\BomResource;
 use App\Enums\BomStatus;
+use App\Filament\Admin\Resources\BomResource;
+use Carbon\Carbon;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Illuminate\Support\HtmlString;
 
 class ViewBom extends ViewRecord
 {
@@ -31,10 +31,10 @@ class ViewBom extends ViewRecord
                     TextEntry::make('po_details_table')
                         ->label('')
                         ->getStateUsing(function ($record) {
-                            $Unique_ID     = $record->purchaseOrder->unique_id ?? '';
-                            $Sales_Order   = $record->purchaseOrder->partNumber->description ?? '';
-                            $Part_Number   = $record->purchaseOrder->partNumber->partnumber ?? '';
-                            $Revision      = $record->purchaseOrder->partNumber->revision ?? '';
+                            $Unique_ID = $record->purchaseOrder->unique_id ?? '';
+                            $Sales_Order = $record->purchaseOrder->partNumber->description ?? '';
+                            $Part_Number = $record->purchaseOrder->partNumber->partnumber ?? '';
+                            $Revision = $record->purchaseOrder->partNumber->revision ?? '';
                             $Machine_Group = $record->machine_group_id ?? '';
 
                             return new HtmlString('
@@ -98,7 +98,7 @@ class ViewBom extends ViewRecord
                             $deliveryDateTooltip = '';
                             if ($leadTime && $deliveryTarget && $leadTime->greaterThan($deliveryTarget)) {
                                 $deliveryDateStyle = 'color: #dc2626; font-weight: bold;';
-                                $deliveryDateTooltip = 'Sales Order Line Target Completion Date : ' . htmlspecialchars($deliveryDate);
+                                $deliveryDateTooltip = 'Sales Order Line Target Completion Date : '.htmlspecialchars($deliveryDate);
                             }
 
                             $statusLabel = BomStatus::tryFrom($record->status)?->label() ?? $record->status;

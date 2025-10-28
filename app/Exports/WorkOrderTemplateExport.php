@@ -3,11 +3,11 @@
 namespace App\Exports;
 
 use App\Models\Factory;
-use PhpOffice\PhpSpreadsheet\IOFactory;
+use App\Models\WorkOrder;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Log;
-use App\Models\WorkOrder;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class WorkOrderTemplateExport
 {
@@ -23,7 +23,7 @@ class WorkOrderTemplateExport
         $csvRelativePath = "csv/{$filename}";
         $csvFullPath = storage_path("app/public/{$csvRelativePath}");
 
-        if (!file_exists(dirname($csvFullPath))) {
+        if (! file_exists(dirname($csvFullPath))) {
             mkdir(dirname($csvFullPath), 0755, true);
         }
 
@@ -36,7 +36,7 @@ class WorkOrderTemplateExport
             'machine',
             'operator',
             'okQuantities',
-            'scrappedQuantities'
+            'scrappedQuantities',
         ])
             ->where('factory_id', $factoryId)
             ->whereBetween('created_at', [$this->start, $this->end])
@@ -47,7 +47,7 @@ class WorkOrderTemplateExport
         // Write headers
         fputcsv($handle, [
             'Work Order No', 'BOM', 'Part Number', 'Revision', 'Machine', 'Operator',
-            'Qty', 'Status', 'Start Time', 'End Time', 'OK Qty', 'KO Qty'
+            'Qty', 'Status', 'Start Time', 'End Time', 'OK Qty', 'KO Qty',
         ]);
 
         // Write data rows
@@ -75,26 +75,27 @@ class WorkOrderTemplateExport
 
         return response()->file($csvFullPath, [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'inline; filename="' . basename($csvFullPath) . '"',
+            'Content-Disposition' => 'inline; filename="'.basename($csvFullPath).'"',
         ]);
 
     }
+
     public function download()
     {
         $relativeTemplatePath = $this->factory->template_path;
         Log::info('Factory template path:', ['template_path' => $relativeTemplatePath]);
 
-        $templatePath = storage_path('app/public/' . $relativeTemplatePath);
+        $templatePath = storage_path('app/public/'.$relativeTemplatePath);
         Log::info('Resolved template full path:', ['path' => $templatePath]);
 
-        if (!file_exists($templatePath) || is_dir($templatePath)) {
+        if (! file_exists($templatePath) || is_dir($templatePath)) {
             abort(404, 'Template file not found or is a directory.');
         }
 
-        $filename = 'workorder_' . Str::slug($this->factory->name) . '_' . now()->format('Ymd_His') . '.xlsx';
+        $filename = 'workorder_'.Str::slug($this->factory->name).'_'.now()->format('Ymd_His').'.xlsx';
         $tempPath = storage_path("app/temp/{$filename}");
 
-        if (!file_exists(storage_path('app/temp'))) {
+        if (! file_exists(storage_path('app/temp'))) {
             mkdir(storage_path('app/temp'), 0755, true);
         }
 
@@ -103,7 +104,7 @@ class WorkOrderTemplateExport
         $spreadsheet = IOFactory::load($tempPath);
         $sheet = $spreadsheet->getSheetByName('Work Order Header');
 
-        if (!$sheet) {
+        if (! $sheet) {
             abort(500, 'Sheet "Work Order Header" not found in template.');
         }
 
@@ -112,7 +113,7 @@ class WorkOrderTemplateExport
             'machine',
             'operator',
             'okQuantities',
-            'scrappedQuantities'
+            'scrappedQuantities',
         ])
             ->where('factory_id', $this->factory->id)
             ->whereBetween('created_at', [$this->start, $this->end])
@@ -139,5 +140,3 @@ class WorkOrderTemplateExport
         return response()->download($tempPath)->deleteFileAfterSend();
     }
 }
-
-

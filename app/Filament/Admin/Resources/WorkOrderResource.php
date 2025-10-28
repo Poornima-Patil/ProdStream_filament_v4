@@ -30,6 +30,7 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\TimePicker;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
@@ -419,12 +420,11 @@ class WorkOrderResource extends Resource
                     ->disabled(! $isAdminOrManager)
                     ->label('Planned Start Time')
                     ->minDate(fn (string $operation): ?\Carbon\Carbon => $operation === 'create' ? now()->startOfDay() : null)
-                    ->seconds(false) // Cleaner UI without seconds
-                    ->native(false) // Better custom picker
-                    ->displayFormat('d M Y, H:i') // "21 Jul 2025, 14:30"
-                    ->timezone('Asia/Kolkata')
+                    ->seconds(false)
+                    ->native(false)
+                    ->displayFormat('d-m-Y H:i')
+                    ->timezone(config('app.timezone'))
                     ->live(onBlur: true)
-
                     ->rules([
                         function (callable $get) {
                             return function (string $attribute, $value, Closure $fail) use ($get) {
@@ -441,21 +441,33 @@ class WorkOrderResource extends Resource
                         },
                     ])
                     ->afterStateUpdated(function (callable $get, callable $set, $state) {
-                        // Only validate if all required fields are filled
+                        // Validate if all required fields are filled
                         if ($state && $get('machine_id') && $get('end_time')) {
                             self::validateMachineScheduling($get, $set);
                         }
                     }),
+
+                TimePicker::make('delay_time')
+                    ->disabled(! $isAdminOrManager)
+                    ->label('Acceptable Delay time')
+                    ->default('00:00')
+                    ->seconds(false)
+                    ->native(false)
+                    ->displayFormat('H:i')
+                    ->timezone(config('app.timezone'))
+                    ->live(onBlur: true)
+                    ->helperText('Set the acceptable delay time for this work order.'),
+
                 DateTimePicker::make('end_time')
+                    ->required()
+                    ->disabled(! $isAdminOrManager)
                     ->label('Planned End Time')
                     ->minDate(fn (string $operation): ?\Carbon\Carbon => $operation === 'create' ? now()->startOfDay() : null)
-                    ->disabled(! $isAdminOrManager)
-                    ->seconds(false) // Cleaner UI without seconds
-                    ->native(false) // Better custom picker
-                    ->displayFormat('d M Y, H:i') // "21 Jul 2025, 14:30"
-                    ->timezone('Asia/Kolkata')
+                    ->seconds(false)
+                    ->native(false)
+                    ->displayFormat('d-m-Y H:i')
+                    ->timezone(config('app.timezone'))
                     ->live(onBlur: true)
-                    ->required()
                     ->rules([
                         function (callable $get) {
                             return function (string $attribute, $value, Closure $fail) use ($get) {
@@ -472,7 +484,7 @@ class WorkOrderResource extends Resource
                         },
                     ])
                     ->afterStateUpdated(function (callable $get, callable $set, $state) {
-                        // Only validate if all required fields are filled
+                        // Validate if all required fields are filled
                         if ($state && $get('machine_id') && $get('start_time')) {
                             self::validateMachineScheduling($get, $set);
                         }
@@ -488,8 +500,7 @@ class WorkOrderResource extends Resource
                         }
 
                         return null;
-                    })
-                    ->reactive(),
+                    }),
 
                 // Machine Status Information Section
                 Section::make('Machine Scheduling Information')
@@ -1087,6 +1098,7 @@ class WorkOrderResource extends Resource
                 Select::make('status')
                     ->label('Status')
                     ->required()
+                    ->live()
                     ->options(function ($record) {
                         if ($record) {
                             $user = Auth::user(); // Get the logged-in user
@@ -1162,6 +1174,9 @@ class WorkOrderResource extends Resource
                                             $fail($startValidation['message']);
                                         }
                                     }
+
+                                    // Note: Early start validation for Operators is handled in EditWorkOrder::beforeSave()
+                                    // This allows for a better UX with notification actions
                                 }
                             };
                         },
@@ -1185,6 +1200,34 @@ class WorkOrderResource extends Resource
                     ->reactive()
                     ->afterStateUpdated(function ($set, $get, $livewire, $record, $state) {
                         $status = $get('status');
+
+                        // EARLY/LATE START VALIDATION FOR OPERATORS
+                        if ($status === 'Start' && Auth::user()->hasRole('Operator') && $record) {
+                            // Check if this is the first start
+                            $existingStartLog = $record->workOrderLogs()->where('status', 'Start')->exists();
+
+                            if (! $existingStartLog) {
+                                // Use the model's helper method to validate start time
+                                $validation = $record->canOperatorStartNow();
+
+                                if (! $validation['can_start']) {
+                                    \Filament\Notifications\Notification::make()
+                                        ->title($validation['reason'] === 'early_start' ? 'Cannot Start Before Planned Time' : 'Time Limit Exceeded')
+                                        ->body($validation['message'])
+                                        ->danger()
+                                        ->persistent()
+                                        ->send();
+
+                                    // Revert status back to original
+                                    $set('status', $record->status);
+                                    $livewire->data['status'] = $record->status;
+
+                                    return; // Stop further processing
+                                }
+                            }
+                        }
+
+                        // Clear hold_reason_id when status is not Hold
                         if ($status !== 'Hold') {
                             $livewire->data['hold_reason_id'] = null;
                             $set('hold_reason_id', null);
@@ -1193,12 +1236,9 @@ class WorkOrderResource extends Resource
                                 $record->save();
                             }
                         }
-                        if ($status === 'Start' && $record) {
-                            $existingLog = $record->workOrderLogs()->where('status', 'Start')->first();
-                            if (! $existingLog) {
-                                $record->createWorkOrderLog('Start');
-                            }
-                        }
+                        // Note: Start log creation is now handled in WorkOrder model's booted() method
+                        // after validation passes. This prevents premature log creation that would
+                        // bypass the early start validation in EditWorkOrder::beforeSave()
 
                         // Trigger machine status update when status changes
                         if ($state && $get('machine_id')) {

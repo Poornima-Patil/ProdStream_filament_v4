@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('work_order_logs', function (Blueprint $table) {
-            $table->float('fpy')->default(0)->after('hold_reason_id')->comment('First Pass Yield percentage');
+        Schema::table('work_orders', function (Blueprint $table) {
+            $table->time('delay_time')->default('00:00');
         });
     }
 
@@ -21,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('work_order_logs', function (Blueprint $table) {
-            $table->dropColumn('fpy');
+        Schema::table('work_orders', function (Blueprint $table) {
+            //
         });
     }
 };

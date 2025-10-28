@@ -2,10 +2,10 @@
 
 namespace App\Filament\Pages\Tenancy;
 
-use Filament\Schemas\Schema;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Pages\Tenancy\EditTenantProfile;
-use Filament\Forms\Components\FileUpload;
+use Filament\Schemas\Schema;
 
 class EditFactoryProfile extends EditTenantProfile
 {

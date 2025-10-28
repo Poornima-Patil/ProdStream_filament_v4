@@ -2,19 +2,15 @@
 
 namespace App\Filament\Admin\Resources\WorkOrderResource\Pages;
 
-use Filament\Actions\CreateAction;
-use Log;
-use Filament\Schemas\Components\Tabs\Tab;
-use App\Models\WorkOrder;
-use App\Models\Operator;
-use App\Filament\Admin\Resources\WorkOrderResource\Widgets\SimpleWorkOrderGantt;
-use Illuminate\Database\Eloquent\Model;
 use App\Filament\Admin\Resources\WorkOrderResource;
+use App\Filament\Admin\Resources\WorkOrderResource\Widgets\SimpleWorkOrderGantt;
 use App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderPieChart;
+use App\Models\Operator;
 use App\Models\PartNumber;
+use App\Models\WorkOrder;
 use App\Models\WorkOrderLog;
 use Carbon\Carbon;
-use Filament\Actions;
+use Filament\Actions\CreateAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -22,13 +18,16 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Concerns\ExposesTableToWidgets;
 use Filament\Resources\Pages\ListRecords;
+use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Log;
 
 class ListWorkOrders extends ListRecords
 {
@@ -108,10 +107,10 @@ class ListWorkOrders extends ListRecords
             ->pluck('status')
             ->unique();
 
-    foreach ($statuses as $status) {
+        foreach ($statuses as $status) {
             $tabs[str($status)->slug()->toString()] = Tab::make($status)
             //    ->badge(fn () => \App\Models\WorkOrder::where('factory_id', auth()->user()->factory_id)->where('status', $status)->count())
-              ->modifyQueryUsing(fn (Builder $query) => $query->where('status', $status));
+                ->modifyQueryUsing(fn (Builder $query) => $query->where('status', $status));
         }
 
         return $tabs;
@@ -132,7 +131,7 @@ class ListWorkOrders extends ListRecords
                             ->where('factory_id', auth()->user()->factory_id)
                             ->get()
                             ->mapWithKeys(function ($operator) {
-                                return [$operator->id => $operator->user?->first_name . ' ' . $operator->user?->last_name];
+                                return [$operator->id => $operator->user?->first_name.' '.$operator->user?->last_name];
                             })
                             ->toArray();
                     })
@@ -185,9 +184,8 @@ class ListWorkOrders extends ListRecords
                 // Unique ID Filter
                 Filter::make('unique_id')
                     ->label('Unique ID')
-                    ->query(fn (Builder $query, $data) =>
-                        $query->where('factory_id', auth()->user()->factory_id)
-                            ->where('unique_id', 'like', '%'.(is_array($data) ? implode(',', $data) : $data).'%')
+                    ->query(fn (Builder $query, $data) => $query->where('factory_id', auth()->user()->factory_id)
+                        ->where('unique_id', 'like', '%'.(is_array($data) ? implode(',', $data) : $data).'%')
                     )
                     ->schema([
                         TextInput::make('unique_id')->label('Unique ID'),
@@ -215,6 +213,7 @@ class ListWorkOrders extends ListRecords
                         if ($from && $to) {
                             $query->whereBetween('created_at', [$from, $to]);
                         }
+
                         return $query;
                     })
                     ->indicateUsing(function (array $data): ?string {
@@ -223,6 +222,7 @@ class ListWorkOrders extends ListRecords
                         }
                         $from = Carbon::parse($data['from'])->format('d-m-Y');
                         $to = Carbon::parse($data['to'])->format('d-m-Y');
+
                         return "Created between {$from} and {$to}";
                     }),
             ]);

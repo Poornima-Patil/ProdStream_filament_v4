@@ -2,9 +2,8 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Livewire\Component;
 
 class MachineGroupAnalytics extends Component
 {
@@ -17,7 +16,7 @@ class MachineGroupAnalytics extends Component
 
     public function getWorkOrderStatusDistribution()
     {
-        if (!$this->machineGroup) {
+        if (! $this->machineGroup) {
             return collect();
         }
 
@@ -39,7 +38,7 @@ class MachineGroupAnalytics extends Component
 
     public function getQualityData()
     {
-        if (!$this->machineGroup) {
+        if (! $this->machineGroup) {
             return null;
         }
 

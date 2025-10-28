@@ -2,13 +2,11 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
-use App\Models\WorkOrder;
 use App\Models\Machine;
-use App\Models\Operator;
+use App\Models\WorkOrder;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Livewire\Component;
 
 class WorkOrderPivotTable extends Component
 {
@@ -30,22 +28,28 @@ class WorkOrderPivotTable extends Component
 
     // Field collections for drag and drop
     public $rowFields = [];
+
     public $columnFields = [];
+
     public $valueFields = [];
 
     // Pivot table data
     public $pivotData = [];
+
     public $pivotHeaders = [];
+
     public $pivotRows = [];
 
     // Filters
     public $filterDateFrom = '';
+
     public $filterDateTo = '';
+
     public $filterStatus = '';
+
     public $filterMachine = '';
+
     public $filterOperator = '';
-
-
 
     public function mount($filterDateFrom = null, $filterDateTo = null, $filterStatus = null, $filterMachine = null, $filterOperator = null)
     {
@@ -70,17 +74,17 @@ class WorkOrderPivotTable extends Component
 
         switch ($zone) {
             case 'rows':
-                if (!$this->fieldExistsInArray($this->rowFields, $fieldKey)) {
+                if (! $this->fieldExistsInArray($this->rowFields, $fieldKey)) {
                     $this->rowFields[] = $field;
                 }
                 break;
             case 'columns':
-                if (!$this->fieldExistsInArray($this->columnFields, $fieldKey)) {
+                if (! $this->fieldExistsInArray($this->columnFields, $fieldKey)) {
                     $this->columnFields[] = $field;
                 }
                 break;
             case 'values':
-                if (!$this->fieldExistsInArray($this->valueFields, $fieldKey)) {
+                if (! $this->fieldExistsInArray($this->valueFields, $fieldKey)) {
                     $this->valueFields[] = $field;
                 }
                 break;
@@ -93,13 +97,13 @@ class WorkOrderPivotTable extends Component
     {
         switch ($zone) {
             case 'rows':
-                $this->rowFields = array_filter($this->rowFields, fn($field) => $field['key'] !== $fieldKey);
+                $this->rowFields = array_filter($this->rowFields, fn ($field) => $field['key'] !== $fieldKey);
                 break;
             case 'columns':
-                $this->columnFields = array_filter($this->columnFields, fn($field) => $field['key'] !== $fieldKey);
+                $this->columnFields = array_filter($this->columnFields, fn ($field) => $field['key'] !== $fieldKey);
                 break;
             case 'values':
-                $this->valueFields = array_filter($this->valueFields, fn($field) => $field['key'] !== $fieldKey);
+                $this->valueFields = array_filter($this->valueFields, fn ($field) => $field['key'] !== $fieldKey);
                 break;
         }
 
@@ -108,9 +112,9 @@ class WorkOrderPivotTable extends Component
 
     private function removeFieldFromAllZones($fieldKey)
     {
-        $this->rowFields = array_filter($this->rowFields, fn($field) => $field['key'] !== $fieldKey);
-        $this->columnFields = array_filter($this->columnFields, fn($field) => $field['key'] !== $fieldKey);
-        $this->valueFields = array_filter($this->valueFields, fn($field) => $field['key'] !== $fieldKey);
+        $this->rowFields = array_filter($this->rowFields, fn ($field) => $field['key'] !== $fieldKey);
+        $this->columnFields = array_filter($this->columnFields, fn ($field) => $field['key'] !== $fieldKey);
+        $this->valueFields = array_filter($this->valueFields, fn ($field) => $field['key'] !== $fieldKey);
     }
 
     private function fieldExistsInArray($array, $fieldKey)
@@ -120,6 +124,7 @@ class WorkOrderPivotTable extends Component
                 return true;
             }
         }
+
         return false;
     }
 
@@ -139,6 +144,7 @@ class WorkOrderPivotTable extends Component
             $this->pivotData = [];
             $this->pivotHeaders = [];
             $this->pivotRows = [];
+
             return;
         }
 
@@ -146,10 +152,11 @@ class WorkOrderPivotTable extends Component
         if (empty($this->filterDateFrom) || empty($this->filterDateTo)) {
             $this->pivotData = [
                 'headers' => ['Warning'],
-                'rows' => [['Please select both start and end dates to generate the pivot table.']]
+                'rows' => [['Please select both start and end dates to generate the pivot table.']],
             ];
             $this->pivotHeaders = ['Warning'];
             $this->pivotRows = [['Please select both start and end dates to generate the pivot table.']];
+
             return;
         }
 
@@ -177,7 +184,7 @@ class WorkOrderPivotTable extends Component
         $workOrders = $query->get();
 
         // Debug: Check what data we're getting
-        Log::info('Pivot Table - Work Orders Count: ' . $workOrders->count());
+        Log::info('Pivot Table - Work Orders Count: '.$workOrders->count());
         if ($workOrders->count() > 0) {
             $firstWo = $workOrders->first();
             Log::info('Pivot Table - Sample Work Order:', [
@@ -197,18 +204,18 @@ class WorkOrderPivotTable extends Component
         // Transform data for pivot
         $transformedData = $workOrders->map(function ($wo) {
             return [
-                'work_order_no' => $wo->wo_number ?? $wo->unique_id ?? 'WO-' . $wo->id,
+                'work_order_no' => $wo->wo_number ?? $wo->unique_id ?? 'WO-'.$wo->id,
                 'status' => $wo->status ?? 'Unknown',
-                'machine' => $wo->machine?->name ?? ($wo->machine_id ? 'Machine-' . $wo->machine_id : 'Unassigned'),
-                'operator' => $wo->operator?->user?->getFilamentName() ?? ($wo->operator_id ? 'Operator-' . $wo->operator_id : 'Unassigned'),
-                'bom' => $wo->bom?->bom_number ?? ($wo->bom_id ? 'BOM-' . $wo->bom_id : 'No BOM'),
+                'machine' => $wo->machine?->name ?? ($wo->machine_id ? 'Machine-'.$wo->machine_id : 'Unassigned'),
+                'operator' => $wo->operator?->user?->getFilamentName() ?? ($wo->operator_id ? 'Operator-'.$wo->operator_id : 'Unassigned'),
+                'bom' => $wo->bom?->bom_number ?? ($wo->bom_id ? 'BOM-'.$wo->bom_id : 'No BOM'),
                 'part_number' => $wo->bom?->purchaseOrder?->partNumber?->partnumber ?? 'No Part Number',
                 'revision' => $wo->bom?->purchaseOrder?->partNumber?->revision ?? 'No Revision',
                 'start_time' => $wo->start_time ? $wo->start_time->format('Y-m-d H:i') : 'Not Started',
                 'end_time' => $wo->end_time ? $wo->end_time->format('Y-m-d H:i') : 'Not Finished',
-                'qty' => (int)($wo->qty ?? 0),
-                'ok_qty' => (int)($wo->ok_qtys ?? 0),
-                'ko_qty' => (int)($wo->scrapped_qtys ?? 0),
+                'qty' => (int) ($wo->qty ?? 0),
+                'ok_qty' => (int) ($wo->ok_qtys ?? 0),
+                'ko_qty' => (int) ($wo->scrapped_qtys ?? 0),
             ];
         })->toArray();
 
@@ -222,12 +229,14 @@ class WorkOrderPivotTable extends Component
             $this->pivotData = [];
             $this->pivotHeaders = [];
             $this->pivotRows = [];
+
             return;
         }
 
         // If no columns selected, create a simple table
         if (empty($this->columnFields)) {
             $this->createSimpleTable($data);
+
             return;
         }
 
@@ -274,7 +283,7 @@ class WorkOrderPivotTable extends Component
 
         $this->pivotData = [
             'headers' => $this->pivotHeaders,
-            'rows' => $this->pivotRows
+            'rows' => $this->pivotRows,
         ];
     }
 
@@ -295,7 +304,7 @@ class WorkOrderPivotTable extends Component
 
         foreach ($columnGroups as $colKey => $colItems) {
             foreach ($this->valueFields as $valueField) {
-                $colLabel = $colKey . ' (' . $valueField['label'] . ')';
+                $colLabel = $colKey.' ('.$valueField['label'].')';
                 $this->pivotHeaders[] = $colLabel;
             }
         }
@@ -316,6 +325,7 @@ class WorkOrderPivotTable extends Component
                 $intersection = array_filter($data, function ($item) use ($rowKey, $colKey, $rowKeys, $columnKeys) {
                     $rowMatch = $this->matchesGroup($item, $rowKeys, $rowKey);
                     $colMatch = $this->matchesGroup($item, $columnKeys, $colKey);
+
                     return $rowMatch && $colMatch;
                 });
 
@@ -330,7 +340,7 @@ class WorkOrderPivotTable extends Component
 
         $this->pivotData = [
             'headers' => $this->pivotHeaders,
-            'rows' => $this->pivotRows
+            'rows' => $this->pivotRows,
         ];
     }
 
@@ -339,8 +349,8 @@ class WorkOrderPivotTable extends Component
         $grouped = [];
 
         foreach ($data as $item) {
-            $key = implode('|', array_map(fn($field) => $item[$field] ?? 'N/A', $fields));
-            if (!isset($grouped[$key])) {
+            $key = implode('|', array_map(fn ($field) => $item[$field] ?? 'N/A', $fields));
+            if (! isset($grouped[$key])) {
                 $grouped[$key] = [];
             }
             $grouped[$key][] = $item;
@@ -351,7 +361,8 @@ class WorkOrderPivotTable extends Component
 
     private function matchesGroup($item, $fields, $groupKey)
     {
-        $itemKey = implode('|', array_map(fn($field) => $item[$field] ?? 'N/A', $fields));
+        $itemKey = implode('|', array_map(fn ($field) => $item[$field] ?? 'N/A', $fields));
+
         return $itemKey === $groupKey;
     }
 

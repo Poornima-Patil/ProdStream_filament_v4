@@ -2,9 +2,8 @@
 
 namespace App\Filament\Admin\Resources\CustomerInformationResource\Pages;
 
-use Filament\Actions\DeleteAction;
 use App\Filament\Admin\Resources\CustomerInformationResource;
-use Filament\Actions;
+use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditCustomerInformation extends EditRecord

@@ -84,6 +84,13 @@ class WorkOrderQuantity extends Model implements HasMedia
     {
         Log::info('generateQRCode called for ID: '.$this->id);
 
+        // Skip QR code generation if using GD driver (not supported by simple-qrcode with imagick)
+        if (env('IMAGE_DRIVER') === 'gd') {
+            Log::info('Skipping QR code generation - GD driver detected');
+
+            return;
+        }
+
         // Generate the correct URL format
         $url = url("/work-order-quantity/{$this->id}/download");
 

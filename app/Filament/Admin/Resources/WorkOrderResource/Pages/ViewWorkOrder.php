@@ -2,17 +2,17 @@
 
 namespace App\Filament\Admin\Resources\WorkOrderResource\Pages;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Illuminate\Support\HtmlString;
-use Filament\Schemas\Components\Livewire;
-use Carbon\Carbon;
 use App\Filament\Admin\Resources\WorkOrderResource;
 use App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderProgress;
 use App\Filament\Admin\Resources\WorkOrderResource\Widgets\WorkOrderQtyTrendChart;
+use Carbon\Carbon;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Livewire;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\HtmlString;
 
 class ViewWorkOrder extends ViewRecord
 {
@@ -42,14 +42,14 @@ class ViewWorkOrder extends ViewRecord
                         ->schema([
                             TextEntry::make('progress_header')
                                 ->label('')
-                                ->getStateUsing(fn() => new HtmlString('
+                                ->getStateUsing(fn () => new HtmlString('
                                     <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
                                         <h4 class="font-bold text-black dark:text-white">Work Order Progress</h4>
                                     </div>
                                 '))->html(),
                             Livewire::make(WorkOrderProgress::class),
                         ]),
-                    
+
                     // Work Order Quantity Trend Chart Section
                     Section::make('')
                         ->columnSpan([
@@ -59,14 +59,14 @@ class ViewWorkOrder extends ViewRecord
                         ->schema([
                             TextEntry::make('trend_header')
                                 ->label('')
-                                ->getStateUsing(fn() => new HtmlString('
+                                ->getStateUsing(fn () => new HtmlString('
                                     <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
                                         <h4 class="font-bold text-black dark:text-white">Work Order Quantity Trend Chart</h4>
                                     </div>
                                 '))->html(),
                             Livewire::make(WorkOrderQtyTrendChart::class, ['workOrder' => $this->record]),
                         ]),
-                    
+
                     // Production Throughput Section - only show for completed or closed status
                     TextEntry::make('production_throughput_section')
                         ->label('')
@@ -74,7 +74,7 @@ class ViewWorkOrder extends ViewRecord
                             'sm' => 'full',
                             'md' => 1,
                         ])
-                        ->visible(fn($record) => in_array(strtolower($record->status ?? ''), ['completed', 'closed']))
+                        ->visible(fn ($record) => in_array(strtolower($record->status ?? ''), ['completed', 'closed']))
                         ->getStateUsing(function ($record) {
                             // Get the completion log for this work order
                             $completionLog = $record->workOrderLogs()
@@ -82,7 +82,7 @@ class ViewWorkOrder extends ViewRecord
                                 ->orderBy('updated_at', 'desc')
                                 ->first();
 
-                            if (!$completionLog) {
+                            if (! $completionLog) {
                                 return new HtmlString('
                                     <div class="mt-4">
                                         <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
@@ -104,7 +104,7 @@ class ViewWorkOrder extends ViewRecord
                                 ->first();
 
                             // If no Start log found, show appropriate message
-                            if (!$startLog) {
+                            if (! $startLog) {
                                 return new HtmlString('
                                     <div class="mt-4">
                                         <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
@@ -133,14 +133,14 @@ class ViewWorkOrder extends ViewRecord
                             } else {
                                 $dataNote = '';
                             }
-                            
+
                             // Get units produced
                             $units = $record->ok_qtys ?? 0;
-                            
+
                             // Calculate throughput
                             $throughputPerHour = $hours > 0 ? round($units / $hours, 3) : 0;
                             $throughputPerDay = round($throughputPerHour * 24, 1);
-                            
+
                             return new HtmlString('
                                 <div class="mt-4">
                                     <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
@@ -148,16 +148,16 @@ class ViewWorkOrder extends ViewRecord
                                     </div>
                                     <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
                                         <div class="flex justify-between items-center mb-2">
-                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Hourly Rate: ' . $throughputPerHour . ' units/hr' . $dataNote . '</span>
-                                            <span class="text-xs text-gray-600 dark:text-gray-400">' . $units . ' units in ' . number_format($hours, 1) . ' hrs</span>
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Hourly Rate: '.$throughputPerHour.' units/hr'.$dataNote.'</span>
+                                            <span class="text-xs text-gray-600 dark:text-gray-400">'.$units.' units in '.number_format($hours, 1).' hrs</span>
                                         </div>
                                         <div class="flex justify-between items-center mb-4">
-                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Daily Rate: ' . $throughputPerDay . ' units/day</span>
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Daily Rate: '.$throughputPerDay.' units/day</span>
                                             <span class="text-xs text-gray-600 dark:text-gray-400">24-hour equivalent</span>
                                         </div>
                                         <div class="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                                            <div>Production Started: ' . $startedAt->format('Y-m-d H:i:s') . '</div>
-                                            <div>Completed: ' . $completedAt->format('Y-m-d H:i:s') . '</div>
+                                            <div>Production Started: '.$startedAt->format('Y-m-d H:i:s').'</div>
+                                            <div>Completed: '.$completedAt->format('Y-m-d H:i:s').'</div>
                                         </div>
                                     </div>
                                 </div>
@@ -171,7 +171,7 @@ class ViewWorkOrder extends ViewRecord
                             'sm' => 'full',
                             'md' => 1,
                         ])
-                        ->visible(fn($record) => in_array(strtolower($record->status ?? ''), ['completed', 'closed', 'hold']))
+                        ->visible(fn ($record) => in_array(strtolower($record->status ?? ''), ['completed', 'closed', 'hold']))
                         ->getStateUsing(function ($record) {
                             // Get all Start, Hold, Completed, and Closed logs in chronological order
                             $logs = $record->workOrderLogs()
@@ -203,8 +203,7 @@ class ViewWorkOrder extends ViewRecord
                                 if ($log->status === 'Start') {
                                     // Mark the start of a production period
                                     $lastStartTime = Carbon::parse($log->created_at);
-                                }
-                                elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
+                                } elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
                                     // End of a production period - calculate duration
                                     $endTime = Carbon::parse($log->created_at);
                                     $periodHours = $lastStartTime->diffInHours($endTime, true);
@@ -216,7 +215,7 @@ class ViewWorkOrder extends ViewRecord
                                     $productionPeriods[] = [
                                         'start' => $lastStartTime,
                                         'end' => $endTime,
-                                        'hours' => $periodHours
+                                        'hours' => $periodHours,
                                     ];
 
                                     // Reset start time (production paused/ended)
@@ -239,15 +238,15 @@ class ViewWorkOrder extends ViewRecord
                                     </div>
                                     <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
                                         <div class="flex justify-between items-center mb-2">
-                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Hourly Rate: ' . $throughputPerHour . ' units/hr</span>
-                                            <span class="text-xs text-gray-600 dark:text-gray-400">' . $units . ' units in ' . number_format($netProductionHours, 1) . ' net hrs</span>
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Hourly Rate: '.$throughputPerHour.' units/hr</span>
+                                            <span class="text-xs text-gray-600 dark:text-gray-400">'.$units.' units in '.number_format($netProductionHours, 1).' net hrs</span>
                                         </div>
                                         <div class="flex justify-between items-center mb-4">
-                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Daily Rate: ' . $throughputPerDay . ' units/day</span>
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Daily Rate: '.$throughputPerDay.' units/day</span>
                                             <span class="text-xs text-gray-600 dark:text-gray-400">24-hour equivalent</span>
                                         </div>
                                         <div class="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                                            <div class="font-semibold mb-1">Production Periods: ' . $periodCount . '</div>
+                                            <div class="font-semibold mb-1">Production Periods: '.$periodCount.'</div>
                                             <div class="text-xs italic">Excludes hold/pause time</div>
                                         </div>
                                     </div>
@@ -262,7 +261,7 @@ class ViewWorkOrder extends ViewRecord
                             'sm' => 'full',
                             'md' => 1,
                         ])
-                        ->visible(fn($record) => in_array(strtolower($record->status ?? ''), ['completed', 'closed', 'hold']))
+                        ->visible(fn ($record) => in_array(strtolower($record->status ?? ''), ['completed', 'closed', 'hold']))
                         ->getStateUsing(function ($record) {
                             // Get the completion/hold log for this work order
                             $endLog = null;
@@ -279,7 +278,7 @@ class ViewWorkOrder extends ViewRecord
                                     ->first();
                             }
 
-                            if (!$endLog) {
+                            if (! $endLog) {
                                 return new HtmlString('
                                     <div class="mt-4">
                                         <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
@@ -301,7 +300,7 @@ class ViewWorkOrder extends ViewRecord
                                 ->first();
 
                             // If no Start log found, show appropriate message
-                            if (!$startLog) {
+                            if (! $startLog) {
                                 return new HtmlString('
                                     <div class="mt-4">
                                         <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
@@ -347,17 +346,17 @@ class ViewWorkOrder extends ViewRecord
                                     </div>
                                     <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
                                         <div class="flex justify-between items-center mb-2">
-                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Hourly Rate: ' . $throughputPerHour . ' units/hr' . $dataNote . '</span>
-                                            <span class="text-xs text-gray-600 dark:text-gray-400">' . $grossUnits . ' total units in ' . number_format($hours, 1) . ' hrs</span>
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Hourly Rate: '.$throughputPerHour.' units/hr'.$dataNote.'</span>
+                                            <span class="text-xs text-gray-600 dark:text-gray-400">'.$grossUnits.' total units in '.number_format($hours, 1).' hrs</span>
                                         </div>
                                         <div class="flex justify-between items-center mb-4">
-                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Daily Rate: ' . $throughputPerDay . ' units/day</span>
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Daily Rate: '.$throughputPerDay.' units/day</span>
                                             <span class="text-xs text-gray-600 dark:text-gray-400">24-hour equivalent</span>
                                         </div>
                                         <div class="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                                            <div>Production Started: ' . $startedAt->format('Y-m-d H:i:s') . '</div>
-                                            <div>Ended: ' . $endedAt->format('Y-m-d H:i:s') . '</div>
-                                            <div class="mt-2 text-xs italic">Total Output: ' . $okQty . ' OK + ' . $scrappedQty . ' Scrapped</div>
+                                            <div>Production Started: '.$startedAt->format('Y-m-d H:i:s').'</div>
+                                            <div>Ended: '.$endedAt->format('Y-m-d H:i:s').'</div>
+                                            <div class="mt-2 text-xs italic">Total Output: '.$okQty.' OK + '.$scrappedQty.' Scrapped</div>
                                         </div>
                                     </div>
                                 </div>
@@ -371,7 +370,7 @@ class ViewWorkOrder extends ViewRecord
                             'sm' => 'full',
                             'md' => 1,
                         ])
-                        ->visible(fn($record) => in_array(strtolower($record->status ?? ''), ['completed', 'closed', 'hold']))
+                        ->visible(fn ($record) => in_array(strtolower($record->status ?? ''), ['completed', 'closed', 'hold']))
                         ->getStateUsing(function ($record) {
                             // Get all Start, Hold, Completed, and Closed logs in chronological order
                             $logs = $record->workOrderLogs()
@@ -403,8 +402,7 @@ class ViewWorkOrder extends ViewRecord
                                 if ($log->status === 'Start') {
                                     // Mark the start of a production period
                                     $lastStartTime = Carbon::parse($log->created_at);
-                                }
-                                elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
+                                } elseif (in_array($log->status, ['Hold', 'Completed', 'Closed']) && $lastStartTime !== null) {
                                     // End of a production period - calculate duration
                                     $endTime = Carbon::parse($log->created_at);
                                     $periodHours = $lastStartTime->diffInHours($endTime, true);
@@ -416,7 +414,7 @@ class ViewWorkOrder extends ViewRecord
                                     $productionPeriods[] = [
                                         'start' => $lastStartTime,
                                         'end' => $endTime,
-                                        'hours' => $periodHours
+                                        'hours' => $periodHours,
                                     ];
 
                                     // Reset start time (production paused/ended)
@@ -441,17 +439,17 @@ class ViewWorkOrder extends ViewRecord
                                     </div>
                                     <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
                                         <div class="flex justify-between items-center mb-2">
-                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Hourly Rate: ' . $throughputPerHour . ' units/hr</span>
-                                            <span class="text-xs text-gray-600 dark:text-gray-400">' . $grossUnits . ' total units in ' . number_format($netProductionHours, 1) . ' net hrs</span>
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Hourly Rate: '.$throughputPerHour.' units/hr</span>
+                                            <span class="text-xs text-gray-600 dark:text-gray-400">'.$grossUnits.' total units in '.number_format($netProductionHours, 1).' net hrs</span>
                                         </div>
                                         <div class="flex justify-between items-center mb-4">
-                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Daily Rate: ' . $throughputPerDay . ' units/day</span>
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Daily Rate: '.$throughputPerDay.' units/day</span>
                                             <span class="text-xs text-gray-600 dark:text-gray-400">24-hour equivalent</span>
                                         </div>
                                         <div class="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                                            <div class="font-semibold mb-1">Production Periods: ' . $periodCount . '</div>
+                                            <div class="font-semibold mb-1">Production Periods: '.$periodCount.'</div>
                                             <div class="text-xs italic">Excludes hold/pause time</div>
-                                            <div class="mt-2 text-xs italic">Total Output: ' . $okQty . ' OK + ' . $scrappedQty . ' Scrapped</div>
+                                            <div class="mt-2 text-xs italic">Total Output: '.$okQty.' OK + '.$scrappedQty.' Scrapped</div>
                                         </div>
                                     </div>
                                 </div>
@@ -465,13 +463,13 @@ class ViewWorkOrder extends ViewRecord
                             'sm' => 'full',
                             'md' => 1,
                         ])
-                        ->visible(fn($record) => in_array(strtolower($record->status ?? ''), ['completed', 'hold', 'closed']))
+                        ->visible(fn ($record) => in_array(strtolower($record->status ?? ''), ['completed', 'hold', 'closed']))
                         ->getStateUsing(function ($record) {
                             $totalQty = $record->qty ?? 0;
                             $scrappedQty = $record->scrapped_qtys ?? 0;
                             $scrapRate = $totalQty > 0 ? ($scrappedQty / $totalQty) * 100 : 0;
                             $goodRate = 100 - $scrapRate;
-                            
+
                             return new HtmlString('
                                 <div class="mt-4">
                                     <div class="bg-primary-500 dark:bg-primary-700 text-white px-4 py-2 rounded-t-lg">
@@ -479,18 +477,18 @@ class ViewWorkOrder extends ViewRecord
                                     </div>
                                     <div class="bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-b-lg p-4">
                                         <div class="flex justify-between items-center mb-2">
-                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Scrap Rate: ' . number_format($scrapRate, 1) . '%</span>
-                                            <span class="text-xs text-gray-600 dark:text-gray-400">' . $scrappedQty . ' / ' . $totalQty . '</span>
+                                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Scrap Rate: '.number_format($scrapRate, 1).'%</span>
+                                            <span class="text-xs text-gray-600 dark:text-gray-400">'.$scrappedQty.' / '.$totalQty.'</span>
                                         </div>
                                         <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-6 overflow-hidden">
                                             <div class="flex h-full">
-                                                <div class="bg-green-500 dark:bg-green-600 transition-all duration-500" style="width: ' . $goodRate . '%"></div>
-                                                <div class="bg-red-500 dark:bg-red-600 transition-all duration-500" style="width: ' . $scrapRate . '%"></div>
+                                                <div class="bg-green-500 dark:bg-green-600 transition-all duration-500" style="width: '.$goodRate.'%"></div>
+                                                <div class="bg-red-500 dark:bg-red-600 transition-all duration-500" style="width: '.$scrapRate.'%"></div>
                                             </div>
                                         </div>
                                         <div class="flex justify-between mt-2 text-xs">
-                                            <span class="text-green-600 dark:text-green-400">✓ Good: ' . number_format($goodRate, 1) . '%</span>
-                                            <span class="text-red-600 dark:text-red-400">✗ Scrapped: ' . number_format($scrapRate, 1) . '%</span>
+                                            <span class="text-green-600 dark:text-green-400">✓ Good: '.number_format($goodRate, 1).'%</span>
+                                            <span class="text-red-600 dark:text-red-400">✗ Scrapped: '.number_format($scrapRate, 1).'%</span>
                                         </div>
                                     </div>
                                 </div>
@@ -504,7 +502,7 @@ class ViewWorkOrder extends ViewRecord
                             'sm' => 'full',
                             'md' => 1,
                         ])
-                        ->visible(fn($record) => strtolower($record->status ?? '') !== 'hold')
+                        ->visible(fn ($record) => strtolower($record->status ?? '') !== 'hold')
                         ->getStateUsing(function ($record) {
                             $currentDate = Carbon::now();
                             $status = $record->status;
@@ -538,11 +536,11 @@ class ViewWorkOrder extends ViewRecord
 
                                 if ($statusLog) {
                                     $referenceDate = Carbon::parse($statusLog->created_at);
-                                    $referenceText = 'Status Changed to ' . $status;
+                                    $referenceText = 'Status Changed to '.$status;
                                 } else {
                                     // Fallback to work order created_at if no status log found
                                     $referenceDate = Carbon::parse($record->created_at);
-                                    $referenceText = 'Work Order Created (No ' . $status . ' Log)';
+                                    $referenceText = 'Work Order Created (No '.$status.' Log)';
                                 }
                             } else {
                                 // For any other statuses, get the created_at from work_order_logs when status changed
@@ -553,7 +551,7 @@ class ViewWorkOrder extends ViewRecord
 
                                 if ($statusLog) {
                                     $referenceDate = Carbon::parse($statusLog->created_at);
-                                    $referenceText = 'Status Changed to ' . $status;
+                                    $referenceText = 'Status Changed to '.$status;
                                 } else {
                                     // Fallback to work order created_at if no status log found
                                     $referenceDate = Carbon::parse($record->created_at);
@@ -569,10 +567,10 @@ class ViewWorkOrder extends ViewRecord
                             $agingText = '';
                             if ($agingInDays > 0) {
                                 $remainingHours = round($agingInHours % 24);
-                                $agingText = $agingInDays . ' day' . ($agingInDays > 1 ? 's' : '') .
-                                           ($remainingHours > 0 ? ', ' . $remainingHours . ' hr' . ($remainingHours > 1 ? 's' : '') : '');
+                                $agingText = $agingInDays.' day'.($agingInDays > 1 ? 's' : '').
+                                           ($remainingHours > 0 ? ', '.$remainingHours.' hr'.($remainingHours > 1 ? 's' : '') : '');
                             } else {
-                                $agingText = $agingInHours . ' hr' . ($agingInHours > 1 ? 's' : '');
+                                $agingText = $agingInHours.' hr'.($agingInHours > 1 ? 's' : '');
                             }
 
                             // Remove aging status classification - no status display needed
@@ -586,14 +584,14 @@ class ViewWorkOrder extends ViewRecord
                                         <div class="space-y-3">
                                             <div class="flex justify-between items-center">
                                                 <span class="text-sm font-medium text-gray-900 dark:text-gray-100">Age:</span>
-                                                <span class="text-sm font-bold text-gray-700 dark:text-gray-300">' . $agingText . '</span>
+                                                <span class="text-sm font-bold text-gray-700 dark:text-gray-300">'.$agingText.'</span>
                                             </div>
 
                                             <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                                                 <div class="text-xs text-gray-500 dark:text-gray-500">
-                                                    <div>Reference: ' . $referenceText . '</div>
-                                                    <div>Since: ' . $referenceDate->format('Y-m-d H:i:s') . '</div>
-                                                    <div>Current Status: ' . ucfirst($status) . '</div>
+                                                    <div>Reference: '.$referenceText.'</div>
+                                                    <div>Since: '.$referenceDate->format('Y-m-d H:i:s').'</div>
+                                                    <div>Current Status: '.ucfirst($status).'</div>
                                                 </div>
                                             </div>
                                         </div>
@@ -852,7 +850,7 @@ class ViewWorkOrder extends ViewRecord
                                     $query->orderBy('created_at', 'asc');
                                 },
                                 'workOrderLogs.user',
-                                'quantities'
+                                'quantities',
                             ]);
                             $quantities = $record->quantities;
                             $quantitiesIndex = 0;
@@ -1004,46 +1002,46 @@ class ViewWorkOrder extends ViewRecord
 
             // Section 6: Work Order Info Messages
             Section::make('Work Order Info Messages')
-    ->collapsible()->columnSpanFull()
-    ->schema([
-        TextEntry::make('info_messages_table')
-            ->label('Info Messages')
-            ->getStateUsing(function ($record) {
-                $record->load('infoMessages.user');
-                $messages = $record->infoMessages->map(function ($message) {
-                    return [
-                        'user' => $message->user->getFilamentname() ?? 'N/A',
-                        'message' => $message->message,
-                        'priority' => ucfirst($message->priority),
-                        'sent_at' => $message->created_at->format('Y-m-d H:i:s'),
-                    ];
-                });
+                ->collapsible()->columnSpanFull()
+                ->schema([
+                    TextEntry::make('info_messages_table')
+                        ->label('Info Messages')
+                        ->getStateUsing(function ($record) {
+                            $record->load('infoMessages.user');
+                            $messages = $record->infoMessages->map(function ($message) {
+                                return [
+                                    'user' => $message->user->getFilamentname() ?? 'N/A',
+                                    'message' => $message->message,
+                                    'priority' => ucfirst($message->priority),
+                                    'sent_at' => $message->created_at->format('Y-m-d H:i:s'),
+                                ];
+                            });
 
-                $htmlRows = '';
-                foreach ($messages as $message) {
-                    $priorityClass = $message['priority'] === 'High'
-                        ? 'text-red-500 dark:text-red-400'
-                        : ($message['priority'] === 'Medium'
-                            ? 'text-yellow-500 dark:text-yellow-400'
-                            : 'text-green-600 dark:text-green-400');
-                    $htmlRows .= '
+                            $htmlRows = '';
+                            foreach ($messages as $message) {
+                                $priorityClass = $message['priority'] === 'High'
+                                    ? 'text-red-500 dark:text-red-400'
+                                    : ($message['priority'] === 'Medium'
+                                        ? 'text-yellow-500 dark:text-yellow-400'
+                                        : 'text-green-600 dark:text-green-400');
+                                $htmlRows .= '
                         <tr class="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">
                             <td class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">'.e($message['user']).'</td>
                             <td class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">'.e($message['message']).'</td>
                             <td class="border border-gray-300 dark:border-gray-700 px-2 py-1 font-bold '.$priorityClass.'">'.e($message['priority']).'</td>
                             <td class="border border-gray-300 dark:border-gray-700 px-2 py-1 text-gray-900 dark:text-gray-100">'.e($message['sent_at']).'</td>
                         </tr>';
-                }
+                            }
 
-                // Mobile card rendering
-                $mobileRows = '';
-                foreach ($messages as $message) {
-                    $priorityClass = $message['priority'] === 'High'
-                        ? 'text-red-500 dark:text-red-400'
-                        : ($message['priority'] === 'Medium'
-                            ? 'text-yellow-500 dark:text-yellow-400'
-                            : 'text-green-600 dark:text-green-400');
-                    $mobileRows .= '
+                            // Mobile card rendering
+                            $mobileRows = '';
+                            foreach ($messages as $message) {
+                                $priorityClass = $message['priority'] === 'High'
+                                    ? 'text-red-500 dark:text-red-400'
+                                    : ($message['priority'] === 'Medium'
+                                        ? 'text-yellow-500 dark:text-yellow-400'
+                                        : 'text-green-600 dark:text-green-400');
+                                $mobileRows .= '
                         <div class="border-b border-gray-200 dark:border-gray-700 pb-2 mb-2">
                             <div><span class="font-bold">User:</span> <span>'.htmlspecialchars($message['user']).'</span></div>
                             <div><span class="font-bold">Message:</span> <span>'.htmlspecialchars($message['message']).'</span></div>
@@ -1051,12 +1049,12 @@ class ViewWorkOrder extends ViewRecord
                             <div><span class="font-bold">Sent At:</span> <span>'.htmlspecialchars($message['sent_at']).'</span></div>
                         </div>
                     ';
-                }
-                if (empty($mobileRows)) {
-                    $mobileRows = '<span class="text-gray-900 dark:text-gray-100">No info messages found.</span>';
-                }
+                            }
+                            if (empty($mobileRows)) {
+                                $mobileRows = '<span class="text-gray-900 dark:text-gray-100">No info messages found.</span>';
+                            }
 
-                return new HtmlString('
+                            return new HtmlString('
                     <!-- Desktop Table -->
                     <div class="hidden lg:block overflow-x-auto shadow rounded-lg">
                         <table class="table-auto w-full text-left border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-lg overflow-hidden">
@@ -1083,9 +1081,8 @@ class ViewWorkOrder extends ViewRecord
                         </div>
                     </div>
                 ');
-            })->html(),
-    ]),
+                        })->html(),
+                ]),
         ]);
     }
-
 }

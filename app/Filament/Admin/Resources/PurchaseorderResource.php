@@ -2,42 +2,39 @@
 
 namespace App\Filament\Admin\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\Select;
-use App\Models\PartNumber;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\DatePicker;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\TrashedFilter;
-use Filament\Actions\ActionGroup;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
-use Filament\Tables\Enums\RecordActionsPosition;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Admin\Resources\PurchaseorderResource\Pages\ListPurchaseorders;
 use App\Filament\Admin\Resources\PurchaseorderResource\Pages\CreatePurchaseorder;
 use App\Filament\Admin\Resources\PurchaseorderResource\Pages\EditPurchaseorder;
+use App\Filament\Admin\Resources\PurchaseorderResource\Pages\ListPurchaseorders;
 use App\Filament\Admin\Resources\PurchaseorderResource\Pages\ViewPurchaseorder;
-use App\Filament\Admin\Resources\PurchaseorderResource\Pages;
 use App\Models\CustomerInformation;
+use App\Models\PartNumber;
 use App\Models\PurchaseOrder;
-use Filament\Forms;
+use Carbon\Carbon;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
-use Carbon\Carbon;
 
 class PurchaseorderResource extends Resource
 {
     protected static ?string $model = PurchaseOrder::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-shopping-bag';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shopping-bag';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Process Operations';
+    protected static string|\UnitEnum|null $navigationGroup = 'Process Operations';
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
@@ -146,7 +143,7 @@ class PurchaseorderResource extends Resource
                 ActionGroup::make([
                     EditAction::make()->label('Edit')->size('sm'),
                     ViewAction::make()->label('View')->size('sm'),
-                ])->size('sm')->tooltip('Action')->dropdownPlacement('right')
+                ])->size('sm')->tooltip('Action')->dropdownPlacement('right'),
             ], position: RecordActionsPosition::BeforeColumns)
             ->toolbarActions([
                 BulkActionGroup::make([

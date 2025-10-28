@@ -2,11 +2,11 @@
 
 namespace App\Filament\Admin\Pages\Auth;
 
-use Filament\Auth\Pages\Login as BaseLogin;
-use Filament\Auth\Http\Responses\Contracts\LoginResponse;
-use Illuminate\Support\Facades\Auth;
-use Filament\Notifications\Notification;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
+use Filament\Auth\Http\Responses\Contracts\LoginResponse;
+use Filament\Auth\Pages\Login as BaseLogin;
+use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Auth;
 
 class Login extends BaseLogin
 {

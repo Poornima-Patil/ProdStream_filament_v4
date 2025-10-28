@@ -69,6 +69,13 @@ class OkQuantity extends Model implements HasMedia
     {
         Log::info('generateQRCode called for ID: '.$this->id);
 
+        // Skip QR code generation if using GD driver (not supported by simple-qrcode with imagick)
+        if (env('IMAGE_DRIVER') === 'gd') {
+            Log::info('Skipping QR code generation - GD driver detected');
+
+            return;
+        }
+
         // Ensure URL uses HTTP instead of HTTPS
         $url = str_replace('https://', 'http://', route('okquantity.download', ['id' => $this->id]));
 

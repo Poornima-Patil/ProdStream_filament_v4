@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Enums;
 
 enum BomStatus: int
@@ -9,7 +10,7 @@ enum BomStatus: int
 
     public function label(): string
     {
-        return match($this) {
+        return match ($this) {
             self::Active => 'Active',
             self::InActive => 'InActive',
             self::Complete => 'Complete',

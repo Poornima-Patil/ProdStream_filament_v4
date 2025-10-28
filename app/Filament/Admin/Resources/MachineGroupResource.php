@@ -2,27 +2,24 @@
 
 namespace App\Filament\Admin\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
-use Filament\Tables\Table;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\TrashedFilter;
-use Filament\Actions\ActionGroup;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
-use Filament\Tables\Enums\RecordActionsPosition;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Admin\Resources\MachineGroupResource\Pages\ListMachineGroups;
 use App\Filament\Admin\Resources\MachineGroupResource\Pages\CreateMachineGroup;
 use App\Filament\Admin\Resources\MachineGroupResource\Pages\EditMachineGroup;
+use App\Filament\Admin\Resources\MachineGroupResource\Pages\ListMachineGroups;
 use App\Filament\Admin\Resources\MachineGroupResource\Pages\ViewMachineGroup;
-use App\Filament\Admin\Resources\MachineGroupResource\Pages;
 use App\Models\MachineGroup;
-use Filament\Forms;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\RecordActionsPosition;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Tables\Table;
 
 class MachineGroupResource extends Resource
 {
@@ -30,9 +27,9 @@ class MachineGroupResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'factory';
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-cog';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cog';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Admin Operations';
+    protected static string|\UnitEnum|null $navigationGroup = 'Admin Operations';
 
     // Add this for custom labels and navigation
     public static function form(Schema $schema): Schema
@@ -72,11 +69,11 @@ class MachineGroupResource extends Resource
             ->filters([
                 TrashedFilter::make(),
             ])
-          ->recordActions([
+            ->recordActions([
                 ActionGroup::make([
                     EditAction::make()->label('Edit')->size('sm'),
                     ViewAction::make()->label('View')->size('sm'),
-                ])->size('sm')->tooltip('Action')->dropdownPlacement('right')
+                ])->size('sm')->tooltip('Action')->dropdownPlacement('right'),
             ], position: RecordActionsPosition::BeforeColumns)
             ->toolbarActions([
                 BulkActionGroup::make([

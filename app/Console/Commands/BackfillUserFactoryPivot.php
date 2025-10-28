@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Models\User;
 use App\Models\Factory;
+use App\Models\User;
 use Illuminate\Console\Command;
 
 class BackfillUserFactoryPivot extends Command
@@ -59,15 +59,15 @@ class BackfillUserFactoryPivot extends Command
                 foreach ($usersWithoutPivot as $user) {
                     $this->line("    - {$user->email} (ID: {$user->id}, emp_id: {$user->emp_id})");
 
-                    if (!$dryRun) {
+                    if (! $dryRun) {
                         $user->factories()->syncWithoutDetaching([$factory->id]);
                     }
                 }
 
                 $totalProcessed += $count;
-                $this->info("  ✅ " . ($dryRun ? "Would add" : "Added") . " {$count} users to pivot table");
+                $this->info('  ✅ '.($dryRun ? 'Would add' : 'Added')." {$count} users to pivot table");
             } else {
-                $this->line("  ✓ All users already have pivot table entries");
+                $this->line('  ✓ All users already have pivot table entries');
             }
 
             $this->newLine();
@@ -78,12 +78,12 @@ class BackfillUserFactoryPivot extends Command
         if ($totalProcessed > 0) {
             if ($dryRun) {
                 $this->warn("🔍 DRY RUN COMPLETE: Would process {$totalProcessed} users across {$factories->count()} factories");
-                $this->info("Run without --dry-run to apply changes");
+                $this->info('Run without --dry-run to apply changes');
             } else {
                 $this->info("✅ SUCCESS: Processed {$totalProcessed} users across {$factories->count()} factories");
             }
         } else {
-            $this->info("✅ No users needed to be processed - all pivot table entries are correct");
+            $this->info('✅ No users needed to be processed - all pivot table entries are correct');
         }
 
         return Command::SUCCESS;

@@ -2,13 +2,15 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
 use Illuminate\Support\Facades\DB;
+use Livewire\Component;
 
 class MachineGroupStatusChart extends Component
 {
     public $record;
+
     public $fromDate;
+
     public $toDate;
 
     public function mount($record, $fromDate = null, $toDate = null)
@@ -20,10 +22,10 @@ class MachineGroupStatusChart extends Component
 
     public function getData()
     {
-        if (!$this->record?->id) {
+        if (! $this->record?->id) {
             return [
                 'labels' => [],
-                'datasets' => []
+                'datasets' => [],
             ];
         }
 

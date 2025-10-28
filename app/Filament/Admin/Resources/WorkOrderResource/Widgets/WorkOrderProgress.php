@@ -9,7 +9,7 @@ class WorkOrderProgress extends Widget
 {
     protected string $view = 'filament.admin.resources.work-order-resource.widgets.work-order-progress';
 
-    protected int | string | array $columnSpan = [
+    protected int|string|array $columnSpan = [
         'md' => 1,
         'xl' => 1,
     ];

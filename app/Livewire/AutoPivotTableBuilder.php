@@ -2,10 +2,10 @@
 
 namespace App\Livewire;
 
-use Exception;
-use Livewire\Component;
 use App\Models\WorkOrder;
+use Exception;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Component;
 
 class AutoPivotTableBuilder extends Component
 {
@@ -13,16 +13,24 @@ class AutoPivotTableBuilder extends Component
 
     // Pivot configuration
     public $selectedRows = [];
+
     public $selectedColumns = [];
+
     public $selectedValues = [];
+
     public $aggregationFunction = 'sum';
+
     public $dateRange = 'last_month';
+
     public $startDate;
+
     public $endDate;
 
     // Data
     public $workOrderData = [];
+
     public $availableFields = [];
+
     public $pivotResult = [];
 
     // Filter values - exactly like CSV version
@@ -30,6 +38,7 @@ class AutoPivotTableBuilder extends Component
 
     // UI state
     public $showPivotTable = false;
+
     public $autoDownloadCsv = true;
 
     protected $rules = [
@@ -103,7 +112,7 @@ class AutoPivotTableBuilder extends Component
     // Auto-update pivot when filters change
     public function updatedActiveFilters()
     {
-        if ($this->showPivotTable && !empty($this->selectedValues)) {
+        if ($this->showPivotTable && ! empty($this->selectedValues)) {
             $this->autoGeneratePivot();
         }
     }
@@ -111,28 +120,28 @@ class AutoPivotTableBuilder extends Component
     // Auto-update pivot when configuration changes
     public function updatedSelectedRows()
     {
-        if ($this->showPivotTable && !empty($this->selectedValues)) {
+        if ($this->showPivotTable && ! empty($this->selectedValues)) {
             $this->autoGeneratePivot();
         }
     }
 
     public function updatedSelectedColumns()
     {
-        if ($this->showPivotTable && !empty($this->selectedValues)) {
+        if ($this->showPivotTable && ! empty($this->selectedValues)) {
             $this->autoGeneratePivot();
         }
     }
 
     public function updatedSelectedValues()
     {
-        if ($this->showPivotTable && !empty($this->selectedValues)) {
+        if ($this->showPivotTable && ! empty($this->selectedValues)) {
             $this->autoGeneratePivot();
         }
     }
 
     public function updatedAggregationFunction()
     {
-        if ($this->showPivotTable && !empty($this->selectedValues)) {
+        if ($this->showPivotTable && ! empty($this->selectedValues)) {
             $this->autoGeneratePivot();
         }
     }
@@ -145,7 +154,7 @@ class AutoPivotTableBuilder extends Component
             }
 
             $filteredData = $this->applyFilters($this->workOrderData);
-            if (!empty($filteredData)) {
+            if (! empty($filteredData)) {
                 $this->pivotResult = $this->createPivotTable($filteredData);
             }
         } catch (Exception $e) {
@@ -155,8 +164,9 @@ class AutoPivotTableBuilder extends Component
 
     private function loadWorkOrderData()
     {
-        if (!Auth::user() || !Auth::user()->factory) {
+        if (! Auth::user() || ! Auth::user()->factory) {
             $this->workOrderData = [];
+
             return;
         }
 
@@ -165,7 +175,7 @@ class AutoPivotTableBuilder extends Component
             'machine',
             'operator.user',
             'okQuantities',
-            'scrappedQuantities'
+            'scrappedQuantities',
         ])
             ->where('factory_id', Auth::user()->factory->id);
 
@@ -219,7 +229,7 @@ class AutoPivotTableBuilder extends Component
                 'qty' => 'Quantity',
                 'ok_qty' => 'OK Quantity',
                 'ko_qty' => 'KO Quantity',
-            ]
+            ],
         ];
     }
 
@@ -230,6 +240,7 @@ class AutoPivotTableBuilder extends Component
 
             if (empty($this->workOrderData)) {
                 session()->flash('error', 'No work order data found for the selected date range.');
+
                 return;
             }
 
@@ -238,6 +249,7 @@ class AutoPivotTableBuilder extends Component
 
             if (empty($filteredData)) {
                 session()->flash('error', 'No data found after applying filters.');
+
                 return;
             }
 
@@ -251,7 +263,7 @@ class AutoPivotTableBuilder extends Component
 
             session()->flash('success', 'Pivot table generated successfully!');
         } catch (Exception $e) {
-            session()->flash('error', 'Error generating pivot table: ' . $e->getMessage());
+            session()->flash('error', 'Error generating pivot table: '.$e->getMessage());
         }
     }
 
@@ -263,10 +275,11 @@ class AutoPivotTableBuilder extends Component
 
         return collect($data)->filter(function ($row) {
             foreach ($this->activeFilters as $field => $values) {
-                if (!empty($values) && !in_array($row[$field], $values)) {
+                if (! empty($values) && ! in_array($row[$field], $values)) {
                     return false;
                 }
             }
+
             return true;
         })->toArray();
     }
@@ -280,16 +293,16 @@ class AutoPivotTableBuilder extends Component
             $rowKey = $this->createGroupKey($row, $this->selectedRows);
             $colKey = $this->createGroupKey($row, $this->selectedColumns);
 
-            if (!isset($grouped[$rowKey])) {
+            if (! isset($grouped[$rowKey])) {
                 $grouped[$rowKey] = [];
             }
 
-            if (!isset($grouped[$rowKey][$colKey])) {
+            if (! isset($grouped[$rowKey][$colKey])) {
                 $grouped[$rowKey][$colKey] = [];
             }
 
             foreach ($this->selectedValues as $valueField) {
-                if (!isset($grouped[$rowKey][$colKey][$valueField])) {
+                if (! isset($grouped[$rowKey][$colKey][$valueField])) {
                     $grouped[$rowKey][$colKey][$valueField] = [];
                 }
 
@@ -323,7 +336,7 @@ class AutoPivotTableBuilder extends Component
                 'date_range' => $this->dateRange,
                 'start_date' => $this->startDate,
                 'end_date' => $this->endDate,
-            ]
+            ],
         ];
     }
 
@@ -337,6 +350,7 @@ class AutoPivotTableBuilder extends Component
         foreach ($fields as $field) {
             $keyParts[] = $row[$field] ?? 'N/A';
         }
+
         return implode(' | ', $keyParts);
     }
 
@@ -390,7 +404,7 @@ class AutoPivotTableBuilder extends Component
         return [
             'total_rows' => $totalRows,
             'total_columns' => $totalColumns,
-            'grand_total' => $grandTotal
+            'grand_total' => $grandTotal,
         ];
     }
 
@@ -398,10 +412,11 @@ class AutoPivotTableBuilder extends Component
     {
         if (empty($this->pivotResult)) {
             session()->flash('error', 'No pivot data to export');
+
             return;
         }
 
-        $filename = 'work_order_pivot_' . now()->format('Y-m-d_H-i-s') . '.csv';
+        $filename = 'work_order_pivot_'.now()->format('Y-m-d_H-i-s').'.csv';
 
         $headers = [
             'Content-Type' => 'text/csv',
@@ -414,7 +429,7 @@ class AutoPivotTableBuilder extends Component
             // Write metadata
             fputcsv($file, ['Work Order Pivot Table Report']);
             fputcsv($file, ['Generated:', now()->format('Y-m-d H:i:s')]);
-            fputcsv($file, ['Date Range:', $this->startDate . ' to ' . $this->endDate]);
+            fputcsv($file, ['Date Range:', $this->startDate.' to '.$this->endDate]);
             fputcsv($file, ['Total Records:', $this->pivotResult['metadata']['total_records']]);
             fputcsv($file, ['Aggregation:', ucfirst($this->aggregationFunction)]);
             fputcsv($file, []); // Empty row
@@ -437,7 +452,7 @@ class AutoPivotTableBuilder extends Component
                     if (isset($rowData[$colKey])) {
                         $values = [];
                         foreach ($rowData[$colKey] as $valueKey => $value) {
-                            $values[] = $this->availableFields['numeric'][$valueKey] . ": " . number_format($value, 2);
+                            $values[] = $this->availableFields['numeric'][$valueKey].': '.number_format($value, 2);
                         }
                         $cellValue = implode(', ', $values);
                     }
@@ -459,7 +474,7 @@ class AutoPivotTableBuilder extends Component
             'selectedColumns',
             'selectedValues',
             'activeFilters',
-            'pivotResult'
+            'pivotResult',
         ]);
         $this->showPivotTable = false;
         session()->flash('success', 'Configuration reset successfully');

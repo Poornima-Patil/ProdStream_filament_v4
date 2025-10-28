@@ -4,8 +4,8 @@ namespace App\Filament\Admin\Resources\WorkOrderGroupResource\Pages;
 
 use App\Filament\Admin\Resources\WorkOrderGroupResource;
 use Filament\Actions\DeleteAction;
-use Filament\Resources\Pages\EditRecord;
 use Filament\Notifications\Notification;
+use Filament\Resources\Pages\EditRecord;
 
 class EditWorkOrderGroup extends EditRecord
 {
@@ -26,7 +26,7 @@ class EditWorkOrderGroup extends EditRecord
 
             Notification::make()
                 ->title('Cannot Activate WorkOrder Group')
-                ->body('Dependencies must be defined before activation: ' . implode('; ', $errors))
+                ->body('Dependencies must be defined before activation: '.implode('; ', $errors))
                 ->danger()
                 ->persistent()
                 ->send();

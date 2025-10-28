@@ -2,11 +2,10 @@
 
 namespace App\Filament\Admin\Resources\RoleResource\Pages;
 
+use App\Filament\Admin\Resources\RoleResource;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
-use App\Filament\Admin\Resources\RoleResource;
-use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 
 class EditRole extends EditRecord

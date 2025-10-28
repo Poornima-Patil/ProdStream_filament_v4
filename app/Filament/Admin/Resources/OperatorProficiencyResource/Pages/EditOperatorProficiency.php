@@ -2,11 +2,10 @@
 
 namespace App\Filament\Admin\Resources\OperatorProficiencyResource\Pages;
 
+use App\Filament\Admin\Resources\OperatorProficiencyResource;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\RestoreAction;
-use App\Filament\Admin\Resources\OperatorProficiencyResource;
-use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 
 class EditOperatorProficiency extends EditRecord

@@ -2,17 +2,19 @@
 
 namespace App\Livewire;
 
-use Livewire\Component;
-use App\Models\CustomerInformation;
 use App\Services\CustomerKPIService;
 use Carbon\Carbon;
 use Livewire\Attributes\On;
+use Livewire\Component;
 
 class CustomerAnalytics extends Component
 {
     public $customer;
+
     public $fromDate;
+
     public $toDate;
+
     public $factoryId;
 
     protected CustomerKPIService $customerKPIService;
@@ -32,7 +34,7 @@ class CustomerAnalytics extends Component
 
     public function getWorkOrderStatusDistribution()
     {
-        if (!$this->customer || !$this->factoryId) {
+        if (! $this->customer || ! $this->factoryId) {
             return collect();
         }
 
@@ -46,7 +48,7 @@ class CustomerAnalytics extends Component
 
     public function getQualityData()
     {
-        if (!$this->customer || !$this->factoryId) {
+        if (! $this->customer || ! $this->factoryId) {
             return null;
         }
 
@@ -60,7 +62,7 @@ class CustomerAnalytics extends Component
 
     public function getAnalyticsSummary()
     {
-        if (!$this->customer || !$this->factoryId) {
+        if (! $this->customer || ! $this->factoryId) {
             return null;
         }
 

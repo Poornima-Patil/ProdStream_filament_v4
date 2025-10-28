@@ -2,9 +2,8 @@
 
 namespace App\Filament\Admin\Resources\PartnumberResource\Pages;
 
-use Filament\Actions\CreateAction;
 use App\Filament\Admin\Resources\PartnumberResource;
-use Filament\Actions;
+use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListPartnumbers extends ListRecords

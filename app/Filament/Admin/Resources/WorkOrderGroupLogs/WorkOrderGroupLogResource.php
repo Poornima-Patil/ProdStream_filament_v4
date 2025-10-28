@@ -2,8 +2,6 @@
 
 namespace App\Filament\Admin\Resources\WorkOrderGroupLogs;
 
-use App\Filament\Admin\Resources\WorkOrderGroupLogs\Pages\CreateWorkOrderGroupLog;
-use App\Filament\Admin\Resources\WorkOrderGroupLogs\Pages\EditWorkOrderGroupLog;
 use App\Filament\Admin\Resources\WorkOrderGroupLogs\Pages\ListWorkOrderGroupLogs;
 use App\Filament\Admin\Resources\WorkOrderGroupLogs\Schemas\WorkOrderGroupLogForm;
 use App\Filament\Admin\Resources\WorkOrderGroupLogs\Tables\WorkOrderGroupLogsTable;
@@ -21,7 +19,6 @@ class WorkOrderGroupLogResource extends Resource
     // protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlineRectangleStack;
 
     protected static bool $shouldRegisterNavigation = false;
-
 
     public static function form(Schema $schema): Schema
     {

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 class TenantKPICache
 {
     protected Factory $factory;
+
     protected string $store;
 
     public function __construct(Factory $factory, string $store = 'kpi_cache')
@@ -48,6 +49,7 @@ class TenantKPICache
     public function forget(string $key, string $tier): bool
     {
         $fullKey = $this->buildKey($key, $tier);
+
         return Cache::store($this->store)->forget($fullKey);
     }
 
@@ -87,7 +89,7 @@ class TenantKPICache
         return [
             "factory_{$this->factory->id}",
             "tier_{$tier}",
-            "kpi"
+            'kpi',
         ];
     }
 

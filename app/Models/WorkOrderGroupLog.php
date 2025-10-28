@@ -58,9 +58,6 @@ class WorkOrderGroupLog extends Model
         return $this->belongsTo(Factory::class, 'factory_id');
     }
 
-
-
-
     /**
      * Create a dependency satisfaction log entry
      */
@@ -89,7 +86,7 @@ class WorkOrderGroupLog extends Model
      */
     public static function logStatusChange(WorkOrder $workOrder, string $previousStatus, string $newStatus, ?User $user = null): void
     {
-        if (!$workOrder->work_order_group_id) {
+        if (! $workOrder->work_order_group_id) {
             return;
         }
 
@@ -114,7 +111,7 @@ class WorkOrderGroupLog extends Model
      */
     public static function logWorkOrderTriggeredNext(WorkOrder $completedWorkOrder, array $nextWorkOrders): void
     {
-        if (!$completedWorkOrder->work_order_group_id) {
+        if (! $completedWorkOrder->work_order_group_id) {
             return;
         }
 
@@ -138,12 +135,13 @@ class WorkOrderGroupLog extends Model
      */
     public static function logKeyConsumption(WorkOrder $consumerWorkOrder, array $consumedKeys, int $batchNumber): void
     {
-        if (!$consumerWorkOrder->work_order_group_id) {
+        if (! $consumerWorkOrder->work_order_group_id) {
             return;
         }
 
         $keyDetails = collect($consumedKeys)->map(function ($keyId) {
             $key = \App\Models\WorkOrderBatchKey::with('workOrder')->find($keyId);
+
             return [
                 'key_id' => $keyId,
                 'key_code' => $key?->key_code,
@@ -177,7 +175,7 @@ class WorkOrderGroupLog extends Model
      */
     public static function logKeyGeneration(WorkOrder $producerWorkOrder, string $keyCode, int $batchNumber, int $quantityProduced): void
     {
-        if (!$producerWorkOrder->work_order_group_id) {
+        if (! $producerWorkOrder->work_order_group_id) {
             return;
         }
 
