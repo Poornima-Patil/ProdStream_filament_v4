@@ -225,33 +225,79 @@ class KPIAggregateDailyCommand extends Command
 
         $dayStart = $date->copy()->startOfDay();
         $dayEnd = $date->copy()->endOfDay();
+        $machines = Machine::where('factory_id', $factory->id)->get(['id']);
+        $totalMachines = $machines->count();
 
-        $totalMachines = Machine::where('factory_id', $factory->id)->count();
+        $logGroups = WorkOrderLog::whereHas('workOrder', function ($query) use ($factory) {
+                $query->where('factory_id', $factory->id);
+            })
+            ->where('changed_at', '<=', $dayEnd)
+            ->with(['workOrder' => function ($query) {
+                $query->select('id', 'machine_id', 'status', 'start_time', 'updated_at', 'created_at');
+            }])
+            ->orderBy('changed_at', 'desc')
+            ->get()
+            ->groupBy(fn ($log) => $log->workOrder?->machine_id);
 
-        // If work orders were not provided (e.g., skipped utilization), fetch minimal data for status summary
-        if ($workOrders === null) {
-            $workOrders = WorkOrder::where('factory_id', $factory->id)
-                ->where(function ($query) use ($dayStart, $dayEnd) {
-                    $query->whereIn('status', ['Start', 'Setup', 'Hold'])
-                        ->orWhere(function ($scheduledQuery) use ($dayStart, $dayEnd) {
-                            $scheduledQuery->whereIn('status', ['Assigned', 'Completed'])
-                                ->whereBetween('start_time', [$dayStart, $dayEnd]);
-                        });
-                })
-                ->get(['id', 'machine_id', 'status']);
+        $latestOrders = WorkOrder::where('factory_id', $factory->id)
+            ->where(function ($query) use ($dayEnd) {
+                $query->whereNull('updated_at')
+                    ->orWhere('updated_at', '<=', $dayEnd);
+            })
+            ->orderByRaw('COALESCE(updated_at, created_at) DESC')
+            ->get()
+            ->groupBy('machine_id');
+
+        $counts = [
+            'hold' => 0,
+            'setup' => 0,
+            'running' => 0,
+            'scheduled' => 0,
+            'idle' => 0,
+        ];
+
+        foreach ($machines as $machine) {
+            $machineId = $machine->id;
+            $status = null;
+            $startTime = null;
+
+            if ($logGroups->has($machineId)) {
+                $log = $logGroups[$machineId]->first();
+                if ($log && $log->workOrder) {
+                    $status = $log->status;
+                    $startTime = $log->workOrder->start_time
+                        ? Carbon::parse($log->workOrder->start_time)
+                        : null;
+                }
+            } elseif ($latestOrders->has($machineId)) {
+                $wo = $latestOrders[$machineId]->first();
+                $status = $wo->status;
+                $startTime = $wo->start_time
+                    ? Carbon::parse($wo->start_time)
+                    : null;
+            }
+
+            $bucket = 'idle';
+
+            switch ($status) {
+                case 'Hold':
+                    $bucket = 'hold';
+                    break;
+                case 'Setup':
+                    $bucket = 'setup';
+                    break;
+                case 'Start':
+                    $bucket = 'running';
+                    break;
+                case 'Assigned':
+                    $bucket = ($startTime && $startTime->isBetween($dayStart, $dayEnd))
+                        ? 'scheduled'
+                        : 'idle';
+                    break;
+            }
+
+            $counts[$bucket]++;
         }
-
-        $workOrders = $workOrders instanceof \Illuminate\Support\Collection
-            ? $workOrders
-            : collect($workOrders);
-
-        $runningMachines = $workOrders->where('status', 'Start')->pluck('machine_id')->unique();
-        $setupMachines = $workOrders->where('status', 'Setup')->pluck('machine_id')->unique();
-        $holdMachines = $workOrders->where('status', 'Hold')->pluck('machine_id')->unique();
-        $scheduledMachines = $workOrders->where('status', 'Assigned')->pluck('machine_id')->unique();
-        $machinesWithWork = $workOrders->pluck('machine_id')->unique();
-
-        $idleCount = max($totalMachines - $machinesWithWork->count(), 0);
 
         MachineStatusDaily::updateOrCreate(
             [
@@ -259,11 +305,11 @@ class KPIAggregateDailyCommand extends Command
                 'summary_date' => $date->toDateString(),
             ],
             [
-                'running_count' => $runningMachines->count(),
-                'setup_count' => $setupMachines->count(),
-                'hold_count' => $holdMachines->count(),
-                'scheduled_count' => $scheduledMachines->count(),
-                'idle_count' => $idleCount,
+                'running_count' => $counts['running'],
+                'setup_count' => $counts['setup'],
+                'hold_count' => $counts['hold'],
+                'scheduled_count' => $counts['scheduled'],
+                'idle_count' => $counts['idle'],
                 'total_machines' => $totalMachines,
                 'calculated_at' => now(),
             ]

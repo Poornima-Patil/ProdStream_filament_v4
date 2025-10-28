@@ -59,12 +59,11 @@ class RealTimeKPIService extends BaseKPIService
             ];
 
             foreach ($machines as $machine) {
-                $workOrders = $machine->workOrders;
+                $latestWO = $machine->workOrders
+                    ->sortByDesc(fn ($wo) => $wo->updated_at ?? $wo->created_at)
+                    ->first();
 
-                // Determine machine status based on work orders
-                // Priority: Hold > Start > Assigned > Idle
-                if ($workOrders->isEmpty()) {
-                    // No work orders = Idle
+                if (! $latestWO) {
                     $statusGroups['idle']['machines'][] = [
                         'id' => $machine->id,
                         'name' => $machine->name,
@@ -72,53 +71,54 @@ class RealTimeKPIService extends BaseKPIService
                         'status' => 'idle',
                     ];
                     $statusGroups['idle']['count']++;
-                } elseif ($workOrders->contains('status', 'Hold')) {
-                    // Has work orders on hold = Hold (HIGHEST PRIORITY - requires attention)
-                    $holdWOs = $workOrders->where('status', 'Hold');
-                    $primaryHoldWO = $holdWOs->first();
+                    continue;
+                }
 
-                    $operatorName = $primaryHoldWO?->operator?->user
-                        ? "{$primaryHoldWO->operator->user->first_name} {$primaryHoldWO->operator->user->last_name}"
+                $status = strtolower($latestWO->status);
+
+                if ($status === 'hold') {
+                    $holdLog = $latestWO->workOrderLogs
+                        ->where('status', 'Hold')
+                        ->sortByDesc('changed_at')
+                        ->first();
+
+                    $operatorName = $latestWO->operator?->user
+                        ? "{$latestWO->operator->user->first_name} {$latestWO->operator->user->last_name}"
                         : 'Unassigned';
 
-                    $partNumber = $primaryHoldWO?->bom?->purchaseOrder?->partNumber?->partnumber ?? 'N/A';
-
-                    // Get hold reason from the latest Hold log entry
-                    $holdLog = $primaryHoldWO?->workOrderLogs->first();
+                    $partNumber = $latestWO->bom?->purchaseOrder?->partNumber?->partnumber ?? 'N/A';
+                    $holdSince = $holdLog?->changed_at ?? $latestWO->updated_at;
                     $holdReason = $holdLog?->holdReason?->description ?? 'No reason specified';
-                    $holdSince = $holdLog?->changed_at ?? $primaryHoldWO?->updated_at;
 
                     $statusGroups['hold']['machines'][] = [
                         'id' => $machine->id,
                         'name' => $machine->name,
                         'asset_id' => $machine->assetId,
                         'status' => 'hold',
-                        'hold_wo_count' => $holdWOs->count(),
-                        'primary_wo_id' => $primaryHoldWO?->id,
-                        'primary_wo_number' => $primaryHoldWO?->unique_id ?? 'N/A',
-                        'unique_id' => $primaryHoldWO?->unique_id ?? 'N/A',
+                        'hold_wo_count' => 1,
+                        'primary_wo_id' => $latestWO->id,
+                        'primary_wo_number' => $latestWO->unique_id ?? 'N/A',
+                        'unique_id' => $latestWO->unique_id ?? 'N/A',
                         'operator' => $operatorName,
                         'part_number' => $partNumber,
                         'hold_reason' => $holdReason,
                         'hold_since' => $holdSince?->toDateTimeString(),
                         'hold_duration' => $holdSince ? now()->diffForHumans($holdSince, true) : 'Unknown',
                         'hold_priority' => $holdSince ? now()->diffInMinutes($holdSince) : 0,
-                        'wo_numbers' => $holdWOs->pluck('unique_id')->take(3)->toArray(),
+                        'wo_numbers' => [$latestWO->unique_id],
                     ];
                     $statusGroups['hold']['count']++;
-                } elseif ($workOrders->contains('status', 'Setup')) {
-                    // Has work orders in setup phase = Setup
-                    $setupWOs = $workOrders->where('status', 'Setup');
-                    $primarySetupWO = $setupWOs->first();
+                    continue;
+                }
 
-                    $operatorName = $primarySetupWO?->operator?->user
-                        ? "{$primarySetupWO->operator->user->first_name} {$primarySetupWO->operator->user->last_name}"
+                if ($status === 'setup') {
+                    $operatorName = $latestWO->operator?->user
+                        ? "{$latestWO->operator->user->first_name} {$latestWO->operator->user->last_name}"
                         : 'Unassigned';
 
-                    $partNumber = $primarySetupWO?->bom?->purchaseOrder?->partNumber?->partnumber ?? 'N/A';
-
-                    $scheduledStart = $primarySetupWO?->start_time
-                        ? $primarySetupWO->start_time->format('M d, H:i')
+                    $partNumber = $latestWO->bom?->purchaseOrder?->partNumber?->partnumber ?? 'N/A';
+                    $scheduledStart = $latestWO->start_time
+                        ? $latestWO->start_time->format('M d, H:i')
                         : 'Not scheduled';
 
                     $statusGroups['setup']['machines'][] = [
@@ -126,33 +126,31 @@ class RealTimeKPIService extends BaseKPIService
                         'name' => $machine->name,
                         'asset_id' => $machine->assetId,
                         'status' => 'setup',
-                        'setup_wo_count' => $setupWOs->count(),
-                        'primary_wo_id' => $primarySetupWO?->id,
-                        'primary_wo_number' => $primarySetupWO?->unique_id ?? 'N/A',
-                        'unique_id' => $primarySetupWO?->unique_id ?? 'N/A',
+                        'setup_wo_count' => $machine->workOrders->where('status', 'Setup')->count(),
+                        'primary_wo_id' => $latestWO->id,
+                        'primary_wo_number' => $latestWO->unique_id ?? 'N/A',
+                        'unique_id' => $latestWO->unique_id ?? 'N/A',
                         'operator' => $operatorName,
                         'part_number' => $partNumber,
                         'scheduled_start' => $scheduledStart,
-                        'start_time' => $primarySetupWO?->start_time?->toDateTimeString(),
-                        'setup_since' => $primarySetupWO?->updated_at?->toDateTimeString(),
-                        'setup_duration' => $primarySetupWO?->updated_at
-                            ? now()->diffForHumans($primarySetupWO->updated_at, true)
+                        'start_time' => $latestWO->start_time?->toDateTimeString(),
+                        'setup_since' => $latestWO->updated_at?->toDateTimeString(),
+                        'setup_duration' => $latestWO->updated_at
+                            ? now()->diffForHumans($latestWO->updated_at, true)
                             : 'Unknown',
                     ];
                     $statusGroups['setup']['count']++;
-                } elseif ($workOrders->contains('status', 'Start')) {
-                    // Has at least one running work order = Running
-                    $runningWO = $workOrders->firstWhere('status', 'Start');
+                    continue;
+                }
 
-                    $operatorName = $runningWO?->operator?->user
-                        ? "{$runningWO->operator->user->first_name} {$runningWO->operator->user->last_name}"
+                if ($status === 'start') {
+                    $operatorName = $latestWO->operator?->user
+                        ? "{$latestWO->operator->user->first_name} {$latestWO->operator->user->last_name}"
                         : 'Unassigned';
 
-                    $partNumber = $runningWO?->bom?->purchaseOrder?->partNumber?->partnumber ?? 'N/A';
-
-                    // Calculate estimated completion time
-                    $estimatedCompletion = $runningWO?->end_time
-                        ? $runningWO->end_time->diffForHumans()
+                    $partNumber = $latestWO->bom?->purchaseOrder?->partNumber?->partnumber ?? 'N/A';
+                    $estimatedCompletion = $latestWO->end_time
+                        ? $latestWO->end_time->diffForHumans()
                         : 'N/A';
 
                     $statusGroups['running']['machines'][] = [
@@ -160,51 +158,71 @@ class RealTimeKPIService extends BaseKPIService
                         'name' => $machine->name,
                         'asset_id' => $machine->assetId,
                         'status' => 'running',
-                        'wo_id' => $runningWO?->id,
-                        'wo_number' => $runningWO?->unique_id ?? 'N/A',
-                        'unique_id' => $runningWO?->unique_id ?? 'N/A',
+                        'wo_id' => $latestWO->id,
+                        'wo_number' => $latestWO->unique_id ?? 'N/A',
+                        'unique_id' => $latestWO->unique_id ?? 'N/A',
                         'operator' => $operatorName,
                         'part_number' => $partNumber,
                         'estimated_completion' => $estimatedCompletion,
-                        'end_time' => $runningWO?->end_time?->toDateTimeString(),
-                        'qty_target' => $runningWO?->qty ?? 0,
-                        'qty_produced' => $runningWO?->ok_qtys ?? 0,
-                        'progress_percentage' => $runningWO && $runningWO->qty > 0
-                            ? round(($runningWO->ok_qtys / $runningWO->qty) * 100, 1)
+                        'end_time' => $latestWO->end_time?->toDateTimeString(),
+                        'qty_target' => $latestWO->qty ?? 0,
+                        'qty_produced' => $latestWO->ok_qtys ?? 0,
+                        'progress_percentage' => $latestWO->qty > 0
+                            ? round(($latestWO->ok_qtys / $latestWO->qty) * 100, 1)
                             : 0,
                     ];
                     $statusGroups['running']['count']++;
-                } elseif ($workOrders->contains('status', 'Assigned')) {
-                    // Has assigned work orders (but none running) = Scheduled
-                    $assignedWOs = $workOrders->where('status', 'Assigned');
-                    $nextWO = $assignedWOs->first();
+                    continue;
+                }
 
-                    $operatorName = $nextWO?->operator?->user
-                        ? "{$nextWO->operator->user->first_name} {$nextWO->operator->user->last_name}"
+                if ($latestWO->status === 'Assigned') {
+                    $operatorName = $latestWO->operator?->user
+                        ? "{$latestWO->operator->user->first_name} {$latestWO->operator->user->last_name}"
                         : 'Unassigned';
 
-                    $partNumber = $nextWO?->bom?->purchaseOrder?->partNumber?->partnumber ?? 'N/A';
+                    $partNumber = $latestWO->bom?->purchaseOrder?->partNumber?->partnumber ?? 'N/A';
+                    $startTime = $latestWO->start_time;
+                    $isToday = $startTime
+                        && $startTime->isBetween(now()->startOfDay(), now()->endOfDay());
 
-                    $scheduledStart = $nextWO?->start_time
-                        ? $nextWO->start_time->format('M d, H:i')
-                        : 'Not scheduled';
+                    if (! $isToday) {
+                        $statusGroups['idle']['machines'][] = [
+                            'id' => $machine->id,
+                            'name' => $machine->name,
+                            'asset_id' => $machine->assetId,
+                            'status' => 'idle',
+                        ];
+                        $statusGroups['idle']['count']++;
+                        continue;
+                    }
+
+                    $scheduledStart = $startTime->format('M d, H:i');
 
                     $statusGroups['scheduled']['machines'][] = [
                         'id' => $machine->id,
                         'name' => $machine->name,
                         'asset_id' => $machine->assetId,
                         'status' => 'scheduled',
-                        'assigned_wo_count' => $assignedWOs->count(),
-                        'next_wo_id' => $nextWO?->id,
-                        'next_wo_number' => $nextWO?->unique_id ?? 'N/A',
-                        'unique_id' => $nextWO?->unique_id ?? 'N/A',
+                        'assigned_wo_count' => $machine->workOrders->where('status', 'Assigned')->count(),
+                        'next_wo_id' => $latestWO->id,
+                        'next_wo_number' => $latestWO->unique_id ?? 'N/A',
+                        'unique_id' => $latestWO->unique_id ?? 'N/A',
                         'operator' => $operatorName,
                         'part_number' => $partNumber,
                         'scheduled_start' => $scheduledStart,
-                        'start_time' => $nextWO?->start_time?->toDateTimeString(),
+                        'start_time' => $startTime->toDateTimeString(),
                     ];
                     $statusGroups['scheduled']['count']++;
+                    continue;
                 }
+
+                $statusGroups['idle']['machines'][] = [
+                    'id' => $machine->id,
+                    'name' => $machine->name,
+                    'asset_id' => $machine->assetId,
+                    'status' => 'idle',
+                ];
+                $statusGroups['idle']['count']++;
             }
 
             // Sort machines by priority within each status group

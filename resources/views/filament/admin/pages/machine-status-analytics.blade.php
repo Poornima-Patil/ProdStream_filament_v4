@@ -34,7 +34,140 @@
             return '<svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>';
         }
     };
+
+    $statusOrder = ['running', 'setup', 'hold', 'scheduled', 'idle'];
+
+    $statusStyles = [
+        'running' => [
+            'card' => 'bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800',
+            'icon' => 'heroicon-o-play-circle',
+            'icon_class' => 'text-green-600 dark:text-green-400',
+            'wo_class' => 'text-green-700 dark:text-green-300',
+        ],
+        'hold' => [
+            'card' => 'bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800',
+            'icon' => 'heroicon-o-pause-circle',
+            'icon_class' => 'text-yellow-600 dark:text-yellow-400',
+            'wo_class' => 'text-yellow-700 dark:text-yellow-300',
+        ],
+        'setup' => [
+            'card' => 'bg-violet-50 dark:bg-violet-900/20 border-2 border-violet-200 dark:border-violet-800',
+            'icon' => 'heroicon-o-wrench-screwdriver',
+            'icon_class' => 'text-violet-600 dark:text-violet-400',
+            'wo_class' => 'text-violet-700 dark:text-violet-300',
+        ],
+        'scheduled' => [
+            'card' => 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800',
+            'icon' => 'heroicon-o-clock',
+            'icon_class' => 'text-blue-600 dark:text-blue-400',
+            'wo_class' => 'text-blue-700 dark:text-blue-300',
+        ],
+        'idle' => [
+            'card' => 'bg-gray-50 dark:bg-gray-900/20 border-2 border-gray-200 dark:border-gray-700',
+            'icon' => 'heroicon-o-minus-circle',
+            'icon_class' => 'text-gray-600 dark:text-gray-400',
+            'wo_class' => 'text-gray-600 dark:text-gray-300',
+        ],
+    ];
+
+    $buildMatrixMachines = function ($snapshot) use ($statusOrder) {
+        return collect($statusOrder)->flatMap(function ($status) use ($snapshot) {
+            return collect($snapshot[$status]['machines'] ?? [])->map(function ($machine) use ($status) {
+                $machine['__status'] = $status;
+
+                return $machine;
+            });
+        });
+    };
+
+    $primarySnapshot = $primaryPeriod['status_snapshot'] ?? [];
+    $primaryMatrixMachines = $buildMatrixMachines($primarySnapshot);
+
+    $comparisonSnapshot = $comparisonPeriod['status_snapshot'] ?? [];
+    $comparisonMatrixMachines = $comparisonPeriod
+        ? $buildMatrixMachines($comparisonSnapshot)
+        : collect();
+
+    $primarySnapshotDate = $primaryPeriod['snapshot_date'] ?? null;
+    $comparisonSnapshotDate = $comparisonPeriod['snapshot_date'] ?? null;
+
+    $primaryDonutData = [
+        'labels' => ['Running', 'Setup', 'Hold', 'Scheduled', 'Idle'],
+        'values' => [
+            round($summary['avg_running_pct'] ?? 0, 1),
+            round($summary['avg_setup_pct'] ?? 0, 1),
+            round($summary['avg_hold_pct'] ?? 0, 1),
+            round($summary['avg_scheduled_pct'] ?? 0, 1),
+            round($summary['avg_idle_pct'] ?? 0, 1),
+        ],
+    ];
+
+    $comparisonDonutData = $comparisonPeriod
+        ? [
+            'labels' => ['Running', 'Setup', 'Hold', 'Scheduled', 'Idle'],
+            'values' => [
+                round($comparisonPeriod['summary']['avg_running_pct'] ?? 0, 1),
+                round($comparisonPeriod['summary']['avg_setup_pct'] ?? 0, 1),
+                round($comparisonPeriod['summary']['avg_hold_pct'] ?? 0, 1),
+                round($comparisonPeriod['summary']['avg_scheduled_pct'] ?? 0, 1),
+                round($comparisonPeriod['summary']['avg_idle_pct'] ?? 0, 1),
+            ],
+        ]
+        : null;
+
+    $trendLabels = collect($dailyBreakdown)
+        ->map(fn ($day) => \Carbon\Carbon::parse($day['date'])->format('M d'))
+        ->toArray();
+
+    $buildTrendSeries = function (array $breakdown) {
+        $statuses = ['running', 'setup', 'hold', 'scheduled', 'idle'];
+
+        $series = [];
+
+        foreach ($statuses as $status) {
+            $series[$status] = collect($breakdown)->map(function ($day) use ($status) {
+                $total = $day['total_machines'] ?? 0;
+                $value = $day[$status] ?? 0;
+
+                return $total > 0
+                    ? round(($value / $total) * 100, 1)
+                    : 0;
+            })->toArray();
+        }
+
+        return $series;
+    };
+
+    $primaryTrendSeries = $buildTrendSeries($dailyBreakdown);
+    $comparisonTrendSeries = $comparisonPeriod
+        ? $buildTrendSeries($comparisonPeriod['daily_breakdown'] ?? [])
+        : null;
 @endphp
+
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">KPI Analytics Dashboard - ProdStream</h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+            Historical machine status performance based on the selected time period.
+        </p>
+    </div>
+    <button
+        type="button"
+        wire:click="toggleAnalyticsSection('overview')"
+        aria-expanded="{{ $analyticsOverviewExpanded ? 'true' : 'false' }}"
+        aria-controls="kpi-analytics-overview"
+        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+    >
+        <span>{{ $analyticsOverviewExpanded ? 'Collapse' : 'Expand' }}</span>
+        <x-dynamic-component
+            :component="$analyticsOverviewExpanded ? 'heroicon-o-chevron-up' : 'heroicon-o-chevron-down'"
+            class="w-5 h-5"
+        />
+    </button>
+</div>
+
+<div id="kpi-analytics-overview">
+@if($analyticsOverviewExpanded)
 
 {{-- Period Header --}}
 <div class="mb-6">
@@ -216,6 +349,281 @@
                 </div>
             @endif
         </div>
+    </x-filament::card>
+</div>
+
+{{-- Distribution Visualizations --}}
+<div class="space-y-6 mb-6">
+    {{-- Donut Charts --}}
+    <div class="grid grid-cols-1 gap-6 {{ $comparisonPeriod ? 'md:grid-cols-2' : '' }}">
+        <x-filament::card>
+            <button
+                type="button"
+                wire:click="toggleAnalyticsSection('donut')"
+                aria-expanded="{{ $analyticsDonutExpanded ? 'true' : 'false' }}"
+                aria-controls="analytics-donut-primary"
+                class="w-full flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700 text-left hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                        Machine Status Breakdown – {{ $primaryPeriod['label'] }}
+                    </h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                        Average share of machines by status ({{ $primaryPeriod['start_date'] }} → {{ $primaryPeriod['end_date'] }})
+                    </p>
+                </div>
+                <x-dynamic-component
+                    :component="$analyticsDonutExpanded ? 'heroicon-o-chevron-up' : 'heroicon-o-chevron-down'"
+                    class="w-5 h-5 text-gray-500 dark:text-gray-400"
+                />
+            </button>
+
+            @if($analyticsDonutExpanded)
+                <div
+                    id="analytics-donut-primary"
+                    class="mt-6 h-80"
+                    wire:key="analytics-donut-primary-{{ md5(json_encode($primaryDonutData) . $primaryPeriod['label']) }}"
+                    x-data="machineStatusAnalyticsDonut({
+                        chartId: 'primary',
+                        labels: @js($primaryDonutData['labels']),
+                        data: @js($primaryDonutData['values']),
+                    })"
+                >
+                    <canvas x-ref="canvas" class="w-full h-full" wire:ignore></canvas>
+                </div>
+                <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                    Based on {{ $summary['days_analyzed'] }} day average ({{ $summary['total_machines'] }} machines analysed).
+                </p>
+            @endif
+        </x-filament::card>
+
+        @if($comparisonPeriod)
+            <x-filament::card>
+                <button
+                    type="button"
+                    wire:click="toggleAnalyticsSection('donutComparison')"
+                    aria-expanded="{{ $analyticsDonutComparisonExpanded ? 'true' : 'false' }}"
+                    aria-controls="analytics-donut-comparison"
+                    class="w-full flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700 text-left hover:text-gray-900 dark:hover:text-white transition-colors"
+                >
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                            Machine Status Breakdown – {{ $comparisonPeriod['label'] }}
+                        </h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                            Average share of machines by status ({{ $comparisonPeriod['start_date'] }} → {{ $comparisonPeriod['end_date'] }})
+                        </p>
+                    </div>
+                    <x-dynamic-component
+                        :component="$analyticsDonutComparisonExpanded ? 'heroicon-o-chevron-up' : 'heroicon-o-chevron-down'"
+                        class="w-5 h-5 text-gray-500 dark:text-gray-400"
+                    />
+                </button>
+
+                @if($analyticsDonutComparisonExpanded)
+                    <div
+                        id="analytics-donut-comparison"
+                        class="mt-6 h-80"
+                        wire:key="analytics-donut-comparison-{{ md5(json_encode($comparisonDonutData) . $comparisonPeriod['label']) }}"
+                        x-data="machineStatusAnalyticsDonut({
+                            chartId: 'comparison',
+                            labels: @js($comparisonDonutData['labels']),
+                            data: @js($comparisonDonutData['values']),
+                        })"
+                    >
+                        <canvas x-ref="canvas" class="w-full h-full" wire:ignore></canvas>
+                    </div>
+                    <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                        Comparison window normalised across {{ $summary['days_analyzed'] }} days for side-by-side review.
+                    </p>
+                @endif
+            </x-filament::card>
+        @endif
+    </div>
+
+    {{-- Machine Matrices --}}
+    <div class="space-y-6">
+        <x-filament::card>
+            <button
+                type="button"
+                wire:click="toggleAnalyticsSection('matrix')"
+                aria-expanded="{{ $analyticsMatrixExpanded ? 'true' : 'false' }}"
+                aria-controls="analytics-matrix-primary"
+                class="w-full flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700 text-left hover:text-gray-900 dark:hover:text-white transition-colors"
+            >
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                        Machine Status Matrix – {{ $primaryPeriod['label'] }}
+                    </h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                        Snapshot captured on {{ $primarySnapshotDate ? \Carbon\Carbon::parse($primarySnapshotDate)->format('M d, Y') : 'N/A' }} using selected analytics filters.
+                    </p>
+                </div>
+                <span class="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+                    {{ $primaryPeriod['snapshot_total_machines'] ?? $summary['total_machines'] ?? 0 }} Machines
+                    <x-dynamic-component
+                        :component="$analyticsMatrixExpanded ? 'heroicon-o-chevron-up' : 'heroicon-o-chevron-down'"
+                        class="w-5 h-5 text-gray-500 dark:text-gray-400"
+                    />
+                </span>
+            </button>
+
+            @if($analyticsMatrixExpanded)
+                <div id="analytics-matrix-primary" class="mt-6">
+                    @if($primaryMatrixMachines->isEmpty())
+                        <div class="py-8 text-center border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
+                            <p class="text-sm text-gray-500 dark:text-gray-400">
+                                No machine snapshot data available for this period.
+                            </p>
+                        </div>
+                    @else
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            @foreach($primaryMatrixMachines as $machine)
+                                @php
+                                    $statusKey = $machine['__status'] ?? 'idle';
+                                    $styles = $statusStyles[$statusKey] ?? $statusStyles['idle'];
+                                    $woNumber = $machine['wo_number'] ?? null;
+                                    $woDisplay = $woNumber ? \Illuminate\Support\Str::limit($woNumber, 14) : null;
+                                @endphp
+                                <a
+                                    href="{{ \App\Filament\Admin\Resources\MachineResource::getUrl('view', ['record' => $machine['id']]) }}"
+                                    wire:navigate
+                                    wire:key="analytics-matrix-primary-{{ $statusKey }}-{{ $machine['id'] }}"
+                                    class="{{ $styles['card'] }} rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer"
+                                >
+                                    <div class="flex flex-col items-center text-center space-y-2">
+                                        <x-dynamic-component :component="$styles['icon']" class="w-8 h-8 {{ $styles['icon_class'] }}" />
+                                        <div class="text-sm font-semibold text-gray-900 dark:text-white">
+                                            {{ $machine['name'] ?? 'Unnamed Machine' }}
+                                        </div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">
+                                            {{ $machine['asset_id'] ?? 'N/A' }}
+                                        </div>
+                                        @if($woNumber)
+                                            <div class="text-xs font-mono {{ $styles['wo_class'] }}" title="{{ $woNumber }}">
+                                                {{ $woDisplay }}
+                                            </div>
+                                        @endif
+                                    </div>
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+            @endif
+        </x-filament::card>
+
+        @if($comparisonPeriod)
+            <x-filament::card>
+                <button
+                    type="button"
+                    wire:click="toggleAnalyticsSection('matrixComparison')"
+                    aria-expanded="{{ $analyticsMatrixComparisonExpanded ? 'true' : 'false' }}"
+                    aria-controls="analytics-matrix-comparison"
+                    class="w-full flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700 text-left hover:text-gray-900 dark:hover:text-white transition-colors"
+                >
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                            Machine Status Matrix – {{ $comparisonPeriod['label'] }}
+                        </h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                            Snapshot captured on {{ $comparisonSnapshotDate ? \Carbon\Carbon::parse($comparisonSnapshotDate)->format('M d, Y') : 'N/A' }} for the comparison window.
+                        </p>
+                    </div>
+                    <span class="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
+                        {{ $comparisonPeriod['snapshot_total_machines'] ?? ($comparisonPeriod['summary']['total_machines'] ?? 0) }} Machines
+                        <x-dynamic-component
+                            :component="$analyticsMatrixComparisonExpanded ? 'heroicon-o-chevron-up' : 'heroicon-o-chevron-down'"
+                            class="w-5 h-5 text-gray-500 dark:text-gray-400"
+                        />
+                    </span>
+                </button>
+
+                @if($analyticsMatrixComparisonExpanded)
+                    <div id="analytics-matrix-comparison" class="mt-6">
+                        @if($comparisonMatrixMachines->isEmpty())
+                            <div class="py-8 text-center border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
+                                <p class="text-sm text-gray-500 dark:text-gray-400">
+                                    No machine snapshot data available for the comparison period.
+                                </p>
+                            </div>
+                        @else
+                            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                @foreach($comparisonMatrixMachines as $machine)
+                                    @php
+                                        $statusKey = $machine['__status'] ?? 'idle';
+                                        $styles = $statusStyles[$statusKey] ?? $statusStyles['idle'];
+                                        $woNumber = $machine['wo_number'] ?? null;
+                                        $woDisplay = $woNumber ? \Illuminate\Support\Str::limit($woNumber, 14) : null;
+                                    @endphp
+                                    <a
+                                        href="{{ \App\Filament\Admin\Resources\MachineResource::getUrl('view', ['record' => $machine['id']]) }}"
+                                        wire:navigate
+                                        wire:key="analytics-matrix-comparison-{{ $statusKey }}-{{ $machine['id'] }}"
+                                        class="{{ $styles['card'] }} rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer"
+                                    >
+                                        <div class="flex flex-col items-center text-center space-y-2">
+                                            <x-dynamic-component :component="$styles['icon']" class="w-8 h-8 {{ $styles['icon_class'] }}" />
+                                            <div class="text-sm font-semibold text-gray-900 dark:text-white">
+                                                {{ $machine['name'] ?? 'Unnamed Machine' }}
+                                            </div>
+                                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                                                {{ $machine['asset_id'] ?? 'N/A' }}
+                                            </div>
+                                            @if($woNumber)
+                                                <div class="text-xs font-mono {{ $styles['wo_class'] }}" title="{{ $woNumber }}">
+                                                    {{ $woDisplay }}
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </a>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                @endif
+            </x-filament::card>
+        @endif
+    </div>
+
+    {{-- Trend Line --}}
+    <x-filament::card>
+        <button
+            type="button"
+            wire:click="toggleAnalyticsSection('trend')"
+            aria-expanded="{{ $analyticsTrendExpanded ? 'true' : 'false' }}"
+            aria-controls="analytics-trend-panel"
+            class="w-full flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700 text-left hover:text-gray-900 dark:hover:text-white transition-colors"
+        >
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                    Status Trend Over Time
+                </h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Daily percentage of machines in each status across the selected period{{ $comparisonPeriod ? ' with comparison overlay' : '' }}.
+                </p>
+            </div>
+            <x-dynamic-component
+                :component="$analyticsTrendExpanded ? 'heroicon-o-chevron-up' : 'heroicon-o-chevron-down'"
+                class="w-5 h-5 text-gray-500 dark:text-gray-400"
+            />
+        </button>
+
+        @if($analyticsTrendExpanded)
+            <div
+                id="analytics-trend-panel"
+                class="mt-6 h-96"
+                wire:key="analytics-trend-{{ md5(json_encode([$trendLabels, $primaryTrendSeries, $comparisonTrendSeries])) }}"
+                x-data="machineStatusAnalyticsTrend({
+                    labels: @js($trendLabels),
+                    primarySeries: @js($primaryTrendSeries),
+                    comparisonSeries: @js($comparisonTrendSeries),
+                    comparisonEnabled: {{ $comparisonPeriod ? 'true' : 'false' }},
+                })"
+            >
+                <canvas x-ref="canvas" class="w-full h-full" wire:ignore></canvas>
+            </div>
+        @endif
     </x-filament::card>
 </div>
 
@@ -559,3 +967,5 @@
         </div>
     </x-filament::card>
 @endif
+@endif
+</div>

@@ -6,6 +6,8 @@ use App\Models\Factory;
 use App\Models\KPI\MachineDaily;
 use App\Models\KPI\MachineStatusDaily;
 use App\Models\Machine;
+use App\Models\WorkOrder;
+use App\Models\WorkOrderLog;
 use Carbon\Carbon;
 
 class OperationalKPIService extends BaseKPIService
@@ -37,6 +39,8 @@ class OperationalKPIService extends BaseKPIService
             // Fetch primary period data
             $primaryData = $this->fetchMachineStatusDistribution($startDate, $endDate);
 
+            $primarySnapshot = $this->calculateMachineStatusForDate($endDate->copy(), true);
+
             $result = [
                 'primary_period' => [
                     'start_date' => $startDate->toDateString(),
@@ -44,6 +48,9 @@ class OperationalKPIService extends BaseKPIService
                     'label' => $this->getPeriodLabel($options['time_period'] ?? 'yesterday', $startDate, $endDate),
                     'daily_breakdown' => $primaryData['daily'],
                     'summary' => $primaryData['summary'],
+                    'status_snapshot' => $primarySnapshot['status_groups'] ?? [],
+                    'snapshot_total_machines' => $primarySnapshot['total_machines'] ?? 0,
+                    'snapshot_date' => $endDate->toDateString(),
                 ],
             ];
 
@@ -52,6 +59,7 @@ class OperationalKPIService extends BaseKPIService
                 [$compStart, $compEnd] = $this->getComparisonDateRange($startDate, $endDate, $comparisonType);
 
                 $comparisonData = $this->fetchMachineStatusDistribution($compStart, $compEnd);
+                $comparisonSnapshot = $this->calculateMachineStatusForDate($compEnd->copy(), true);
 
                 $result['comparison_period'] = [
                     'start_date' => $compStart->toDateString(),
@@ -59,6 +67,9 @@ class OperationalKPIService extends BaseKPIService
                     'label' => $this->getPeriodLabel($comparisonType, $compStart, $compEnd),
                     'daily_breakdown' => $comparisonData['daily'],
                     'summary' => $comparisonData['summary'],
+                    'status_snapshot' => $comparisonSnapshot['status_groups'] ?? [],
+                    'snapshot_total_machines' => $comparisonSnapshot['total_machines'] ?? 0,
+                    'snapshot_date' => $compEnd->toDateString(),
                 ];
 
                 $result['comparison_analysis'] = $this->calculateStatusDistributionComparison(
@@ -164,36 +175,157 @@ class OperationalKPIService extends BaseKPIService
         ];
     }
 
-    protected function calculateMachineStatusForDate(Carbon $date): array
+    protected function calculateMachineStatusForDate(Carbon $date, bool $returnDetails = false): array
     {
         $dayStart = $date->copy()->startOfDay();
         $dayEnd = $date->copy()->endOfDay();
+        $machines = Machine::where('factory_id', $this->factory->id)
+            ->get(['id', 'name', 'assetId']);
+        $totalMachines = $machines->count();
 
-        $totalMachines = Machine::where('factory_id', $this->factory->id)->count();
-
-        $workOrders = \App\Models\WorkOrder::where('factory_id', $this->factory->id)
-            ->where(function ($query) use ($dayStart, $dayEnd) {
-                $query->whereIn('status', ['Start', 'Setup', 'Hold'])
-                    ->orWhere(function ($scheduledQuery) use ($dayStart, $dayEnd) {
-                        $scheduledQuery->whereIn('status', ['Assigned', 'Completed'])
-                            ->whereBetween('start_time', [$dayStart, $dayEnd]);
-                    });
+        $logGroups = WorkOrderLog::whereHas('workOrder', function ($query) {
+                $query->where('factory_id', $this->factory->id);
             })
-            ->get(['id', 'machine_id', 'status']);
+            ->where('changed_at', '<=', $dayEnd)
+            ->with(['workOrder' => function ($query) {
+                $query->select(
+                    'id',
+                    'machine_id',
+                    'status',
+                    'start_time',
+                    'end_time',
+                    'updated_at',
+                    'created_at',
+                    'unique_id'
+                );
+            }])
+            ->orderBy('changed_at', 'desc')
+            ->get()
+            ->groupBy(fn ($log) => $log->workOrder?->machine_id);
 
-        $runningMachines = $workOrders->where('status', 'Start')->pluck('machine_id')->unique()->count();
-        $setupMachines = $workOrders->where('status', 'Setup')->pluck('machine_id')->unique()->count();
-        $holdMachines = $workOrders->where('status', 'Hold')->pluck('machine_id')->unique()->count();
-        $scheduledMachines = $workOrders->where('status', 'Assigned')->pluck('machine_id')->unique()->count();
-        $machinesWithWork = $workOrders->pluck('machine_id')->unique()->count();
-        $idleMachines = max($totalMachines - $machinesWithWork, 0);
+        $latestOrders = WorkOrder::where('factory_id', $this->factory->id)
+            ->where(function ($query) use ($dayEnd) {
+                $query->whereNull('updated_at')
+                    ->orWhere('updated_at', '<=', $dayEnd);
+            })
+            ->orderByRaw('COALESCE(updated_at, created_at) DESC')
+            ->select(
+                'id',
+                'machine_id',
+                'status',
+                'start_time',
+                'end_time',
+                'updated_at',
+                'created_at',
+                'unique_id'
+            )
+            ->get()
+            ->groupBy('machine_id');
+
+        $counts = [
+            'hold' => 0,
+            'setup' => 0,
+            'running' => 0,
+            'scheduled' => 0,
+            'idle' => 0,
+        ];
+
+        $statusGroups = [];
+
+        if ($returnDetails) {
+            $statusGroups = [
+                'running' => ['count' => 0, 'machines' => []],
+                'hold' => ['count' => 0, 'machines' => []],
+                'setup' => ['count' => 0, 'machines' => []],
+                'scheduled' => ['count' => 0, 'machines' => []],
+                'idle' => ['count' => 0, 'machines' => []],
+            ];
+        }
+
+        foreach ($machines as $machine) {
+            $machineId = $machine->id;
+            $status = null;
+            $startTime = null;
+
+            if ($logGroups->has($machineId)) {
+                $log = $logGroups[$machineId]->first();
+                if ($log && $log->workOrder) {
+                    $status = $log->status;
+                    $startTime = $log->workOrder->start_time
+                        ? Carbon::parse($log->workOrder->start_time)
+                        : null;
+                }
+            } elseif ($latestOrders->has($machineId)) {
+                $wo = $latestOrders[$machineId]->first();
+                $status = $wo->status;
+                $startTime = $wo->start_time
+                    ? Carbon::parse($wo->start_time)
+                    : null;
+            }
+
+            $bucket = 'idle';
+
+            $machineWorkOrder = $latestOrders->has($machineId)
+                ? $latestOrders[$machineId]->first()
+                : null;
+
+            if ($logGroups->has($machineId)) {
+                $log = $logGroups[$machineId]->first();
+                if ($log && $log->workOrder) {
+                    $machineWorkOrder = $log->workOrder;
+                }
+            }
+
+            switch ($status) {
+                case 'Hold':
+                    $bucket = 'hold';
+                    break;
+                case 'Setup':
+                    $bucket = 'setup';
+                    break;
+                case 'Start':
+                    $bucket = 'running';
+                    break;
+                case 'Assigned':
+                    $bucket = ($startTime && $startTime->isBetween($dayStart, $dayEnd))
+                        ? 'scheduled'
+                        : 'idle';
+                    break;
+            }
+
+            $counts[$bucket]++;
+
+            if ($returnDetails) {
+                $statusGroups[$bucket]['machines'][] = [
+                    'id' => $machine->id,
+                    'name' => $machine->name,
+                    'asset_id' => $machine->assetId ?? null,
+                    'status' => $bucket,
+                    'wo_number' => $machineWorkOrder?->unique_id ?? null,
+                    'wo_id' => $machineWorkOrder?->id,
+                    'start_time' => $machineWorkOrder?->start_time?->toDateTimeString(),
+                    'end_time' => $machineWorkOrder?->end_time?->toDateTimeString(),
+                ];
+            }
+        }
+
+        if ($returnDetails) {
+            foreach ($statusGroups as $statusKey => &$group) {
+                $group['count'] = $counts[$statusKey];
+            }
+
+            return [
+                'status_groups' => $statusGroups,
+                'total_machines' => $totalMachines,
+            ];
+        }
 
         return [
-            'running' => $runningMachines,
-            'setup' => $setupMachines,
-            'hold' => $holdMachines,
-            'scheduled' => $scheduledMachines,
-            'idle' => $idleMachines,
+            'running' => $counts['running'],
+            'setup' => $counts['setup'],
+            'hold' => $counts['hold'],
+            'scheduled' => $counts['scheduled'],
+            'idle' => $counts['idle'],
             'total_machines' => $totalMachines,
         ];
     }

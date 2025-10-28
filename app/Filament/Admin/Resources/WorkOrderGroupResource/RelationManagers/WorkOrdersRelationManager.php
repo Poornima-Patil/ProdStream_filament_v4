@@ -610,10 +610,6 @@ class WorkOrdersRelationManager extends RelationManager
                 CreateAction::make()
                     ->label('Create Work Order')
                     ->mutateFormDataUsing(function (array $data): array {
-                        // Generate unique_id using same logic as CreateWorkOrder
-                        $currentDate = Carbon::now();
-                        $dateFormat = $currentDate->format('mdy'); // MMDDYY format
-
                         // Get the related Bom's unique_id
                         $bom = Bom::find($data['bom_id']);
                         $bomUniqueId = $bom ? $bom->unique_id : 'UNKNOWN';
@@ -621,25 +617,7 @@ class WorkOrdersRelationManager extends RelationManager
                         // Get factory_id from the work order group
                         $factoryId = $this->getOwnerRecord()->factory_id;
 
-                        // Get the latest WorkOrder for this specific factory to determine the next sequential number
-                        $lastWorkOrder = WorkOrder::withTrashed()
-                            ->where('factory_id', $factoryId) // Filter by factory
-                            ->whereDate('created_at', 'like', $currentDate->format('Y-m').'%')
-                            ->orderByDesc('unique_id')
-                            ->first();
-
-                        // Generate the sequence number (reset to 1 if no record is found for the current month)
-                        $sequenceNumber = 1;
-                        if ($lastWorkOrder) {
-                            // Extract the current sequence number from the last unique_id (WXXXX)
-                            $sequenceNumber = (int) substr($lastWorkOrder->unique_id, 1, 4) + 1;
-                        }
-
-                        // Pad the sequence number to 4 digits (e.g., 0001, 0002, ...)
-                        $sequenceNumber = str_pad($sequenceNumber, 4, '0', STR_PAD_LEFT);
-
-                        // Generate unique_id format: WXXXX_MMDDYY_BOMUNIQUE_ID
-                        $data['unique_id'] = 'W'.$sequenceNumber.'_'.$dateFormat.'_'.$bomUniqueId;
+                        $data['unique_id'] = WorkOrder::generateUniqueId($factoryId, $bomUniqueId);
 
                         // Set the work order group relationship and factory
                         $data['work_order_group_id'] = $this->getOwnerRecord()->id;

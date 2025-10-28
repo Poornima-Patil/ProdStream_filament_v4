@@ -14,8 +14,17 @@ class CustomerInformationTableSeeder extends Seeder
         $faker = app(Generator::class);
         $factoryId = env('SEED_FACTORY_ID', 1);
         $customerCount = env('SEED_CUSTOMER_COUNT', 5); // Default to 5 if not set
-        $startDate = Carbon::parse(env('SEED_WORK_START_DATE', now()->startOfMonth()));
-        $endDate = $startDate->copy()->addDays(14); // 15 days including start
+
+        $startDate = Carbon::parse(
+            env('SEED_CUSTOMER_START_DATE', now()->subMonths(3)->startOfMonth())
+        );
+        $endDate = Carbon::parse(
+            env('SEED_CUSTOMER_END_DATE', now())
+        );
+
+        if ($endDate->lt($startDate)) {
+            $endDate = $startDate->copy()->addDays(14);
+        }
 
         // Find the last customer_id globally (across all factories) to ensure uniqueness
         $lastCustomer = DB::table('customer_information')

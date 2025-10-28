@@ -36,6 +36,13 @@ class WorkOrder extends Model
         'dependency_metadata',
     ];
 
+    /**
+     * Cache sequence counters per factory/month during a single request.
+     *
+     * @var array<string, int>
+     */
+    protected static array $sequenceCache = [];
+
     protected function casts(): array
     {
         return [
@@ -378,6 +385,51 @@ class WorkOrder extends Model
             'next_cursor' => $nextCursor,
             'has_more' => $nextCursor !== null,
         ];
+    }
+
+    /**
+     * Generate the next unique work order identifier following the application convention.
+     */
+    public static function generateUniqueId(int $factoryId, string $bomUniqueId, ?Carbon $currentDate = null): string
+    {
+        $currentDate ??= Carbon::now();
+
+        $cacheKey = sprintf('%s-%s', $factoryId, $currentDate->format('Y-m'));
+
+        if (! array_key_exists($cacheKey, self::$sequenceCache)) {
+            $lastWorkOrder = self::withTrashed()
+                ->where('factory_id', $factoryId)
+                ->whereBetween('created_at', [
+                    $currentDate->copy()->startOfMonth(),
+                    $currentDate->copy()->endOfMonth(),
+                ])
+                ->orderByDesc('unique_id')
+                ->first();
+
+            self::$sequenceCache[$cacheKey] = self::extractSequenceNumber($lastWorkOrder?->unique_id);
+        }
+
+        self::$sequenceCache[$cacheKey]++;
+
+        $sequenceNumber = str_pad((string) self::$sequenceCache[$cacheKey], 4, '0', STR_PAD_LEFT);
+
+        return sprintf('W%s_%s_%s', $sequenceNumber, $currentDate->format('mdy'), $bomUniqueId);
+    }
+
+    /**
+     * Extract the numeric sequence from an existing work order unique identifier.
+     */
+    protected static function extractSequenceNumber(?string $uniqueId): int
+    {
+        if (! $uniqueId) {
+            return 0;
+        }
+
+        if (preg_match('/^W(\d{4})_/', $uniqueId, $matches)) {
+            return (int) $matches[1];
+        }
+
+        return 0;
     }
 
     protected static function booted()

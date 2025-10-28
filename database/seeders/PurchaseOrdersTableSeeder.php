@@ -12,6 +12,16 @@ class PurchaseOrdersTableSeeder extends Seeder
     public function run(): void
     {
         $factoryId = env('SEED_FACTORY_ID', 1);
+        $startDate = Carbon::parse(
+            env('SEED_PO_START_DATE', now()->subMonths(3)->startOfMonth())
+        );
+        $endDate = Carbon::parse(
+            env('SEED_PO_END_DATE', now()->endOfMonth())
+        );
+
+        if ($endDate->lt($startDate)) {
+            $endDate = $startDate->copy()->addMonth();
+        }
         $customers = DB::table('customer_information')->where('factory_id', $factoryId)->get();
         $partNumbers = DB::table('part_numbers')->where('factory_id', $factoryId)->get();
 
@@ -41,7 +51,9 @@ class PurchaseOrdersTableSeeder extends Seeder
                 $qty = 20000;
                 $cycleTime = $part->cycle_time;
 
-                $purchaseOrderCreatedAt = Carbon::parse($customer->created_at)->addDays(2);
+            $purchaseOrderCreatedAt = Carbon::instance(
+                fake()->dateTimeBetween($startDate, $endDate)
+            );
 
                 $purchaseOrders->push([
                     'customer' => $customer,
@@ -93,7 +105,8 @@ class PurchaseOrdersTableSeeder extends Seeder
             $serial = str_pad($poIndex++, 4, '0', STR_PAD_LEFT);
             $uniqueId = 'S' . $serial . '_' . $monthYear . '_' . $customer->customer_id . '_' . $part->partnumber . '_' . $part->revision;
 
-            $deliveryTargetDate = Carbon::parse($customer->created_at)
+            $deliveryTargetDate = $purchaseOrderCreatedAt
+                ->copy()
                 ->addSeconds($qty * $cycleTime)
                 ->addDays(4)
                 ->toDateString();

@@ -1,4 +1,8 @@
 <x-filament-panels::page>
+    @once
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    @endonce
+
     {{-- Hub View: Category Cards --}}
     @if($viewMode === 'hub')
         <div class="space-y-6">
@@ -254,6 +258,190 @@
                                     @endif
                                 </div>
                             </div>
+
+                            @php
+                                $donutChartId = 'machine-status-donut';
+                                $donutSeries = [
+                                    (int) ($data['status_groups']['running']['count'] ?? 0),
+                                    (int) ($data['status_groups']['setup']['count'] ?? 0),
+                                    (int) ($data['status_groups']['hold']['count'] ?? 0),
+                                    (int) ($data['status_groups']['scheduled']['count'] ?? 0),
+                                    (int) ($data['status_groups']['idle']['count'] ?? 0),
+                                ];
+                                $donutLabels = ['Running', 'Setup', 'Hold', 'Scheduled', 'Idle'];
+                                $totalMachines = array_sum($donutSeries);
+                            @endphp
+
+                            {{-- Debug Info - Remove after testing --}}
+                            <div class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                                <p class="text-sm font-semibold text-blue-900 dark:text-blue-100">Debug Info:</p>
+                                <p class="text-xs text-blue-800 dark:text-blue-200">Chart Data: {{ json_encode($donutSeries) }}</p>
+                                <p class="text-xs text-blue-800 dark:text-blue-200">Total Machines: {{ $totalMachines }}</p>
+                                <p class="text-xs text-blue-800 dark:text-blue-200">Canvas ID: {{ $donutChartId }}</p>
+                            </div>
+
+                            <x-filament::card class="mb-6">
+                                <button
+                                    type="button"
+                                    wire:click="toggleStatusChart"
+                                    aria-expanded="{{ $statusChartExpanded ? 'true' : 'false' }}"
+                                    aria-controls="machine-status-chart-panel"
+                                    class="w-full flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700 text-left hover:text-gray-900 dark:hover:text-white transition-colors"
+                                >
+                                    <div>
+                                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Machine Status Breakdown</h3>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">Visual distribution of live machine states</p>
+                                    </div>
+                                    <x-dynamic-component
+                                        :component="$statusChartExpanded ? 'heroicon-o-chevron-up' : 'heroicon-o-chevron-down'"
+                                        class="w-5 h-5 text-gray-500 dark:text-gray-400"
+                                    />
+                                </button>
+
+                                @if($statusChartExpanded)
+                                    <div id="machine-status-chart-panel" class="mt-6">
+                                        <div class="w-full bg-gray-100 dark:bg-gray-800 rounded p-6" style="height: 450px;"
+                                             wire:key="chart-container-{{ md5(json_encode($donutSeries)) }}"
+                                             x-data="{
+                                                 chartData: @js($donutSeries),
+                                                 chartLabels: @js($donutLabels),
+                                                 init() {
+                                                     console.log('🎬 Chart Alpine initialized with:', this.chartData, this.chartLabels);
+                                                     this.$nextTick(() => {
+                                                         this.updateChart();
+                                                     });
+                                                 },
+                                                 updateChart() {
+                                                     console.log('📊 updateChart called with:', this.chartData, this.chartLabels);
+                                                     if (window.updateMachineStatusChartData) {
+                                                         window.updateMachineStatusChartData(this.chartData, this.chartLabels);
+                                                     }
+                                                 }
+                                             }">
+                                            <div wire:ignore.self style="height: 100%; width: 100%;">
+                                                <canvas id="{{ $donutChartId }}" wire:ignore></canvas>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endif
+                            </x-filament::card>
+
+                            {{-- Machine Status Matrix --}}
+                            <x-filament::card class="mb-6">
+                                <button
+                                    type="button"
+                                    wire:click="toggleMatrixSection"
+                                    aria-expanded="{{ $matrixExpanded ? 'true' : 'false' }}"
+                                    aria-controls="machine-status-matrix-panel"
+                                    class="w-full flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700 text-left hover:text-gray-900 dark:hover:text-white transition-colors"
+                                >
+                                    <div>
+                                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Machine Status Matrix</h3>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">Color-coded overview of all machines</p>
+                                    </div>
+                                    <x-dynamic-component
+                                        :component="$matrixExpanded ? 'heroicon-o-chevron-up' : 'heroicon-o-chevron-down'"
+                                        class="w-5 h-5 text-gray-500 dark:text-gray-400"
+                                    />
+                                </button>
+                                <div id="machine-status-matrix-panel" class="{{ $matrixExpanded ? 'mt-6' : '' }}">
+                                    @if($matrixExpanded)
+                                        @php
+                                            $statusStyles = [
+                                                'running' => [
+                                                    'card' => 'bg-green-50 dark:bg-green-900/20 border-2 border-green-200 dark:border-green-800',
+                                                    'icon' => 'heroicon-o-play-circle',
+                                                    'icon_class' => 'text-green-600 dark:text-green-400',
+                                                    'wo_class' => 'text-green-700 dark:text-green-300',
+                                                ],
+                                                'hold' => [
+                                                    'card' => 'bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-800',
+                                                    'icon' => 'heroicon-o-pause-circle',
+                                                    'icon_class' => 'text-yellow-600 dark:text-yellow-400',
+                                                    'wo_class' => 'text-yellow-700 dark:text-yellow-300',
+                                                ],
+                                                'setup' => [
+                                                    'card' => 'bg-violet-50 dark:bg-violet-900/20 border-2 border-violet-200 dark:border-violet-800',
+                                                    'icon' => 'heroicon-o-wrench-screwdriver',
+                                                    'icon_class' => 'text-violet-600 dark:text-violet-400',
+                                                    'wo_class' => 'text-violet-700 dark:text-violet-300',
+                                                ],
+                                                'scheduled' => [
+                                                    'card' => 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800',
+                                                    'icon' => 'heroicon-o-clock',
+                                                    'icon_class' => 'text-blue-600 dark:text-blue-400',
+                                                    'wo_class' => 'text-blue-700 dark:text-blue-300',
+                                                ],
+                                                'idle' => [
+                                                    'card' => 'bg-gray-50 dark:bg-gray-900/20 border-2 border-gray-200 dark:border-gray-700',
+                                                    'icon' => 'heroicon-o-minus-circle',
+                                                    'icon_class' => 'text-gray-600 dark:text-gray-400',
+                                                    'wo_class' => 'text-gray-600 dark:text-gray-300',
+                                                ],
+                                            ];
+
+                                            $matrixMachines = collect($data['status_groups'] ?? [])->flatMap(function ($group, $statusKey) {
+                                                return collect($group['machines'] ?? [])->map(function ($machine) use ($statusKey) {
+                                                    $machine['__status'] = $statusKey;
+
+                                                    return $machine;
+                                                });
+                                            })->values();
+                                        @endphp
+
+                                        <div
+                                            wire:key="machine-status-matrix-{{ md5(json_encode([$searchQuery, $statusFilter, array_map(fn ($group) => $group['count'] ?? 0, $data['status_groups'] ?? [])])) }}"
+                                        >
+                                            @if($matrixMachines->isEmpty())
+                                                <div class="py-8 text-center border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
+                                                    <p class="text-sm text-gray-500 dark:text-gray-400">No machines match the current filters.</p>
+                                                </div>
+                                            @else
+                                                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                                    @foreach($matrixMachines as $machine)
+                                                        @php
+                                                            $statusKey = $machine['__status'] ?? 'idle';
+                                                            $styles = $statusStyles[$statusKey] ?? [
+                                                                'card' => 'bg-gray-50 dark:bg-gray-900/20 border-2 border-gray-200 dark:border-gray-700',
+                                                                'icon' => 'heroicon-o-question-mark-circle',
+                                                                'icon_class' => 'text-gray-600 dark:text-gray-400',
+                                                                'wo_class' => 'text-gray-600 dark:text-gray-300',
+                                                            ];
+                                                            $woNumber = $machine['wo_number']
+                                                                ?? $machine['primary_wo_number']
+                                                                ?? $machine['current_work_order']
+                                                                ?? $machine['active_work_order']
+                                                                ?? null;
+                                                            $woDisplay = $woNumber ? \Illuminate\Support\Str::limit($woNumber, 14) : null;
+                                                        @endphp
+                                                        <a
+                                                            href="{{ \App\Filament\Admin\Resources\MachineResource::getUrl('view', ['record' => $machine['id']]) }}"
+                                                            wire:navigate
+                                                            wire:key="machine-card-{{ $statusKey }}-{{ $machine['id'] }}"
+                                                            class="{{ $styles['card'] }} rounded-lg p-3 hover:shadow-md transition-shadow cursor-pointer"
+                                                        >
+                                                            <div class="flex flex-col items-center text-center space-y-2">
+                                                                <x-dynamic-component :component="$styles['icon']" class="w-8 h-8 {{ $styles['icon_class'] }}" />
+                                                                <div class="text-sm font-semibold text-gray-900 dark:text-white">
+                                                                    {{ $machine['name'] ?? 'Unnamed Machine' }}
+                                                                </div>
+                                                                <div class="text-xs text-gray-500 dark:text-gray-400">
+                                                                    {{ $machine['asset_id'] ?? 'N/A' }}
+                                                                </div>
+                                                                @if($woNumber)
+                                                                    <div class="text-xs font-mono {{ $styles['wo_class'] }}" title="{{ $woNumber }}">
+                                                                        {{ $woDisplay }}
+                                                                    </div>
+                                                                @endif
+                                                            </div>
+                                                        </a>
+                                                    @endforeach
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endif
+                                </div>
+                            </x-filament::card>
 
                             {{-- Summary Cards at Top --}}
                             <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
@@ -2100,4 +2288,284 @@
             @endif
         </div>
     @endif
+
+    <script>
+        console.log('=== Machine Status Chart Script Loading ===');
+
+        (function() {
+            // Store chart instance globally so it can be accessed across Alpine reinits
+            if (!window.machineStatusChartInstance) {
+                window.machineStatusChartInstance = null;
+            }
+
+            // Expose global function for Alpine.js to call
+            window.updateMachineStatusChartData = function(newData, newLabels) {
+                console.log('🔄 updateMachineStatusChartData called with:', { newData, newLabels });
+
+                const canvas = document.getElementById('machine-status-donut');
+                if (!canvas) {
+                    console.log('❌ Canvas not found');
+                    return;
+                }
+
+                if (typeof Chart === 'undefined') {
+                    console.log('⏳ Chart.js not loaded yet');
+                    return;
+                }
+
+                const colors = ['#16a34a', '#7c3aed', '#f59e0b', '#2563eb', '#6b7280'];
+
+                try {
+                    // Destroy existing chart if it exists
+                    if (window.machineStatusChartInstance) {
+                        console.log('🗑️ Destroying existing chart instance');
+                        window.machineStatusChartInstance.destroy();
+                        window.machineStatusChartInstance = null;
+                    }
+
+                    // Always create a new chart
+                    console.log('🆕 Creating new chart with data:', newData, 'labels:', newLabels);
+                    const ctx = canvas.getContext('2d');
+
+                    window.machineStatusChartInstance = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: newLabels,
+                            datasets: [{
+                                label: 'Machines',
+                                data: newData,
+                                backgroundColor: colors,
+                                borderColor: '#ffffff',
+                                borderWidth: 2,
+                            }],
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        usePointStyle: true,
+                                        padding: 15,
+                                        font: { size: 12 }
+                                    },
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function (context) {
+                                            const label = context.label || '';
+                                            const value = context.raw || 0;
+                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                            return label + ': ' + value + ' machines (' + percentage + '%)';
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    });
+                    console.log('✅ Chart created successfully!');
+                } catch (error) {
+                    console.error('❌ Error creating/updating chart:', error);
+                }
+            };
+
+            // Re-initialize on Livewire navigation
+            document.addEventListener('livewire:navigated', function() {
+                console.log('🔄 livewire:navigated event fired');
+                if (window.machineStatusChartInstance) {
+                    window.machineStatusChartInstance.destroy();
+                    window.machineStatusChartInstance = null;
+                }
+            });
+        })();
+    </script>
+
+    @once
+        <script>
+            window.machineStatusAnalyticsCharts = window.machineStatusAnalyticsCharts || { donuts: {}, trend: null };
+
+            window.machineStatusAnalyticsDonut = function (config) {
+                return {
+                    chartId: config.chartId ?? 'primary',
+                    labels: config.labels ?? [],
+                    data: config.data ?? [],
+                    init() {
+                        this.render();
+                    },
+                    render() {
+                        this.$nextTick(() => {
+                            if (typeof Chart === 'undefined') {
+                                console.warn('Chart.js not available for analytics donut.');
+                                return;
+                            }
+
+                            const canvas = this.$refs.canvas;
+                            if (!canvas) {
+                                return;
+                            }
+
+                            const ctx = canvas.getContext('2d');
+                            const chartKey = `donut-${this.chartId}`;
+
+                            if (window.machineStatusAnalyticsCharts.donuts[chartKey]) {
+                                window.machineStatusAnalyticsCharts.donuts[chartKey].destroy();
+                            }
+
+                            window.machineStatusAnalyticsCharts.donuts[chartKey] = new Chart(ctx, {
+                                type: 'doughnut',
+                                data: {
+                                    labels: this.labels,
+                                    datasets: [{
+                                        data: this.data,
+                                        backgroundColor: ['#16a34a', '#7c3aed', '#f59e0b', '#2563eb', '#6b7280'],
+                                        borderWidth: 1,
+                                    }],
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: {
+                                        legend: {
+                                            position: 'bottom',
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: (context) => {
+                                                    const label = context.label || '';
+                                                    const value = context.raw ?? 0;
+                                                    return `${label}: ${value}%`;
+                                                },
+                                            },
+                                        },
+                                    },
+                                    cutout: '55%',
+                                },
+                            });
+                        });
+                    },
+                    destroy() {
+                        const chartKey = `donut-${this.chartId}`;
+                        if (window.machineStatusAnalyticsCharts.donuts[chartKey]) {
+                            window.machineStatusAnalyticsCharts.donuts[chartKey].destroy();
+                            delete window.machineStatusAnalyticsCharts.donuts[chartKey];
+                        }
+                    },
+                };
+            };
+
+            window.machineStatusAnalyticsTrend = function (config) {
+                return {
+                    labels: config.labels ?? [],
+                    primarySeries: config.primarySeries ?? {},
+                    comparisonSeries: config.comparisonSeries ?? null,
+                    comparisonEnabled: !!config.comparisonEnabled,
+                    init() {
+                        this.render();
+                    },
+                    render() {
+                        this.$nextTick(() => {
+                            if (typeof Chart === 'undefined') {
+                                console.warn('Chart.js not available for analytics trend.');
+                                return;
+                            }
+
+                            const canvas = this.$refs.canvas;
+                            if (!canvas) {
+                                return;
+                            }
+
+                            const ctx = canvas.getContext('2d');
+
+                            if (window.machineStatusAnalyticsCharts.trend) {
+                                window.machineStatusAnalyticsCharts.trend.destroy();
+                            }
+
+                            const palette = {
+                                running: '#16a34a',
+                                setup: '#7c3aed',
+                                hold: '#f59e0b',
+                                scheduled: '#2563eb',
+                                idle: '#6b7280',
+                            };
+
+                            const datasets = Object.keys(this.primarySeries).map((status) => ({
+                                label: `${status.charAt(0).toUpperCase() + status.slice(1)} (%)`,
+                                data: this.primarySeries[status] ?? [],
+                                borderColor: palette[status],
+                                backgroundColor: palette[status],
+                                tension: 0.3,
+                                fill: false,
+                                borderWidth: 2,
+                            }));
+
+                            if (this.comparisonEnabled && this.comparisonSeries) {
+                                Object.keys(this.comparisonSeries).forEach((status) => {
+                                    datasets.push({
+                                        label: `${status.charAt(0).toUpperCase() + status.slice(1)} (Comparison)`,
+                                        data: this.comparisonSeries[status] ?? [],
+                                        borderColor: palette[status],
+                                        backgroundColor: palette[status],
+                                        tension: 0.3,
+                                        fill: false,
+                                        borderWidth: 2,
+                                        borderDash: [6, 3],
+                                    });
+                                });
+                            }
+
+                            window.machineStatusAnalyticsCharts.trend = new Chart(ctx, {
+                                type: 'line',
+                                data: {
+                                    labels: this.labels,
+                                    datasets,
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    interaction: {
+                                        mode: 'index',
+                                        intersect: false,
+                                    },
+                                    stacked: false,
+                                    plugins: {
+                                        legend: {
+                                            position: 'bottom',
+                                        },
+                                        tooltip: {
+                                            callbacks: {
+                                                label: (context) => {
+                                                    const label = context.dataset.label || '';
+                                                    const value = context.parsed.y ?? 0;
+                                                    return `${label}: ${value}%`;
+                                                },
+                                            },
+                                        },
+                                    },
+                                    scales: {
+                                        y: {
+                                            min: 0,
+                                            max: 100,
+                                            ticks: {
+                                                callback: (value) => `${value}%`,
+                                            },
+                                            grid: {
+                                                color: 'rgba(148, 163, 184, 0.2)',
+                                            },
+                                        },
+                                        x: {
+                                            grid: {
+                                                color: 'rgba(148, 163, 184, 0.15)',
+                                            },
+                                        },
+                                    },
+                                },
+                            });
+                        });
+                    },
+                };
+            };
+        </script>
+    @endonce
 </x-filament-panels::page>

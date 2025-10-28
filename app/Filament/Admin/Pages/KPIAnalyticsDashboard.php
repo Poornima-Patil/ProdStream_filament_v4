@@ -75,6 +75,22 @@ class KPIAnalyticsDashboard extends Page implements HasForms
 
     public bool $idleExpanded = false;
 
+    public bool $matrixExpanded = true;
+
+    public bool $statusChartExpanded = true;
+
+    public bool $analyticsOverviewExpanded = true;
+
+    public bool $analyticsDonutExpanded = true;
+
+    public bool $analyticsDonutComparisonExpanded = true;
+
+    public bool $analyticsMatrixExpanded = true;
+
+    public bool $analyticsMatrixComparisonExpanded = true;
+
+    public bool $analyticsTrendExpanded = true;
+
     // Work Order Status pagination properties
     public int $woHoldPage = 1;
 
@@ -229,6 +245,35 @@ class KPIAnalyticsDashboard extends Page implements HasForms
             'assigned' => $this->woAssignedExpanded = ! $this->woAssignedExpanded,
             'completed' => $this->woCompletedExpanded = ! $this->woCompletedExpanded,
             'closed' => $this->woClosedExpanded = ! $this->woClosedExpanded,
+            default => null,
+        };
+    }
+
+    /**
+     * Toggle machine status matrix section
+     */
+    public function toggleMatrixSection(): void
+    {
+        $this->matrixExpanded = ! $this->matrixExpanded;
+    }
+
+    /**
+     * Toggle machine status breakdown chart section
+     */
+    public function toggleStatusChart(): void
+    {
+        $this->statusChartExpanded = ! $this->statusChartExpanded;
+    }
+
+    public function toggleAnalyticsSection(string $section): void
+    {
+        match ($section) {
+            'overview' => $this->analyticsOverviewExpanded = ! $this->analyticsOverviewExpanded,
+            'donut' => $this->analyticsDonutExpanded = ! $this->analyticsDonutExpanded,
+            'donutComparison' => $this->analyticsDonutComparisonExpanded = ! $this->analyticsDonutComparisonExpanded,
+            'matrix' => $this->analyticsMatrixExpanded = ! $this->analyticsMatrixExpanded,
+            'matrixComparison' => $this->analyticsMatrixComparisonExpanded = ! $this->analyticsMatrixComparisonExpanded,
+            'trend' => $this->analyticsTrendExpanded = ! $this->analyticsTrendExpanded,
             default => null,
         };
     }
